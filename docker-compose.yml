@@ -1,0 +1,30 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: tradeos
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}   # local dev only; production uses a managed secret
+      POSTGRES_DB: tradeos
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tradeos"]
+      interval: 3s
+      retries: 10
+
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://tradeos:${POSTGRES_PASSWORD}@db:5432/tradeos
+      SEC_USER_AGENT: ${SEC_USER_AGENT}
+      TIINGO_API_KEY: ${TIINGO_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-flash-latest}
+      EXPLAIN_PROVIDER: ${EXPLAIN_PROVIDER:-template}
+    ports: ["8000:8000"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:

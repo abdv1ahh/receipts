@@ -1,0 +1,38 @@
+{
+  "note": "ILLUSTRATIVE DESIGN FIXTURE — not live data. Assets and wallets are fictional. On-chain feeds arrive in the crypto expansion.",
+  "clusters": [
+    {
+      "asset": "DEMO",
+      "name": "Demo Protocol (illustrative)",
+      "pattern": "Smart-money wallet accumulation",
+      "wallets": 14,
+      "net_inflow_usd": 6800000,
+      "cohort": "labeled smart-money cohort",
+      "confidence": "high",
+      "sample_wallet": "0xDEMO…0000",
+      "detail": "14 labeled smart-money wallets net-accumulated over 48h while exchange balances fell — illustrative pattern only."
+    },
+    {
+      "asset": "EXMPL",
+      "name": "Example Network (illustrative)",
+      "pattern": "Exchange outflow spike",
+      "wallets": 9,
+      "net_inflow_usd": 2400000,
+      "cohort": "early-cycle accumulators",
+      "confidence": "medium",
+      "sample_wallet": "0xEXMPL…1111",
+      "detail": "Coordinated withdrawal to self-custody by a tracked cohort — illustrative."
+    },
+    {
+      "asset": "SMPL",
+      "name": "Sample Chain (illustrative)",
+      "pattern": "Stablecoin dry-powder buildup",
+      "wallets": 21,
+      "net_inflow_usd": 12500000,
+      "cohort": "market-maker adjacent",
+      "confidence": "medium",
+      "sample_wallet": "0xSMPL…2222",
+      "detail": "Rising stablecoin balances in wallets that historically precede accumulation — illustrative."
+    }
+  ]
+}

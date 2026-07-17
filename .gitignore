@@ -1,0 +1,25 @@
+# Secrets — never commit (holds SEC/Tiingo/Gemini keys and DB creds)
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Node / frontend build
+node_modules/
+frontend/dist/
+tradeos/static/
+
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Local scratch
+*.log

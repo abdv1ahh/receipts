@@ -1,0 +1,12 @@
+Description:           Master Index of EDGAR Dissemination Feed
+Last Data Received:    July 14, 2026
+Comments:             fictional test fixture
+CIK|Company Name|Form Type|Date Filed|Filename
+--------------------------------------------------------------------------------
+42|TESTFIXTURE CORP|4|2026-07-14|edgar/data/42/0000000001-26-000123.txt
+555|TESTFIXTURE CAPITAL LP|SCHEDULE 13D|2026-07-14|edgar/data/555/0000000555-26-000042.txt
+556|TESTFIXTURE PARTNERS LLC|SCHEDULE 13G|2026-07-14|edgar/data/556/0000000556-26-000011.txt
+557|TESTFIXTURE ACTIVIST LP|SCHEDULE 13D/A|2026-07-14|edgar/data/557/0000000557-26-000012.txt
+558|TESTFIXTURE INDEX FUND|SCHEDULE 13G/A|2026-07-14|edgar/data/558/0000000558-26-000013.txt
+900|TESTFIXTURE ADVISORS LLC|13F-HR|2026-07-14|edgar/data/900/0000000900-26-000007.txt
+901|TESTFIXTURE ADVISORS TWO LLC|13F-HR/A|2026-07-14|edgar/data/901/0000000901-26-000008.txt

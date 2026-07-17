@@ -1,0 +1,10 @@
+Description:           Master Index of EDGAR Dissemination Feed by Company Name
+Last Data Received:    July 10, 2026
+Comments:              webmaster@sec.gov
+
+CIK|Company Name|Form Type|Date Filed|Filename
+--------------------------------------------------------------------------------
+42|TESTFIXTURE CORP|4|2026-07-10|edgar/data/42/0000000001-26-000123.txt
+43|OTHERFIXTURE INC|10-K|2026-07-10|edgar/data/43/0000000002-26-000456.txt
+44|THIRDFIXTURE LLC|4/A|2026-07-10|edgar/data/44/0000000003-26-000789.txt
+45|FOURTHFIXTURE PLC|13F-HR|2026-07-10|edgar/data/45/0000000004-26-000111.txt

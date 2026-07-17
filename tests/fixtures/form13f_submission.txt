@@ -1,0 +1,94 @@
+<SEC-DOCUMENT>0000000900-26-000007.txt : 20260714
+<SEC-HEADER>0000000900-26-000007.hdr.sgml : 20260714
+<ACCEPTANCE-DATETIME>20260714094929
+ACCESSION NUMBER:		0000000900-26-000007
+CONFORMED SUBMISSION TYPE:	13F-HR
+PUBLIC DOCUMENT COUNT:		2
+CONFORMED PERIOD OF REPORT:	20260630
+FILED AS OF DATE:		20260714
+DATE AS OF CHANGE:		20260714
+EFFECTIVENESS DATE:		20260714
+
+FILER:
+
+	COMPANY DATA:
+		COMPANY CONFORMED NAME:			TESTFIXTURE ADVISORS LLC
+		CENTRAL INDEX KEY:			0000000900
+		STATE OF INCORPORATION:			DE
+		FISCAL YEAR END:			1231
+
+	FILING VALUES:
+		FORM TYPE:		13F-HR
+		SEC ACT:		1934 Act
+		SEC FILE NUMBER:	028-99999
+		FILM NUMBER:		260000009
+
+	BUSINESS ADDRESS:
+		STREET 1:		3 PRETEND PLAZA
+		CITY:			NOWHERE
+		STATE:			MA
+		ZIP:			00000
+</SEC-HEADER>
+<DOCUMENT>
+<TYPE>13F-HR
+<SEQUENCE>1
+<FILENAME>primary_doc.xml
+<TEXT>
+<XML>
+<?xml version="1.0" encoding="UTF-8"?>
+<edgarSubmission>
+  <headerData><submissionType>13F-HR</submissionType></headerData>
+</edgarSubmission>
+</XML>
+</TEXT>
+</DOCUMENT>
+<DOCUMENT>
+<TYPE>INFORMATION TABLE
+<SEQUENCE>2
+<FILENAME>infotable.xml
+<TEXT>
+<XML>
+<?xml version="1.0" encoding="UTF-8"?>
+<informationTable xmlns="http://www.sec.gov/edgar/document/thirteenf/informationtable">
+  <infoTable>
+    <nameOfIssuer>TESTFIXTURE CORP</nameOfIssuer>
+    <titleOfClass>COM</titleOfClass>
+    <cusip>00000E101</cusip>
+    <value>1000</value>
+    <shrsOrPrnAmt>
+      <sshPrnamt>10</sshPrnamt>
+      <sshPrnamtType>SH</sshPrnamtType>
+    </shrsOrPrnAmt>
+    <investmentDiscretion>SOLE</investmentDiscretion>
+    <votingAuthority><Sole>10</Sole><Shared>0</Shared><None>0</None></votingAuthority>
+  </infoTable>
+  <infoTable>
+    <nameOfIssuer>TESTFIXTURE CORP</nameOfIssuer>
+    <titleOfClass>COM</titleOfClass>
+    <cusip>00000E101</cusip>
+    <value>2000</value>
+    <shrsOrPrnAmt>
+      <sshPrnamt>20</sshPrnamt>
+      <sshPrnamtType>SH</sshPrnamtType>
+    </shrsOrPrnAmt>
+    <investmentDiscretion>DFND</investmentDiscretion>
+    <otherManager>2</otherManager>
+    <votingAuthority><Sole>0</Sole><Shared>0</Shared><None>20</None></votingAuthority>
+  </infoTable>
+  <infoTable>
+    <nameOfIssuer>TESTFIXTURE TWO INC</nameOfIssuer>
+    <titleOfClass>COM</titleOfClass>
+    <cusip>00000T202</cusip>
+    <value>500</value>
+    <shrsOrPrnAmt>
+      <sshPrnamt>5</sshPrnamt>
+      <sshPrnamtType>SH</sshPrnamtType>
+    </shrsOrPrnAmt>
+    <investmentDiscretion>SOLE</investmentDiscretion>
+    <votingAuthority><Sole>5</Sole><Shared>0</Shared><None>0</None></votingAuthority>
+  </infoTable>
+</informationTable>
+</XML>
+</TEXT>
+</DOCUMENT>
+</SEC-DOCUMENT>
