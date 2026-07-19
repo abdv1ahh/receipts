@@ -34,6 +34,45 @@ def symbols_for_clusters(conn: psycopg.Connection) -> list[str]:
     return symbols + ["SPY"]
 
 
+def symbols_for_clusters_missing(conn: psycopg.Connection) -> list[str]:
+    """Only the cluster symbols with NO prices yet — so a free-tier pull spends its limited
+    quota on new symbols instead of re-fetching ones already stored."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """SELECT DISTINCT m.symbol FROM signal_clusters c
+               JOIN security_map m ON m.entity_id = c.issuer_entity AND m.source = 'sec_company_tickers'
+               WHERE m.symbol IS NOT NULL
+                 AND NOT EXISTS (SELECT 1 FROM prices_eod p WHERE p.symbol = m.symbol)"""
+        )
+        missing = sorted({r[0] for r in cur.fetchall()})
+    with conn.cursor() as cur:
+        cur.execute("SELECT 1 FROM prices_eod WHERE symbol = 'SPY' LIMIT 1")
+        if not cur.fetchone():
+            missing.append("SPY")
+    return missing
+
+
+def symbols_for_clusters_missing_history(conn: psycopg.Connection, before: date) -> list[str]:
+    """Cluster symbols that have NO price row before `before` — i.e. still missing the deep
+    history the liquidity floor needs for pre-`before` as_of dates. A symbol already priced only
+    in the recent era counts as missing here, so a patient free-tier pass extends it back one batch
+    at a time (each fetched symbol gains pre-`before` rows and drops out of the next pass)."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """SELECT DISTINCT m.symbol FROM signal_clusters c
+               JOIN security_map m ON m.entity_id = c.issuer_entity AND m.source = 'sec_company_tickers'
+               WHERE m.symbol IS NOT NULL
+                 AND NOT EXISTS (SELECT 1 FROM prices_eod p WHERE p.symbol = m.symbol AND p.day < %s)""",
+            (before,),
+        )
+        missing = sorted({r[0] for r in cur.fetchall()})
+    with conn.cursor() as cur:
+        cur.execute("SELECT 1 FROM prices_eod WHERE symbol = 'SPY' AND day < %s LIMIT 1", (before,))
+        if not cur.fetchone():
+            missing.append("SPY")
+    return missing
+
+
 def _cluster_rows(conn: psycopg.Connection):
     with conn.cursor() as cur:
         cur.execute(

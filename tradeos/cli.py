@@ -146,10 +146,16 @@ def cmd_ingest_prices(args) -> None:
     client = TiingoClient(os.environ.get("TIINGO_API_KEY", ""))
     try:
         with db.connect() as conn:
-            if args.symbols_from_clusters:
+            if args.only_missing_history:
+                symbols = backtest.symbols_for_clusters_missing_history(conn, date.fromisoformat(args.history_before))
+            elif args.only_missing:
+                symbols = backtest.symbols_for_clusters_missing(conn)  # quota-efficient free-tier top-up
+            elif args.symbols_from_clusters:
                 symbols = backtest.symbols_for_clusters(conn)
             else:
                 symbols = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
+            if args.limit:
+                symbols = symbols[: args.limit]  # bound a pass so free-tier 429s don't stall it
             counters = ingest_prices(conn, client, symbols, start)
         print(f"ingest-prices: {counters}")
     finally:
@@ -284,6 +290,14 @@ def main() -> None:
 
     ip = sub.add_parser("ingest-prices")
     ip.add_argument("--symbols-from-clusters", action="store_true", dest="symbols_from_clusters")
+    ip.add_argument("--only-missing", action="store_true", dest="only_missing",
+                    help="only fetch cluster symbols with no prices yet (spend free-tier quota wisely)")
+    ip.add_argument("--only-missing-history", action="store_true", dest="only_missing_history",
+                    help="only fetch cluster symbols lacking price history before --history-before "
+                         "(patient deep-history backfill; pair with --start 2024-04-01)")
+    ip.add_argument("--history-before", default="2026-01-02",
+                    help="cutoff date for --only-missing-history: symbols with no price row before this")
+    ip.add_argument("--limit", type=int, default=0, help="cap symbols fetched this pass (0 = no cap)")
     ip.add_argument("--symbols", default="", help="comma-separated symbols if not --symbols-from-clusters")
     ip.add_argument("--start", default="2026-01-01")
     ip.set_defaults(fn=cmd_ingest_prices)
