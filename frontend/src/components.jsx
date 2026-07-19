@@ -98,8 +98,9 @@ export function Disclaimer() {
     <div className="disclaimer">
       TradeOS is an analytics and education platform. Nothing here is investment advice.
       Signals describe disclosed activity by third parties, with delays as labeled.
-      Confidence buckets are score-threshold placeholders labeled “Backtested calibration
-      pending” until backtested calibration lands (Slice 4).
+      Confidence buckets show a backtested hit rate wherever the resolved-episode sample is
+      sufficient, and read “insufficient sample” otherwise. Higher-conviction buckets remain
+      sample-limited by historical price coverage (free-tier data); those rates are pending, not claimed.
     </div>
   );
 }
