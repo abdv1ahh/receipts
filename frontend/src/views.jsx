@@ -1,7 +1,7 @@
 // Deep-dive, screener, and profile surfaces. Every figure carries its freshness; a filer is
 // a link into its profile; nothing evaluates a user's position (the advice line).
 import { useEffect, useState } from "react";
-import { addWatchlist, authLogin, authRegister, extractTickers, fetchActivity, fetchAsset, fetchExplanation, fetchInsider, fetchInstitution, fetchLibrary, fetchLibraryEntry, fetchScreener, fetchWatchlist, removeWatchlist } from "./api";
+import { addFollow, addWatchlist, authLogin, authRegister, extractTickers, fetchActivity, fetchAsset, fetchExplanation, fetchInsider, fetchInstitution, fetchLibrary, fetchLibraryEntry, fetchScreener, fetchWatchlist, removeWatchlist } from "./api";
 import { Backtested, Disclaimer, Freshness } from "./components.jsx";
 
 function fmtDetail(o) {
@@ -357,20 +357,29 @@ export function LibraryEntry({ slug, onBack, onOpenLibrary }) {
   );
 }
 
-export function ProfileView({ kind, id, onOpenSymbol, onBack }) {
+export function ProfileView({ kind, id, user, onOpenSymbol, onBack }) {
   const [data, setData] = useState(null);
+  const [followed, setFollowed] = useState(false);
   useEffect(() => {
-    setData(null);
+    setData(null); setFollowed(false);
     (kind === "insider" ? fetchInsider(id) : fetchInstitution(id)).then(setData).catch(() => setData({ found: false }));
   }, [kind, id]);
   if (!data) return <div className="detail"><div className="skel" style={{ width: 220 }} /></div>;
   if (data.found === false) return <div className="detail"><button className="back" onClick={onBack}>← back</button><div className="name" style={{ marginTop: 10 }}>profile not found.</div></div>;
 
+  const doFollow = async () => {
+    if (kind === "insider") await addFollow("insider", data.owner_cik, data.name);
+    else await addFollow("filer", String(id), data.name);
+    setFollowed(true);
+  };
   const Sym = ({ s }) => s ? <button className="linkish" onClick={() => onOpenSymbol(s)}>{s}</button> : <span>—</span>;
   return (
     <div className="detail">
       <button className="back" onClick={onBack}>← back</button>
-      <h2>{data.name}</h2>
+      <h2>
+        {data.name}
+        {user && <button className="act" style={{ marginLeft: 10, fontSize: 12, verticalAlign: "middle" }} onClick={doFollow}>{followed ? "following ✓" : "+ follow"}</button>}
+      </h2>
       <div className="meta">{kind === "insider" ? `insider · CIK ${data.owner_cik}` : `${data.kind} · CIK ${data.cik}`} · positioning from public filings only</div>
 
       {kind === "insider" ? (

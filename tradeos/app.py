@@ -12,15 +12,16 @@ from __future__ import annotations
 import logging
 import os
 import time
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import Cookie, FastAPI, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from psycopg.types.json import Json
 from pydantic import BaseModel
 
-from . import authn, db
+from . import apikeys, authn, billing, db, portfolio, presentation
 
 SESSION_COOKIE = "tos_session"
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").lower() == "true"  # true behind TLS in prod
@@ -36,6 +37,38 @@ class LoginReq(BaseModel):
     email: str
     password: str
     totp_code: str | None = None
+
+
+class FollowReq(BaseModel):
+    kind: str
+    ref: str
+    label: str | None = None
+
+
+class AlertPrefsReq(BaseModel):
+    new_high_conviction: bool
+    followed_activity: bool
+    min_score: int
+    email_enabled: bool
+
+
+class PortfolioReq(BaseModel):
+    name: str
+    kind: str = "manual"
+    buckets: list[str] | None = None
+
+
+class PositionReq(BaseModel):
+    symbol: str
+    opened_on: str | None = None
+
+
+class CheckoutReq(BaseModel):
+    plan: str
+
+
+class ApiKeyReq(BaseModel):
+    name: str | None = None
 
 
 def _set_session_cookie(response: Response, token: str) -> None:
@@ -227,6 +260,35 @@ def _staleness(event_time, knowable_time) -> dict:
     }
 
 
+def _voice_names(cur, contribution_lists: list[list[dict]]) -> dict[str, str]:
+    """Batch-resolve the display name behind every voice key across a set of clusters, in two
+    queries. Voice keys are 'insider:<cik>' (owner name) or 'filer:<entity_id>' (institution
+    name). Names come straight from the filings — nothing invented."""
+    ciks: set[str] = set()
+    filer_ids: set[int] = set()
+    for contribs in contribution_lists:
+        for c in contribs or []:
+            kind, _, ident = (c.get("voice") or "").partition(":")
+            if kind == "insider" and ident:
+                ciks.add(ident)
+            elif kind == "filer" and ident.isdigit():
+                filer_ids.add(int(ident))
+    names: dict[str, str] = {}
+    if ciks:
+        cur.execute(
+            "SELECT DISTINCT ON (owner_cik) owner_cik, owner_name FROM insider_transactions "
+            "WHERE owner_cik = ANY(%s) AND owner_name IS NOT NULL ORDER BY owner_cik, knowable_time DESC",
+            (list(ciks),),
+        )
+        for cik, nm in cur.fetchall():
+            names[f"insider:{cik}"] = nm
+    if filer_ids:
+        cur.execute("SELECT id, name FROM entities WHERE id = ANY(%s)", (list(filer_ids),))
+        for fid, nm in cur.fetchall():
+            names[f"filer:{fid}"] = nm
+    return names
+
+
 @app.get("/api/activity")
 def activity(symbol: str, limit: int = 200) -> dict:
     with db.connect() as conn, conn.cursor() as cur:
@@ -315,7 +377,8 @@ def clusters(as_of: str = "latest", min_confidence: str = "medium", source_class
             defver = dv
             out.append({
                 "issuer_entity": issuer, "symbol": symbol, "name": name,
-                "score": float(score), "confidence_bucket": bucket,
+                "score": float(score), "smart_money_score": presentation.smart_money_score(float(score)),
+                "confidence_bucket": bucket,
                 "voices": voices, "source_classes": classes, "definition_version": dv,
                 "freshest_contributing_knowable": fresh, "stalest_contributing_knowable": stale,
                 "above_liquidity_floor": floor == "true",
@@ -344,9 +407,12 @@ def _build_cluster_detail(cur, issuer_id: int, aso) -> dict:
         (classes,),
     )
     library_links = [{"slug": s, "title": t} for s, t in cur.fetchall()]
+    contributions = inputs.get("contributions", [])
+    story = presentation.cluster_story(contributions, _voice_names(cur, [contributions]))
     return {
         "found": True, "cluster_id": cid, "issuer_entity": issuer_id, "symbol": _symbol_for(cur, issuer_id),
         "name": name, "cik": cik, "as_of": aso2.isoformat(), "score": float(score),
+        "smart_money_score": presentation.smart_money_score(float(score)), "story": story,
         "confidence_bucket": bucket, "voices": voices,
         "source_classes": classes, "definition_version": inputs.get("definition_version"), "inputs": inputs,
         "library_links": library_links,
@@ -410,6 +476,161 @@ def definitions() -> dict:
                  "resolved-episode sample is sufficient (min 30 episodes), and read 'insufficient sample' "
                  "otherwise; higher-conviction buckets remain sample-limited by historical price coverage."),
     }
+
+
+@app.get("/api/home")
+def home(min_confidence: str = "medium", limit: int = 40, tos_session: str | None = Cookie(None)) -> dict:
+    """The consumer feed — "Smart Money Today". Today's convergences ranked by Smart Money
+    Score, each with the plain-language story of who is piling in (named where the filing makes
+    it public) and how fresh it is. Tier-delay aware (free sees the 48h-old set). Backtested
+    rates are attached client-side from /api/calibration; nothing here promises returns."""
+    min_rank = _BUCKET_RANK.get(min_confidence, 1)
+    limit = max(1, min(100, limit))
+    with db.connect() as conn, conn.cursor() as cur:
+        tier = _tier_of(conn, tos_session)
+        aso = _effective_as_of(cur, "latest", tier)
+        if aso is None:
+            return {"as_of": None, "tier": tier, "delayed_hours": authn.delay_hours(tier), "count": 0, "feed": []}
+        cur.execute(
+            """SELECT c.issuer_entity, e.name, c.score, c.confidence_bucket, c.voices, c.source_classes, c.inputs,
+                      (SELECT symbol FROM security_map m WHERE m.entity_id = c.issuer_entity
+                         AND m.source = 'sec_company_tickers' ORDER BY confidence DESC LIMIT 1)
+               FROM signal_clusters c JOIN entities e ON e.id = c.issuer_entity
+               WHERE c.as_of = %s ORDER BY c.score DESC""",
+            (aso,),
+        )
+        rows = [r for r in cur.fetchall() if _BUCKET_RANK[r[3]] >= min_rank][:limit]
+        names = _voice_names(cur, [(r[6] or {}).get("contributions", []) for r in rows])
+        feed = []
+        for issuer, name, score, bucket, voices, classes, inputs, symbol in rows:
+            story = presentation.cluster_story((inputs or {}).get("contributions", []), names)
+            feed.append({
+                "issuer_entity": issuer, "symbol": symbol, "name": name,
+                "smart_money_score": presentation.smart_money_score(float(score)),
+                "score": float(score), "confidence_bucket": bucket,
+                "voices": voices, "source_classes": classes,
+                "headline": story["headline"], "story": story,
+                "freshest_contributing_knowable": (inputs or {}).get("freshest_knowable"),
+                "stalest_contributing_knowable": (inputs or {}).get("stalest_knowable"),
+            })
+    return {"as_of": aso.isoformat(), "tier": tier, "delayed_hours": authn.delay_hours(tier),
+            "count": len(feed), "feed": feed}
+
+
+@app.get("/api/leaderboards")
+def leaderboards(tos_session: str | None = Cookie(None)) -> dict:
+    """Consumer leaderboards built only from public filings, anchored to the most recent data
+    actually on hand (not wall-clock), so windows are never empty and never overstated."""
+    with db.connect() as conn, conn.cursor() as cur:
+        tier = _tier_of(conn, tos_session)
+        cur.execute(
+            """SELECT t.issuer_entity, e.name,
+                      (SELECT symbol FROM security_map m WHERE m.entity_id=t.issuer_entity
+                         AND m.source='sec_company_tickers' ORDER BY confidence DESC LIMIT 1) AS symbol,
+                      count(DISTINCT t.owner_cik) AS buyers
+               FROM insider_transactions t JOIN entities e ON e.id=t.issuer_entity
+               WHERE t.transaction_code='P' AND t.acquired_disposed='A' AND t.issuer_entity IS NOT NULL
+                 AND t.knowable_time > (SELECT max(knowable_time) FROM insider_transactions) - interval '30 days'
+               GROUP BY t.issuer_entity, e.name HAVING count(DISTINCT t.owner_cik) >= 2
+               ORDER BY buyers DESC, e.name LIMIT 12""",
+        )
+        most_bought = [{"issuer_entity": i, "name": n, "symbol": s, "buyers": b} for i, n, s, b in cur.fetchall()]
+        cur.execute(
+            """SELECT s.filer_entity, f.name AS filer, s.issuer_entity, e.name AS issuer,
+                      (SELECT symbol FROM security_map m WHERE m.entity_id=s.issuer_entity
+                         AND m.source='sec_company_tickers' ORDER BY confidence DESC LIMIT 1) AS symbol,
+                      s.knowable_time
+               FROM stake_events s JOIN entities f ON f.id=s.filer_entity JOIN entities e ON e.id=s.issuer_entity
+               WHERE s.form_type='SCHEDULE 13D' AND s.issuer_entity IS NOT NULL
+               ORDER BY s.knowable_time DESC LIMIT 12""",
+        )
+        new_activist = [{"filer_entity": fe, "filer": f, "issuer_entity": ie, "issuer": iss,
+                         "symbol": sym, "knowable_time": kn.isoformat()}
+                        for fe, f, ie, iss, sym, kn in cur.fetchall()]
+        aso = _effective_as_of(cur, "latest", tier)
+        top = []
+        if aso is not None:
+            cur.execute(
+                """SELECT c.issuer_entity, e.name, c.score, c.confidence_bucket,
+                          (SELECT symbol FROM security_map m WHERE m.entity_id=c.issuer_entity
+                             AND m.source='sec_company_tickers' ORDER BY confidence DESC LIMIT 1)
+                   FROM signal_clusters c JOIN entities e ON e.id=c.issuer_entity
+                   WHERE c.as_of=%s ORDER BY c.score DESC LIMIT 12""",
+                (aso,),
+            )
+            top = [{"issuer_entity": i, "name": n, "symbol": s,
+                    "smart_money_score": presentation.smart_money_score(float(sc)), "confidence_bucket": b}
+                   for i, n, sc, b, s in cur.fetchall()]
+    return {"most_bought": most_bought, "new_activist_stakes": new_activist, "top_convergence": top,
+            "note": "Built from public SEC filings, anchored to the most recent data on hand. "
+                    "Counts and stakes are facts from the filings; nothing here is advice."}
+
+
+@app.get("/api/brief")
+def brief(tos_session: str | None = Cookie(None)) -> dict:
+    """The Daily Smart-Money Brief — an auto-composed digest of what smart money did, tier-delay
+    aware. Every figure is a fact from the filings; the intro is a deterministic template that
+    states counts, never a recommendation."""
+    with db.connect() as conn, conn.cursor() as cur:
+        tier = _tier_of(conn, tos_session)
+        aso = _effective_as_of(cur, "latest", tier)
+        top: list[dict] = []
+        if aso is not None:
+            cur.execute(
+                """SELECT c.issuer_entity, e.name, c.score, c.confidence_bucket, c.inputs,
+                          (SELECT symbol FROM security_map m WHERE m.entity_id=c.issuer_entity
+                             AND m.source='sec_company_tickers' ORDER BY confidence DESC LIMIT 1)
+                   FROM signal_clusters c JOIN entities e ON e.id=c.issuer_entity
+                   WHERE c.as_of=%s ORDER BY c.score DESC LIMIT 6""",
+                (aso,),
+            )
+            rows = cur.fetchall()
+            names = _voice_names(cur, [(r[4] or {}).get("contributions", []) for r in rows])
+            for ent, name, score, bucket, inputs, sym in rows:
+                story = presentation.cluster_story((inputs or {}).get("contributions", []), names)
+                top.append({"issuer_entity": ent, "symbol": sym, "name": name,
+                            "smart_money_score": presentation.smart_money_score(float(score)),
+                            "confidence_bucket": bucket, "headline": story["headline"]})
+        cur.execute(
+            """SELECT t.owner_name, t.issuer_entity, e.name,
+                      (SELECT symbol FROM security_map m WHERE m.entity_id=t.issuer_entity
+                         AND m.source='sec_company_tickers' ORDER BY confidence DESC LIMIT 1),
+                      round(sum(t.shares * t.price_per_share)) AS value_usd, t.knowable_time::date AS day
+               FROM insider_transactions t JOIN entities e ON e.id=t.issuer_entity
+               WHERE t.transaction_code='P' AND t.acquired_disposed='A'
+                 AND t.shares IS NOT NULL AND t.price_per_share IS NOT NULL AND t.issuer_entity IS NOT NULL
+                 AND t.knowable_time <= COALESCE(%s, now())
+                 AND t.knowable_time > (SELECT max(knowable_time) FROM insider_transactions) - interval '30 days'
+               GROUP BY t.owner_name, t.issuer_entity, e.name, t.knowable_time::date
+               ORDER BY value_usd DESC LIMIT 40""",
+            (aso,),
+        )
+        biggest_buys, seen_issuers = [], set()  # one row per company (the largest buy) for variety
+        for nm, ent, name, sym, v, d in cur.fetchall():
+            if ent in seen_issuers:
+                continue
+            seen_issuers.add(ent)
+            biggest_buys.append({"insider": nm, "issuer_entity": ent, "name": name, "symbol": sym,
+                                 "value_usd": float(v) if v is not None else None, "date": d.isoformat()})
+            if len(biggest_buys) >= 6:
+                break
+        cur.execute(
+            """SELECT s.filer_entity, f.name, s.issuer_entity, e.name,
+                      (SELECT symbol FROM security_map m WHERE m.entity_id=s.issuer_entity
+                         AND m.source='sec_company_tickers' ORDER BY confidence DESC LIMIT 1), s.knowable_time::date
+               FROM stake_events s JOIN entities f ON f.id=s.filer_entity JOIN entities e ON e.id=s.issuer_entity
+               WHERE s.form_type='SCHEDULE 13D' AND s.issuer_entity IS NOT NULL
+               ORDER BY s.knowable_time DESC LIMIT 6""",
+        )
+        new_activist = [{"filer_entity": fe, "filer": f, "issuer_entity": ie, "issuer": iss,
+                         "symbol": sym, "date": d.isoformat()} for fe, f, ie, iss, sym, d in cur.fetchall()]
+    lead = top[0] if top else None
+    intro = (f"{len(top)} name{'s' if len(top) != 1 else ''} show smart-money convergence right now"
+             + (f", led by {lead['symbol'] or lead['name']} (score {lead['smart_money_score']})." if lead else ".")
+             + " Below: the biggest recent insider buys and the newest activist stakes. Each name carries"
+             + " its backtested rate; nothing here is investment advice.")
+    return {"as_of": aso.isoformat() if aso else None, "tier": tier, "delayed_hours": authn.delay_hours(tier),
+            "intro": intro, "top_convergences": top, "biggest_buys": biggest_buys, "new_activist_stakes": new_activist}
 
 
 @app.get("/api/asset/{symbol}")
@@ -575,6 +796,398 @@ def watchlist_remove(symbol: str, user: str = "demo") -> dict:
     return {"user": user, "symbol": symbol.strip().upper(), "removed": True}
 
 
+# ------------------------------------------------------------ follows / alerts (Slice B)
+# All per-user surfaces enforce object-level authorization: every read and write is scoped to the
+# session's user_id, so no id in the URL or body can reach another account's follows or alerts.
+
+@app.get("/api/follows")
+def follows_list(tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            return {"authenticated": False, "follows": []}
+        cur.execute("SELECT id, kind, ref, label, created_at FROM follows WHERE user_id=%s ORDER BY created_at DESC",
+                    (user["id"],))
+        follows = [{"id": i, "kind": k, "ref": r, "label": l, "created_at": ca.isoformat()}
+                   for i, k, r, l, ca in cur.fetchall()]
+    return {"authenticated": True, "follows": follows}
+
+
+@app.post("/api/follows")
+def follows_add(req: FollowReq, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    if req.kind not in ("symbol", "insider", "filer"):
+        response.status_code = 400
+        return {"error": "invalid follow kind"}
+    ref = req.ref.strip()
+    ref = ref.upper() if req.kind == "symbol" else ref
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "log in to follow and get alerts"}
+        max_follows = billing.entitlements(user["tier"])["max_follows"]
+        cur.execute("SELECT count(*) FROM follows WHERE user_id=%s", (user["id"],))
+        if cur.fetchone()[0] >= max_follows:
+            response.status_code = 403
+            return {"error": f"Your plan allows {max_follows} follows. Upgrade for more.", "upgrade": True}
+        cur.execute(
+            "INSERT INTO follows (user_id, kind, ref, label) VALUES (%s,%s,%s,%s) "
+            "ON CONFLICT (user_id, kind, ref) DO NOTHING RETURNING id",
+            (user["id"], req.kind, ref, (req.label or "").strip() or None),
+        )
+        row = cur.fetchone()
+        conn.commit()
+    return {"followed": True, "kind": req.kind, "ref": ref, "id": row[0] if row else None}
+
+
+@app.delete("/api/follows/{follow_id}")
+def follows_remove(follow_id: int, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "not authenticated"}
+        cur.execute("DELETE FROM follows WHERE id=%s AND user_id=%s", (follow_id, user["id"]))  # object-level check
+        conn.commit()
+        removed = cur.rowcount
+    return {"removed": bool(removed)}
+
+
+@app.get("/api/notifications")
+def notifications_list(limit: int = 50, tos_session: str | None = Cookie(None)) -> dict:
+    limit = max(1, min(100, limit))
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            return {"authenticated": False, "unread": 0, "notifications": []}
+        cur.execute(
+            """SELECT id, kind, title, body, symbol, entity_id, created_at, read_at
+               FROM notifications WHERE user_id=%s ORDER BY created_at DESC LIMIT %s""",
+            (user["id"], limit),
+        )
+        items = [{"id": i, "kind": k, "title": t, "body": b, "symbol": s, "entity_id": e,
+                  "created_at": ca.isoformat(), "read": ra is not None}
+                 for i, k, t, b, s, e, ca, ra in cur.fetchall()]
+        cur.execute("SELECT count(*) FROM notifications WHERE user_id=%s AND read_at IS NULL", (user["id"],))
+        unread = cur.fetchone()[0]
+    return {"authenticated": True, "unread": unread, "notifications": items}
+
+
+@app.post("/api/notifications/read")
+def notifications_read(response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "not authenticated"}
+        cur.execute("UPDATE notifications SET read_at=now() WHERE user_id=%s AND read_at IS NULL", (user["id"],))
+        conn.commit()
+        marked = cur.rowcount
+    return {"marked_read": marked}
+
+
+@app.get("/api/alert-prefs")
+def alert_prefs_get(tos_session: str | None = Cookie(None)) -> dict:
+    from .alerts import DEFAULT_PREFS
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            return {"authenticated": False, "prefs": dict(DEFAULT_PREFS)}
+        cur.execute("SELECT new_high_conviction, followed_activity, min_score, email_enabled FROM alert_prefs WHERE user_id=%s",
+                    (user["id"],))
+        r = cur.fetchone()
+        prefs = ({"new_high_conviction": r[0], "followed_activity": r[1], "min_score": r[2], "email_enabled": r[3]}
+                 if r else dict(DEFAULT_PREFS))
+    return {"authenticated": True, "prefs": prefs}
+
+
+@app.put("/api/alert-prefs")
+def alert_prefs_set(req: AlertPrefsReq, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    ms = max(0, min(100, req.min_score))
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "not authenticated"}
+        cur.execute(
+            """INSERT INTO alert_prefs (user_id, new_high_conviction, followed_activity, min_score, email_enabled, updated_at)
+               VALUES (%s,%s,%s,%s,%s, now())
+               ON CONFLICT (user_id) DO UPDATE SET new_high_conviction=EXCLUDED.new_high_conviction,
+                   followed_activity=EXCLUDED.followed_activity, min_score=EXCLUDED.min_score,
+                   email_enabled=EXCLUDED.email_enabled, updated_at=now()""",
+            (user["id"], req.new_high_conviction, req.followed_activity, ms, req.email_enabled),
+        )
+        conn.commit()
+    return {"saved": True, "prefs": {"new_high_conviction": req.new_high_conviction,
+            "followed_activity": req.followed_activity, "min_score": ms, "email_enabled": req.email_enabled}}
+
+
+# ------------------------------------------------------------ paper portfolios (Slice C)
+
+def _default_opened_on(cur, symbol: str, entity_id: int | None):
+    """Entry for a paper position: the name's first convergence date if it has one (shadow from
+    the signal), else ~90 days before its latest price so there is a real window, else today."""
+    if entity_id is not None:
+        cur.execute("SELECT min(as_of)::date FROM signal_clusters WHERE issuer_entity=%s", (entity_id,))
+        r = cur.fetchone()
+        if r and r[0]:
+            return r[0]
+    cur.execute("SELECT max(day) FROM prices_eod WHERE symbol=%s", (symbol,))
+    r = cur.fetchone()
+    if r and r[0]:
+        return r[0] - timedelta(days=90)
+    return datetime.now(timezone.utc).date()
+
+
+@app.post("/api/portfolios")
+def portfolio_create(req: PortfolioReq, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    kind = req.kind if req.kind in ("manual", "shadow_bucket") else "manual"
+    buckets = [b for b in (req.buckets or ["high", "medium"]) if b in ("low", "medium", "high")] or ["high", "medium"]
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "log in to build a portfolio"}
+        max_p = billing.entitlements(user["tier"])["max_portfolios"]
+        cur.execute("SELECT count(*) FROM portfolios WHERE user_id=%s", (user["id"],))
+        if cur.fetchone()[0] >= max_p:
+            response.status_code = 403
+            return {"error": f"Your plan allows {max_p} portfolio(s). Upgrade for more.", "upgrade": True}
+        spec = {"buckets": buckets} if kind == "shadow_bucket" else {}
+        cur.execute("INSERT INTO portfolios (user_id, name, kind, spec) VALUES (%s,%s,%s,%s) RETURNING id",
+                    (user["id"], (req.name.strip()[:80] or "Portfolio"), kind, Json(spec)))
+        pid = cur.fetchone()[0]
+        conn.commit()
+    added = 0
+    if kind == "shadow_bucket":
+        with db.connect() as conn:
+            added = portfolio.populate_shadow(conn, pid, buckets)
+    return {"created": True, "id": pid, "kind": kind, "positions_added": added}
+
+
+@app.get("/api/portfolios")
+def portfolios_list(tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            return {"authenticated": False, "portfolios": []}
+        return {"authenticated": True, "portfolios": portfolio.list_for_user(conn, user["id"])}
+
+
+@app.get("/api/portfolios/{pid}")
+def portfolio_get(pid: int, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            return {"found": False, "authenticated": False}
+        return portfolio.detail(conn, pid, user["id"])  # scoped to user_id inside
+
+
+@app.post("/api/portfolios/{pid}/positions")
+def portfolio_add_position(pid: int, req: PositionReq, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    sym = req.symbol.strip().upper()
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "not authenticated"}
+        cur.execute("SELECT 1 FROM portfolios WHERE id=%s AND user_id=%s", (pid, user["id"]))
+        if not cur.fetchone():
+            response.status_code = 404
+            return {"error": "portfolio not found"}
+        ent = _resolve_symbol(cur, sym)
+        entity_id = ent[0] if ent else None
+        if req.opened_on:
+            try:
+                opened = date.fromisoformat(req.opened_on)
+            except ValueError:
+                response.status_code = 400
+                return {"error": "opened_on must be YYYY-MM-DD"}
+        else:
+            opened = _default_opened_on(cur, sym, entity_id)
+        cur.execute("INSERT INTO portfolio_positions (portfolio_id, symbol, entity_id, opened_on) "
+                    "VALUES (%s,%s,%s,%s) ON CONFLICT (portfolio_id, symbol) DO NOTHING RETURNING id",
+                    (pid, sym, entity_id, opened))
+        row = cur.fetchone()
+        conn.commit()
+    return {"added": bool(row), "symbol": sym, "opened_on": opened.isoformat()}
+
+
+@app.delete("/api/portfolios/{pid}")
+def portfolio_delete(pid: int, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "not authenticated"}
+        cur.execute("DELETE FROM portfolios WHERE id=%s AND user_id=%s", (pid, user["id"]))
+        conn.commit()
+        return {"removed": bool(cur.rowcount)}
+
+
+@app.delete("/api/portfolios/{pid}/positions/{pos_id}")
+def portfolio_remove_position(pid: int, pos_id: int, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "not authenticated"}
+        cur.execute("DELETE FROM portfolio_positions p USING portfolios pf "
+                    "WHERE p.id=%s AND p.portfolio_id=pf.id AND pf.id=%s AND pf.user_id=%s",
+                    (pos_id, pid, user["id"]))
+        conn.commit()
+        return {"removed": bool(cur.rowcount)}
+
+
+@app.get("/api/track-record")
+def track_record() -> dict:
+    """Live public track record: the realized excess return vs SPY of shadowing each convergence
+    bucket, straight from the backtest. Published even when unflattering — calibration is the brand."""
+    from .backtest.run import compute_calibration
+    with db.connect() as conn:
+        cal = compute_calibration(conn)
+    return {"per_bucket": cal["per_bucket"], "horizons": cal.get("horizons", [30, 90, 180]),
+            "episodes_total": cal.get("episodes_total"),
+            "note": "The realized excess return vs SPY of shadowing each convergence bucket, updated as "
+                    "episodes resolve. Buckets under 30 resolved episodes read 'insufficient sample'. We "
+                    "publish this even when it is unflattering. Nothing here is advice or a promise of future results."}
+
+
+# ------------------------------------------------------------ billing + Pro API (Slice D)
+
+@app.get("/api/billing/plans")
+def billing_plans(tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        sub = billing.current_subscription(conn, user["id"]) if user else {"plan": "free", "status": "active"}
+    plans = [{"id": k, "name": v["name"], "price": v["price"], "tier": v["tier"],
+              "entitlements": billing.ENTITLEMENTS[v["tier"]]} for k, v in billing.PLANS.items()]
+    return {"plans": plans, "current": sub, "provider_configured": billing.provider_configured(),
+            "authenticated": bool(user)}
+
+
+@app.post("/api/billing/checkout")
+def billing_checkout(req: CheckoutReq, request: Request, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "log in to upgrade"}
+        out = billing.create_checkout(conn, user, req.plan, str(request.base_url).rstrip("/"))
+    if out.get("error"):
+        response.status_code = 400
+    return out
+
+
+@app.post("/api/billing/test-activate")
+def billing_test_activate(req: CheckoutReq, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "not authenticated"}
+        out = billing.test_activate(conn, user, req.plan)
+    if out.get("error"):
+        response.status_code = 403
+    return out
+
+
+@app.post("/api/billing/cancel")
+def billing_cancel(response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "not authenticated"}
+        return billing.cancel(conn, user)
+
+
+@app.post("/api/billing/webhook")
+async def billing_webhook(request: Request) -> JSONResponse:
+    body = await request.body()
+    with db.connect() as conn:
+        out = billing.handle_webhook(conn, body, request.headers.get("stripe-signature"))
+    return JSONResponse(out, status_code=200 if out.get("ok") else 400)
+
+
+@app.post("/api/keys")
+def keys_create(req: ApiKeyReq, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "not authenticated"}
+        if not billing.entitlements(user["tier"])["api"]:
+            response.status_code = 403
+            return {"error": "API access requires the Pro plan", "upgrade": True}
+        out = apikeys.generate(conn, user["id"], req.name)
+        authn.audit(conn, user["email"], "api_key_create", out["prefix"])
+    return out
+
+
+@app.get("/api/keys")
+def keys_list(tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            return {"authenticated": False, "api_enabled": False, "keys": []}
+        return {"authenticated": True, "api_enabled": billing.entitlements(user["tier"])["api"],
+                "keys": apikeys.list_keys(conn, user["id"])}
+
+
+@app.delete("/api/keys/{key_id}")
+def keys_revoke(key_id: int, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "not authenticated"}
+        return {"revoked": apikeys.revoke(conn, user["id"], key_id)}
+
+
+@app.get("/api/v1/clusters")
+def v1_clusters(request: Request, min_confidence: str = "medium", limit: int = 50) -> JSONResponse:
+    """The Pro data API. Authenticated by a scoped, hashed API key (Bearer). Every response carries
+    a per-key `meta.trace` canary so a resold dataset is traceable to the leaking key."""
+    auth = request.headers.get("authorization", "")
+    raw = auth[7:].strip() if auth[:7].lower() == "bearer " else None
+    min_rank = _BUCKET_RANK.get(min_confidence, 1)
+    limit = max(1, min(200, limit))
+    with db.connect() as conn:
+        key = apikeys.verify(conn, raw)
+        if not key:
+            return JSONResponse({"error": "invalid or missing API key"}, status_code=401)
+        if key["tier"] not in ("pro", "admin"):
+            return JSONResponse({"error": "API access requires the Pro plan"}, status_code=403)
+        if not apikeys.rate_ok(key["id"]):
+            return JSONResponse({"error": "rate limit exceeded"}, status_code=429)
+        rows: list[dict] = []
+        with conn.cursor() as cur:
+            aso = _effective_as_of(cur, "latest", key["tier"])
+            if aso is not None:
+                cur.execute(
+                    """SELECT c.issuer_entity, e.name, c.score, c.confidence_bucket, c.voices, c.source_classes,
+                              (SELECT symbol FROM security_map m WHERE m.entity_id=c.issuer_entity
+                                 AND m.source='sec_company_tickers' ORDER BY confidence DESC LIMIT 1)
+                       FROM signal_clusters c JOIN entities e ON e.id=c.issuer_entity
+                       WHERE c.as_of=%s ORDER BY c.score DESC""",
+                    (aso,),
+                )
+                for ent, name, score, bucket, voices, classes, sym in cur.fetchall():
+                    if _BUCKET_RANK[bucket] < min_rank:
+                        continue
+                    rows.append({"symbol": sym, "name": name,
+                                 "smart_money_score": presentation.smart_money_score(float(score)),
+                                 "score": float(score), "confidence_bucket": bucket,
+                                 "voices": voices, "source_classes": classes})
+                    if len(rows) >= limit:
+                        break
+        trace = apikeys.canary_trace(key["canary"], date.today().isoformat())
+    return JSONResponse({"as_of": aso.isoformat() if aso else None, "count": len(rows), "clusters": rows,
+                         "meta": {"trace": trace, "plan": key["tier"],
+                                  "terms": "Licensed to your account. Redistribution is traceable via meta.trace."}})
+
+
 @app.get("/api/library")
 def library() -> dict:
     with db.connect() as conn, conn.cursor() as cur:
@@ -600,6 +1213,62 @@ def library_entry(slug: str) -> dict:
         return {"found": False, "slug": slug}
     return {"found": True, "slug": r[0], "kind": r[1], "title": r[2], "body_md": r[3],
             "sources": r[4], "linked_source_classes": r[5], "review_status": r[6]}
+
+
+# --------------------------------------------------------------- shareable cards (Slice C)
+
+def _card_data(cur, symbol: str) -> dict | None:
+    ent = _resolve_symbol(cur, symbol)
+    if ent is None:
+        return None
+    eid, _cik, name = ent
+    aso = _effective_as_of(cur, "latest", "free")  # a public card uses the free (delayed) view
+    r = None
+    if aso is not None:
+        cur.execute("SELECT score, confidence_bucket, inputs FROM signal_clusters WHERE issuer_entity=%s AND as_of=%s",
+                    (eid, aso))
+        r = cur.fetchone()
+    if not r:
+        return {"symbol": symbol, "name": name, "score": None, "bucket": None,
+                "headline": "No active convergence right now"}
+    score, bucket, inputs = r
+    contribs = (inputs or {}).get("contributions", [])
+    story = presentation.cluster_story(contribs, _voice_names(cur, [contribs]))
+    return {"symbol": symbol, "name": name, "score": presentation.smart_money_score(float(score)),
+            "bucket": bucket, "headline": story["headline"]}
+
+
+@app.get("/api/card/{symbol}.svg")
+def card_svg(symbol: str) -> Response:
+    sym = symbol.strip().upper()
+    with db.connect() as conn, conn.cursor() as cur:
+        d = _card_data(cur, sym) or {"symbol": sym, "name": "", "score": None, "bucket": None,
+                                     "headline": "Not a resolved issuer"}
+    svg = presentation.score_card_svg(d["symbol"], d["name"], d["score"], d["bucket"], d["headline"])
+    return Response(content=svg, media_type="image/svg+xml", headers={"Cache-Control": "public, max-age=300"})
+
+
+@app.get("/s/{symbol}", response_class=HTMLResponse)
+def share_page(symbol: str) -> str:
+    sym = symbol.strip().upper()
+    with db.connect() as conn, conn.cursor() as cur:
+        d = _card_data(cur, sym) or {"symbol": sym, "name": "", "score": None, "headline": "Not a resolved issuer"}
+    e = presentation._xml_escape
+    title = f"{sym} · Smart Money Score {d['score']}" if d.get("score") is not None else f"{sym} · TradeOS"
+    card = f"/api/card/{sym}.svg"
+    return f'''<!doctype html><html lang="en"><head><meta charset="utf-8">
+<title>{e(title)}</title>
+<meta property="og:title" content="{e(title)}">
+<meta property="og:description" content="{e(d.get('headline') or '')}">
+<meta property="og:image" content="{card}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>body{{background:#090b11;color:#d7e0ee;font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:flex;flex-direction:column;align-items:center;gap:22px;padding:44px 16px}}img{{max-width:100%;width:640px;border-radius:16px;border:1px solid #222b3a}}a{{color:#5b8cff;text-decoration:none;font-weight:600;font-size:18px}}p{{color:#7a8699;font-size:13px;max-width:560px;text-align:center;line-height:1.5}}</style>
+</head><body>
+<img src="{card}" alt="{e(title)}">
+<a href="/?symbol={e(sym)}">Open {e(sym)} on TradeOS &#8594;</a>
+<p>TradeOS shows what the smartest money is quietly doing, with backtested, probability-framed context. Not investment advice.</p>
+</body></html>'''
 
 
 # ------------------------------------------------------------------- frontend (SPA)

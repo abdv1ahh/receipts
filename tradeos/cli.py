@@ -19,7 +19,7 @@ import logging
 import os
 from datetime import date, datetime, time, timedelta, timezone
 
-from . import authn, db
+from . import alerts, authn, db
 from .config import sec_user_agent
 from .ingestion import form13f, schedule13
 from .ingestion.edgar_client import EdgarClient
@@ -197,6 +197,11 @@ def cmd_sync_library(_args) -> None:
         print(f"sync-library: {sync_library(conn)}")
 
 
+def cmd_generate_alerts(_args) -> None:
+    with db.connect() as conn:
+        print(f"generate-alerts: {alerts.generate_alerts(conn)}")
+
+
 def cmd_seed_admin(args) -> None:
     import getpass
     import pyotp
@@ -309,6 +314,7 @@ def main() -> None:
     sub.add_parser("run-backtest").set_defaults(fn=cmd_run_backtest)
     sub.add_parser("calibration").set_defaults(fn=cmd_calibration)
     sub.add_parser("sync-library").set_defaults(fn=cmd_sync_library)
+    sub.add_parser("generate-alerts").set_defaults(fn=cmd_generate_alerts)
 
     sa = sub.add_parser("seed-admin")
     sa.add_argument("--email", required=True)

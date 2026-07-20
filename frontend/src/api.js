@@ -6,6 +6,9 @@ async function get(path) {
   return res.json();
 }
 
+export const fetchHome = (minConfidence = "medium") =>
+  get(`/api/home?min_confidence=${encodeURIComponent(minConfidence)}`);
+export const fetchLeaderboards = () => get("/api/leaderboards");
 export const fetchClusters = (minConfidence) =>
   get(`/api/clusters?as_of=latest&min_confidence=${encodeURIComponent(minConfidence)}`);
 export const fetchClusterDetail = (issuerId) => get(`/api/clusters/${issuerId}?as_of=latest`);
@@ -30,6 +33,36 @@ export async function extractTickers(file) {
   return res.json();
 }
 const post = (path, body) => fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then((r) => r.json());
+export const fetchFollows = () => get("/api/follows");
+export const addFollow = (kind, ref, label) => post("/api/follows", { kind, ref, label });
+export const removeFollow = (id) => fetch(`/api/follows/${id}`, { method: "DELETE" }).then((r) => r.json());
+export const fetchNotifications = () => get("/api/notifications");
+export const markNotificationsRead = () => fetch("/api/notifications/read", { method: "POST" }).then((r) => r.json());
+export const fetchAlertPrefs = () => get("/api/alert-prefs");
+export const saveAlertPrefs = (prefs) => fetch("/api/alert-prefs", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(prefs) }).then((r) => r.json());
+export const fetchBrief = () => get("/api/brief");
+export const fetchPortfolios = () => get("/api/portfolios");
+export const getPortfolio = (id) => get(`/api/portfolios/${id}`);
+export const createPortfolio = (name, kind, buckets) => post("/api/portfolios", { name, kind, buckets: buckets || null });
+export const addPosition = (id, symbol, opened_on) => post(`/api/portfolios/${id}/positions`, { symbol, opened_on: opened_on || null });
+export const deletePortfolio = (id) => fetch(`/api/portfolios/${id}`, { method: "DELETE" }).then((r) => r.json());
+export const removePosition = (id, posId) => fetch(`/api/portfolios/${id}/positions/${posId}`, { method: "DELETE" }).then((r) => r.json());
+export const fetchTrackRecord = () => get("/api/track-record");
+// Quick-shadow one name into a default "My shadows" portfolio (create it if needed).
+export async function shadowSymbol(symbol) {
+  const d = await fetchPortfolios();
+  if (d.authenticated === false) return { error: "login" };
+  let p = (d.portfolios || []).find((x) => x.name === "My shadows");
+  if (!p) { const c = await createPortfolio("My shadows", "manual"); p = { id: c.id }; }
+  return addPosition(p.id, symbol);
+}
+export const fetchPlans = () => get("/api/billing/plans");
+export const checkout = (plan) => post("/api/billing/checkout", { plan });
+export const testActivate = (plan) => post("/api/billing/test-activate", { plan });
+export const cancelSub = () => fetch("/api/billing/cancel", { method: "POST" }).then((r) => r.json());
+export const fetchKeys = () => get("/api/keys");
+export const createKey = (name) => post("/api/keys", { name });
+export const revokeKey = (id) => fetch(`/api/keys/${id}`, { method: "DELETE" }).then((r) => r.json());
 export const authMe = () => get("/api/auth/me");
 export const authLogin = (email, password, totp_code) => post("/api/auth/login", { email, password, totp_code: totp_code || null });
 export const authRegister = (email, password, invite_code) => post("/api/auth/register", { email, password, invite_code });
