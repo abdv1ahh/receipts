@@ -56,6 +56,7 @@ export async function shadowSymbol(symbol) {
   if (!p) { const c = await createPortfolio("My shadows", "manual"); p = { id: c.id }; }
   return addPosition(p.id, symbol);
 }
+export const fetchOnboarding = () => get("/api/onboarding");
 export const fetchReferral = () => get("/api/referral");
 export const fetchPlans = () => get("/api/billing/plans");
 export const checkout = (plan) => post("/api/billing/checkout", { plan });

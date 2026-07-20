@@ -135,6 +135,7 @@ export default function App() {
       {view === "home" ? (
         <Home calibration={calibration} horizon={horizon} minC={minC} user={user}
               onLogin={() => { setView("auth"); setDetail(null); }}
+              onNav={(v) => { setView(v); setDetail(null); }}
               onOpenSymbol={openSymbol}
               onOpenDetail={(id) => { setView("dashboard"); openDetail(id); }}
               onOpenProfile={openProfile} />

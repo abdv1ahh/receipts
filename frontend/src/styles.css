@@ -321,3 +321,16 @@ table.clusters { width: 100%; border-collapse: collapse; }
 .plan .act { text-align: center; }
 .key-fresh { margin-top: 10px; background: #0f2417; border: 1px solid #2f4a2f; border-radius: 8px; padding: 10px 12px; font-size: 12.5px; color: var(--green); word-break: break-all; }
 .key-fresh code { color: #eaf0fb; }
+
+/* ------------------------------------------------------------------ onboarding */
+.onboard { background: linear-gradient(180deg, rgba(91,140,255,0.10), var(--panel-2)); border: 1px solid #2a3a5a; border-radius: 14px; padding: 14px 16px; margin-bottom: 14px; }
+.onboard-head { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.onboard-bar { height: 6px; background: var(--panel-2); border-radius: 999px; overflow: hidden; margin: 10px 0; }
+.onboard-bar > div { height: 100%; background: linear-gradient(92deg, var(--accent), var(--accent2)); transition: width .3s; }
+.onboard-step { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: none; border: 0; padding: 7px 2px; color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
+.onboard-step:hover:not(:disabled) { color: #fff; }
+.onboard-step:disabled { color: var(--muted); cursor: default; }
+.onboard-check { width: 22px; height: 22px; border-radius: 999px; border: 1px solid var(--border); display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex: none; }
+.onboard-on .onboard-check { background: rgba(51,209,122,0.16); border-color: rgba(51,209,122,0.5); color: var(--green); }
+.nudge { border: 0; cursor: pointer; }
+.nudge:hover { filter: brightness(1.18); }

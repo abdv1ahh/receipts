@@ -182,6 +182,27 @@ def auth_me(tos_session: str | None = Cookie(None)) -> dict:
         return {"user": authn.session_user(conn, tos_session)}
 
 
+@app.get("/api/onboarding")
+def onboarding(tos_session: str | None = Cookie(None)) -> dict:
+    """Per-user activation progress, so a new account gets a short 'get value fast' checklist."""
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            return {"authenticated": False}
+        uid = user["id"]
+        cur.execute("SELECT count(*) FROM follows WHERE user_id=%s", (uid,))
+        follows = cur.fetchone()[0]
+        cur.execute("SELECT count(*) FROM portfolios WHERE user_id=%s", (uid,))
+        portfolios = cur.fetchone()[0]
+        cur.execute("SELECT 1 FROM alert_prefs WHERE user_id=%s", (uid,))
+        has_prefs = cur.fetchone() is not None
+        cur.execute("SELECT count(*) FROM notifications WHERE user_id=%s", (uid,))
+        notifs = cur.fetchone()[0]
+    alerts_on = has_prefs or notifs > 0
+    return {"authenticated": True, "follows": follows, "portfolios": portfolios,
+            "alerts_configured": alerts_on, "complete": follows > 0 and portfolios > 0 and alerts_on}
+
+
 @app.get("/api/referral")
 def referral(tos_session: str | None = Cookie(None)) -> dict:
     """A user's reusable referral code + how many people have joined through it. Sharing the code as

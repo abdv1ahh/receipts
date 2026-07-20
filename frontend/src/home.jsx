@@ -2,10 +2,39 @@
 // people and funds behind it (named straight from the filings), and honest freshness +
 // backtested framing on every card. Nothing here promises returns; it shows who is converging.
 import { useEffect, useState } from "react";
-import { addFollow, addWatchlist, fetchHome, fetchLeaderboards, shadowSymbol } from "./api";
+import { addFollow, addWatchlist, fetchHome, fetchLeaderboards, fetchOnboarding, shadowSymbol } from "./api";
 import { Backtested, Freshness } from "./components.jsx";
 
 const BAND = { high: "band-high", medium: "band-med", low: "band-low" };
+
+function OnboardingBanner({ onNav }) {
+  const [d, setD] = useState(null);
+  const [hidden, setHidden] = useState(() => localStorage.getItem("tos_onboard_done") === "1");
+  useEffect(() => { fetchOnboarding().then(setD).catch(() => {}); }, []);
+  if (hidden || !d || !d.authenticated || d.complete) return null;
+  const steps = [
+    { on: d.follows > 0, label: "Follow a name or a smart-money investor", go: "home" },
+    { on: d.portfolios > 0, label: "Build a shadow portfolio — track it vs SPY", go: "portfolios" },
+    { on: d.alerts_configured, label: "Turn on your alerts", go: "alerts" },
+  ];
+  const done = steps.filter((s) => s.on).length;
+  return (
+    <div className="onboard">
+      <div className="onboard-head">
+        <b>👋 Get value in 3 steps</b>
+        <span className="name">{done}/3 done</span>
+        <button className="linkish" style={{ marginLeft: "auto", color: "var(--muted)" }}
+                onClick={() => { localStorage.setItem("tos_onboard_done", "1"); setHidden(true); }}>dismiss</button>
+      </div>
+      <div className="onboard-bar"><div style={{ width: `${(done / 3) * 100}%` }} /></div>
+      {steps.map((s, i) => (
+        <button key={i} className={`onboard-step ${s.on ? "onboard-on" : ""}`} onClick={() => onNav(s.go)} disabled={s.on}>
+          <span className="onboard-check">{s.on ? "✓" : i + 1}</span> {s.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 function ScoreMedallion({ score, bucket }) {
   return (
@@ -39,7 +68,7 @@ function Protagonists({ people, onOpenProfile }) {
   );
 }
 
-function ScoreCard({ c, calibration, horizon, user, onLogin, onOpenSymbol, onOpenDetail, onOpenProfile }) {
+function ScoreCard({ c, calibration, horizon, user, onLogin, onNav, onOpenSymbol, onOpenDetail, onOpenProfile }) {
   const [followed, setFollowed] = useState(false);
   const [shadowed, setShadowed] = useState(false);
   const [shared, setShared] = useState(false);
@@ -48,8 +77,10 @@ function ScoreCard({ c, calibration, horizon, user, onLogin, onOpenSymbol, onOpe
   const follow = async (e) => {
     e.stopPropagation();
     if (!c.symbol) return;
-    if (user) await addFollow("symbol", c.symbol, c.name);   // real follow → drives alerts
-    else await addWatchlist(c.symbol);                        // logged-out: keep a local watch
+    if (user) {
+      const r = await addFollow("symbol", c.symbol, c.name);   // real follow → drives alerts
+      if (r && r.upgrade) { onNav && onNav("pricing"); return; }  // hit the free follow cap → nudge
+    } else await addWatchlist(c.symbol);                        // logged-out: keep a local watch
     setFollowed(true);
   };
   const share = async (e) => {
@@ -131,7 +162,7 @@ function Leaderboards({ data, onOpenSymbol, onOpenProfile }) {
   );
 }
 
-export function Home({ calibration, horizon, minC, user, onLogin, onOpenSymbol, onOpenDetail, onOpenProfile }) {
+export function Home({ calibration, horizon, minC, user, onLogin, onNav, onOpenSymbol, onOpenDetail, onOpenProfile }) {
   const [data, setData] = useState(null);
   const [boards, setBoards] = useState(null);
   const [err, setErr] = useState(null);
@@ -151,19 +182,20 @@ export function Home({ calibration, horizon, minC, user, onLogin, onOpenSymbol, 
           {data && (
             <span className="feed-sub">
               {data.delayed_hours > 0
-                ? <span className="fresh a">{data.delayed_hours}h delayed · {data.tier}</span>
+                ? <button className="fresh a nudge" onClick={() => onNav && onNav("pricing")}>{data.delayed_hours}h delayed · upgrade for live ⚡</button>
                 : <span className="fresh g">live · {data.tier}</span>}
               {data.as_of ? ` · as of ${data.as_of.slice(0, 10)}` : ""}
             </span>
           )}
         </div>
+        {user && <OnboardingBanner onNav={onNav} />}
         {data === null ? (
           [...Array(4)].map((_, i) => <div key={i} className="card card-skel"><div className="skel" style={{ width: `${60 - i * 6}%` }} /></div>)
         ) : data.feed.length === 0 ? (
           <div className="empty">No convergences at this threshold right now. Smart money isn’t clustering on a name today — that’s an honest signal too.</div>
         ) : (
           data.feed.map((c) => (
-            <ScoreCard key={c.issuer_entity} c={c} calibration={calibration} horizon={horizon} user={user} onLogin={onLogin}
+            <ScoreCard key={c.issuer_entity} c={c} calibration={calibration} horizon={horizon} user={user} onLogin={onLogin} onNav={onNav}
                        onOpenSymbol={onOpenSymbol} onOpenDetail={onOpenDetail} onOpenProfile={onOpenProfile} />
           ))
         )}
