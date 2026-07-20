@@ -182,6 +182,17 @@ def auth_me(tos_session: str | None = Cookie(None)) -> dict:
         return {"user": authn.session_user(conn, tos_session)}
 
 
+@app.get("/api/referral")
+def referral(tos_session: str | None = Cookie(None)) -> dict:
+    """A user's reusable referral code + how many people have joined through it. Sharing the code as
+    an invite opens signup, and a referred user gets a 14-day Pro trial (authn._grant_trial)."""
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            return {"authenticated": False}
+        return {"authenticated": True, **authn.referral_stats(conn, user["id"])}
+
+
 def _tier_of(conn, token: str | None) -> str:
     return (authn.session_user(conn, token) or {}).get("tier", "free")
 

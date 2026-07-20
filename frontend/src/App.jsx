@@ -31,6 +31,7 @@ export default function App() {
   const [err, setErr] = useState(null);
   const [pulseKey, setPulseKey] = useState(0);
   const [unread, setUnread] = useState(0);
+  const [refCode] = useState(() => new URLSearchParams(window.location.search).get("ref") || "");
   const hero = useRef(null);
 
   const refreshUnread = () => fetchNotifications().then((d) => setUnread(d.unread || 0)).catch(() => {});
@@ -44,6 +45,7 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     if (params.get("symbol")) { setAssetSymbol(params.get("symbol").toUpperCase()); setView("asset"); }
     if (params.get("upgraded")) setView("pricing");   // returned from Stripe Checkout
+    if (params.get("ref")) setView("auth");           // arrived via a referral link
   }, []);
 
   useEffect(() => { if (user) refreshUnread(); else setUnread(0); }, [user]);
@@ -158,7 +160,7 @@ export default function App() {
       ) : view === "watchlist" ? (
         <WatchlistView onOpenSymbol={openSymbol} />
       ) : view === "auth" ? (
-        <AuthPanel onAuthed={onAuthed} onBack={() => setView("dashboard")} />
+        <AuthPanel onAuthed={onAuthed} onBack={() => setView("dashboard")} initialInvite={refCode} />
       ) : view === "library" ? (
         <LibraryView onOpenEntry={openLibrary} />
       ) : view === "library-entry" ? (

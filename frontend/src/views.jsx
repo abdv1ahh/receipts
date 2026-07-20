@@ -271,11 +271,11 @@ export function WatchlistView({ onOpenSymbol }) {
   );
 }
 
-export function AuthPanel({ onAuthed, onBack }) {
-  const [mode, setMode] = useState("login");
+export function AuthPanel({ onAuthed, onBack, initialInvite }) {
+  const [mode, setMode] = useState(initialInvite ? "register" : "login");
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
-  const [invite, setInvite] = useState("");
+  const [invite, setInvite] = useState(initialInvite || "");
   const [totp, setTotp] = useState("");
   const [err, setErr] = useState(null);
   const submit = async () => {
@@ -289,10 +289,11 @@ export function AuthPanel({ onAuthed, onBack }) {
       <button className="back" onClick={onBack}>← back</button>
       <h2>{mode === "login" ? "Log in" : "Create account"}</h2>
       <div className="meta">Invite-only. Free tier sees signals on a 48-hour delay; paid tiers see them live.</div>
+      {initialInvite && mode === "register" && <div className="warn" style={{ borderColor: "#2f4a2f", color: "var(--green)", background: "#0f2417" }}>You were referred — register to start a 14-day Pro trial free.</div>}
       <div className="auth-form">
         <input className="search" style={{ width: "100%" }} placeholder="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         <input className="search" style={{ width: "100%" }} type="password" placeholder="password (10+ chars)" value={pw} onChange={(e) => setPw(e.target.value)} />
-        {mode === "register" && <input className="search" style={{ width: "100%" }} placeholder="invite code" value={invite} onChange={(e) => setInvite(e.target.value)} />}
+        {mode === "register" && <input className="search" style={{ width: "100%" }} placeholder="invite or referral code" value={invite} onChange={(e) => setInvite(e.target.value)} />}
         {mode === "login" && <input className="search" style={{ width: "100%" }} placeholder="TOTP code (admins only)" value={totp} onChange={(e) => setTotp(e.target.value)} />}
         <button className="shot-btn" onClick={submit}>{mode === "login" ? "log in" : "register"}</button>
         {err && <div className="warn">{err}</div>}

@@ -3,8 +3,27 @@
 // clearly labeled. Upgrading flips your tier server-side, which unlocks live signals.
 import { useEffect, useState } from "react";
 import {
-  cancelSub, checkout, createKey, fetchKeys, fetchPlans, revokeKey, testActivate,
+  cancelSub, checkout, createKey, fetchKeys, fetchPlans, fetchReferral, revokeKey, testActivate,
 } from "./api";
+
+function ReferralCard() {
+  const [d, setD] = useState(null);
+  const [copied, setCopied] = useState(false);
+  useEffect(() => { fetchReferral().then(setD).catch(() => {}); }, []);
+  if (!d || !d.authenticated) return null;
+  const link = `${location.origin}/?ref=${d.code}`;
+  const copy = async () => { try { await navigator.clipboard.writeText(link); } catch { /* clipboard blocked */ } setCopied(true); setTimeout(() => setCopied(false), 1500); };
+  return (
+    <div className="track" style={{ marginTop: 22 }}>
+      <div className="board-title" style={{ fontSize: 14 }}>🎁 Invite friends — they get 14 days of Pro free</div>
+      <div className="meta">Share your link. Anyone who joins through it starts on a 14-day Pro trial, and you’ve referred {d.referred} {d.referred === 1 ? "person" : "people"} so far.</div>
+      <div className="controls" style={{ marginTop: 8 }}>
+        <input className="search" style={{ width: 340, maxWidth: "100%" }} readOnly value={link} onFocus={(e) => e.target.select()} />
+        <button className="act act-on" onClick={copy}>{copied ? "copied ✓" : "copy link"}</button>
+      </div>
+    </div>
+  );
+}
 
 function feats(e) {
   return [
@@ -93,6 +112,7 @@ export function PricingView({ user, onUpgraded, onLogin }) {
         ))}
       </div>
       {!user && <div className="name" style={{ marginTop: 10 }}>Log in to upgrade.</div>}
+      {user && <ReferralCard />}
       {user && <ApiKeys />}
       <div className="disclaimer" style={{ marginTop: 20 }}>
         Payments are handled by Stripe; card data never touches TradeOS servers. TradeOS is analytics and
