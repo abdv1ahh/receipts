@@ -17,11 +17,10 @@ export function Freshness({ iso, quarterly }) {
   );
 }
 
-export function Bucket({ bucket, calibration }) {
+export function Bucket({ bucket }) {
   return (
     <div>
       <span className={`bucket ${bucket}`}>{bucket.toUpperCase()}</span>
-      {calibration && <div className="calib">{calibration}</div>}
     </div>
   );
 }
@@ -138,7 +137,7 @@ export function ClusterTable({ clusters, onSelect, pulseKey, calibration, horizo
               </span>
             </td>
             <td>
-              <Bucket bucket={c.confidence_bucket} calibration={c.calibration} />
+              <Bucket bucket={c.confidence_bucket} />
             </td>
             <td>
               <Backtested cal={calFor(c.confidence_bucket)} />

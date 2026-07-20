@@ -315,7 +315,7 @@ def clusters(as_of: str = "latest", min_confidence: str = "medium", source_class
             defver = dv
             out.append({
                 "issuer_entity": issuer, "symbol": symbol, "name": name,
-                "score": float(score), "confidence_bucket": bucket, "calibration": CALIBRATION_PENDING,
+                "score": float(score), "confidence_bucket": bucket,
                 "voices": voices, "source_classes": classes, "definition_version": dv,
                 "freshest_contributing_knowable": fresh, "stalest_contributing_knowable": stale,
                 "above_liquidity_floor": floor == "true",
@@ -347,7 +347,7 @@ def _build_cluster_detail(cur, issuer_id: int, aso) -> dict:
     return {
         "found": True, "cluster_id": cid, "issuer_entity": issuer_id, "symbol": _symbol_for(cur, issuer_id),
         "name": name, "cik": cik, "as_of": aso2.isoformat(), "score": float(score),
-        "confidence_bucket": bucket, "calibration": CALIBRATION_PENDING, "voices": voices,
+        "confidence_bucket": bucket, "voices": voices,
         "source_classes": classes, "definition_version": inputs.get("definition_version"), "inputs": inputs,
         "library_links": library_links,
     }
@@ -406,8 +406,9 @@ def definitions() -> dict:
                  "created_at": ca.isoformat()} for n, v, p, h, c, ca in cur.fetchall()]
     return {
         "definitions": defs,
-        "note": ("Public methodology. Confidence buckets are score-threshold placeholders labeled "
-                 "'Backtested calibration pending' until Slice 4 replaces them with backtested hit rates."),
+        "note": ("Public methodology. Confidence buckets show backtested hit rates per horizon where the "
+                 "resolved-episode sample is sufficient (min 30 episodes), and read 'insufficient sample' "
+                 "otherwise; higher-conviction buckets remain sample-limited by historical price coverage."),
     }
 
 
