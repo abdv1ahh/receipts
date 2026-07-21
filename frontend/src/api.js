@@ -66,6 +66,7 @@ export const deleteTrade = (id) => fetch(`/api/trades/${id}`, { method: "DELETE"
 export const fetchTradeAnalysis = (id) => get(`/api/trades/${id}/analysis`);
 export const uploadTradeImage = (id, file) => fetch(`/api/trades/${id}/image`, { method: "POST", headers: { "Content-Type": file.type }, body: file }).then((r) => r.json());
 export const fetchPerformance = () => get("/api/performance");
+export const askAssistant = (message) => post("/api/assistant", { message });
 
 export const fetchOnboarding = () => get("/api/onboarding");
 export const fetchReferral = () => get("/api/referral");

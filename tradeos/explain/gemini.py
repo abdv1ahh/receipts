@@ -143,6 +143,53 @@ def generate_trade_prose(analysis: dict, trade: dict) -> str | None:
     return text or None
 
 
+ASSISTANT_INSTRUCTION = (
+    "You are the assistant inside a financial-intelligence terminal. Answer the user's question using "
+    "ONLY the CONTEXT JSON below, which is real platform data. Rules, exactly:\n"
+    "- Describe only what is in the context. If the context does not contain something the user asked "
+    "about (e.g. it marks sentiment or price moves unavailable), say plainly that it is not connected "
+    "yet — NEVER invent a sentiment reading, a price reason, a signal, or a number.\n"
+    "- NEVER give advice or tell the user what to do. NEVER use buy, sell, hold, should, recommend, "
+    "price target, outperform, or any directive/advice language.\n"
+    "- NEVER introduce a number that is not in the context.\n"
+    "- Be concrete: name the tickers and library titles from the context. 2 to 5 sentences.\n"
+    "CONTEXT (JSON):\n"
+)
+
+
+def answer_question(question: str, ctx: dict) -> str | None:
+    """Grounded answer from the retrieved context only — it never measures or browses. The caller
+    re-checks both guards. Returns None with no key or on failure, so the deterministic answer is used."""
+    key = os.environ.get("GEMINI_API_KEY")
+    if not key:
+        return None
+    model = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
+    url = GEMINI_URL.format(model=model)
+    if urlparse(url).hostname != GEMINI_HOST:
+        raise ValueError("Gemini host allowlist violation")
+    prompt = ASSISTANT_INSTRUCTION + json.dumps(ctx) + "\n\nQUESTION: " + question[:500]
+    body = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 640,
+                             "thinkingConfig": {"thinkingBudget": 0}},
+    }
+    with httpx.Client(timeout=45.0) as client:
+        for attempt in range(3):  # transient 429/503 -> brief retry, else template
+            resp = client.post(url, params={"key": key}, json=body)
+            if resp.status_code in (429, 503) and attempt < 2:
+                time.sleep(2 * (attempt + 1))
+                continue
+            resp.raise_for_status()
+            break
+        data = resp.json()
+    candidates = data.get("candidates") or []
+    if not candidates:
+        return None
+    parts = candidates[0].get("content", {}).get("parts") or []
+    text = "".join(p.get("text", "") for p in parts if not p.get("thought")).strip()
+    return text or None
+
+
 VISION_INSTRUCTION = (
     "Extract ONLY the stock ticker symbols visible in this image. Return ONLY a JSON array of "
     "uppercase ticker symbols, e.g. [\"AAPL\",\"MSFT\"]. Ignore all prices, quantities, dollar "

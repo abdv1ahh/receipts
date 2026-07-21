@@ -24,7 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from psycopg.types.json import Json
 from pydantic import BaseModel
 
-from . import apikeys, authn, billing, db, portfolio, presentation, trades
+from . import apikeys, assistant, authn, billing, db, portfolio, presentation, trades
 
 SESSION_COOKIE = "tos_session"
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").lower() == "true"  # true behind TLS in prod
@@ -94,6 +94,10 @@ class TradeReq(BaseModel):
     opened_on: str | None = None
     closed_on: str | None = None
     is_public: bool = False
+
+
+class AssistantReq(BaseModel):
+    message: str
 
 
 def _set_session_cookie(response: Response, token: str) -> None:
@@ -1072,6 +1076,26 @@ def trade_image(tid: int, tos_session: str | None = Cookie(None)):
         return Response(status_code=404)
     return Response(p.read_bytes(), media_type="image/png",
                     headers={"Cache-Control": "private, max-age=3600", "X-Content-Type-Options": "nosniff"})
+
+
+@app.post("/api/assistant")
+def assistant_endpoint(req: AssistantReq, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    """Grounded, guarded Q&A over real platform data (docs/threat-models/assistant.md). Tier-honest
+    (clusters read at the tier's effective as_of) and object-scoped (only the requester's trades)."""
+    if not _rate_ok(limit=15):
+        response.status_code = 429
+        return {"answer": "I'm getting a lot of questions right now — try again in a moment.",
+                "sources": [], "model_id": "template", "used_template": True}
+    q = (req.message or "").strip()[:500]
+    if not q:
+        return {"answer": "Ask me about a ticker's smart-money signal, a strategy or concept from the "
+                          "library, or your own logged trades.", "sources": [], "model_id": "template",
+                "used_template": True}
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        tier = (user or {}).get("tier", "free")
+        as_of = _effective_as_of(cur, "latest", tier)
+        return assistant.answer(cur, q, user, as_of)
 
 
 @app.get("/api/watchlist")
