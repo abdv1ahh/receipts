@@ -24,7 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from psycopg.types.json import Json
 from pydantic import BaseModel
 
-from . import apikeys, assistant, authn, billing, db, portfolio, presentation, sentiment, trades
+from . import apikeys, assistant, authn, billing, community, db, portfolio, presentation, sentiment, trades
 
 SESSION_COOKIE = "tos_session"
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").lower() == "true"  # true behind TLS in prod
@@ -98,6 +98,29 @@ class TradeReq(BaseModel):
 
 class AssistantReq(BaseModel):
     message: str
+
+
+class ProfileReq(BaseModel):
+    handle: str | None = None
+    bio: str | None = None
+
+
+class FollowUserReq(BaseModel):
+    handle: str
+
+
+class CommentReq(BaseModel):
+    body: str
+
+
+class ReactReq(BaseModel):
+    kind: str
+
+
+class ReportReq(BaseModel):
+    target_type: str
+    target_id: int
+    reason: str | None = None
 
 
 def _set_session_cookie(response: Response, token: str) -> None:
@@ -965,7 +988,18 @@ def trade_get(tid: int, tos_session: str | None = Cookie(None)) -> dict:
         owner = bool(me and me["id"] == m["user_id"])
         if not m["is_public"] and not owner:
             return {"found": False}  # never reveal a private trade's existence
-    return {"found": True, "owner": owner, "trade": _trade_to_dict(row)}
+        cur.execute("SELECT handle FROM users WHERE id=%s", (m["user_id"],))
+        author = cur.fetchone()[0]
+        cur.execute("SELECT count(*) FROM trade_reactions WHERE trade_id=%s AND kind='like'", (tid,))
+        likes = cur.fetchone()[0]
+        cur.execute("SELECT count(*) FROM trade_comments WHERE trade_id=%s AND NOT hidden", (tid,))
+        comments = cur.fetchone()[0]
+        mine: set = set()
+        if me:
+            cur.execute("SELECT kind FROM trade_reactions WHERE trade_id=%s AND user_id=%s", (tid, me["id"]))
+            mine = {r[0] for r in cur.fetchall()}
+    return {"found": True, "owner": owner, "author": author, "likes": likes, "comments": comments,
+            "my_reactions": sorted(mine), "trade": _trade_to_dict(row)}
 
 
 @app.patch("/api/trades/{tid}")
@@ -1118,6 +1152,146 @@ def sentiment_endpoint(symbol: str) -> dict:
         d = sentiment.symbol_sentiment(conn, symbol)
     return {"found": d is not None, "symbol": symbol.upper(), "detail": d,
             "sources": sentiment.sources_status()}
+
+
+# ------------------------------------------------------------------- community & social (Slice F)
+
+@app.patch("/api/profile")
+def profile_set(req: ProfileReq, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "log in to set your profile"}
+        res = community.set_profile(conn, user["id"], handle=req.handle, bio=req.bio)
+        if res.get("error"):
+            response.status_code = 400
+        return res
+
+
+@app.get("/api/u/{handle}")
+def user_profile(handle: str, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        viewer = authn.session_user(conn, tos_session)
+        prof = community.public_profile(conn, handle.lower(), viewer["id"] if viewer else None)
+        if prof.get("found"):
+            with conn.cursor() as cur:
+                cur.execute(f"SELECT {', '.join(_TRADE_COLS)} FROM trades WHERE user_id=%s AND is_public "
+                            f"AND hidden=false ORDER BY created_at DESC LIMIT 100", (prof["id"],))
+                prof["trades"] = [_trade_to_dict(r) for r in cur.fetchall()]
+    return prof
+
+
+@app.post("/api/users/follow")
+def user_follow(req: FollowUserReq, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "log in to follow traders"}
+        res = community.follow_user(conn, user["id"], req.handle.strip().lstrip("@").lower())
+        if res.get("error"):
+            response.status_code = 400
+        return res
+
+
+@app.delete("/api/users/follow/{handle}")
+def user_unfollow(handle: str, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "not authenticated"}
+        return community.unfollow_user(conn, user["id"], handle.strip().lstrip("@").lower())
+
+
+@app.get("/api/community/feed")
+def community_feed(scope: str = "public", before_id: int | None = None,
+                   tos_session: str | None = Cookie(None)) -> dict:
+    scope = scope if scope in ("public", "following") else "public"
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        feed = community.public_feed(conn, viewer_id=user["id"] if user else None, scope=scope, before_id=before_id)
+    return {"scope": scope, "authenticated": bool(user), "feed": feed}
+
+
+@app.post("/api/trades/{tid}/react")
+def trade_react(tid: int, req: ReactReq, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "log in to react"}
+        res = community.react(conn, user["id"], tid, req.kind)
+        if res.get("error"):
+            response.status_code = 400
+        return res
+
+
+@app.delete("/api/trades/{tid}/react/{kind}")
+def trade_unreact(tid: int, kind: str, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "not authenticated"}
+        return community.unreact(conn, user["id"], tid, kind)
+
+
+@app.get("/api/trades/{tid}/comments")
+def trade_comments_list(tid: int, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        return community.list_comments(conn, tid, user["id"] if user else None)
+
+
+@app.post("/api/trades/{tid}/comments")
+def trade_comment_add(tid: int, req: CommentReq, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    if not _rate_ok(limit=10):
+        response.status_code = 429
+        return {"error": "slow down a moment and try again"}
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "log in to comment"}
+        res = community.add_comment(conn, user["id"], tid, req.body)
+        if res.get("error"):
+            response.status_code = 400
+        return res
+
+
+@app.delete("/api/comments/{cid}")
+def comment_delete(cid: int, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "not authenticated"}
+        res = community.delete_comment(conn, user["id"], cid, is_admin=user["tier"] == "admin")
+        if res.get("error"):
+            response.status_code = 403
+        return res
+
+
+@app.post("/api/report")
+def content_report(req: ReportReq, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "log in to report"}
+        res = community.report(conn, user["id"], req.target_type, req.target_id, req.reason)
+        if res.get("error"):
+            response.status_code = 400
+        return res
+
+
+@app.get("/api/leaderboard/traders")
+def leaderboard_traders() -> dict:
+    with db.connect() as conn:
+        board = community.trader_leaderboard_data(conn)
+    return {"leaderboard": board, "min_closed": community.LEADERBOARD_MIN_CLOSED}
 
 
 @app.get("/api/watchlist")

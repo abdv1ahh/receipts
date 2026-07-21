@@ -145,7 +145,7 @@ function Section({ title, items, warn }) {
   );
 }
 
-function AnalysisPanel({ id, onOpenLibrary }) {
+export function AnalysisPanel({ id, onOpenLibrary }) {
   const [a, setA] = useState(null);
   useEffect(() => { setA(null); fetchTradeAnalysis(id).then((d) => setA(d.analysis || null)).catch(() => {}); }, [id]);
   if (!a) return <div className="analysis"><div className="skel" style={{ width: "70%" }} /></div>;

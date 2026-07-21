@@ -427,3 +427,14 @@ table.clusters { width: 100%; border-collapse: collapse; }
 .att-fill { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 6px 0 0 6px; }
 .att-num { position: absolute; right: 6px; top: 0; line-height: 16px; font-size: 10.5px; font-weight: 700; font-family: var(--mono); color: var(--text); }
 .flag-chip { border-color: rgba(255,182,72,0.5); color: #ffcd80; }
+
+/* ---- Community & social (Slice F) ------------------------------------------------------------ */
+.social-bar { display: flex; gap: 8px; align-items: center; margin: 14px 0 4px; }
+.comments { margin-top: 4px; }
+.comment { border-top: 1px solid var(--border); padding: 10px 0; }
+.comment-head { display: flex; align-items: center; gap: 6px; font-size: 12.5px; }
+.comment-actions { margin-left: auto; display: flex; gap: 10px; }
+.comment-body { font-size: 13.5px; line-height: 1.5; margin-top: 4px; white-space: pre-wrap; word-break: break-word; }
+.comment-add { display: flex; gap: 8px; margin-top: 12px; }
+.comment-add input { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 8px 10px; font: inherit; font-size: 13px; }
+.profile-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 8px; }

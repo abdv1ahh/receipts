@@ -89,17 +89,17 @@ def session_user(conn: psycopg.Connection, token: str | None) -> dict | None:
         return None
     with conn.cursor() as cur:
         cur.execute(
-            """SELECT u.id, u.email, u.tier FROM sessions s JOIN users u ON u.id = s.user_id
+            """SELECT u.id, u.email, u.tier, u.handle FROM sessions s JOIN users u ON u.id = s.user_id
                WHERE s.token_hash = %s AND s.expires_at > now()""",
             (_hash_token(token),),
         )
         r = cur.fetchone()
         if not r:
             return None
-        uid, email, tier = r
+        uid, email, tier, handle = r
         if tier in ("retail", "pro"):
             tier = _expire_trial_if_lapsed(cur, conn, uid, tier)
-    return {"id": uid, "email": email, "tier": tier}
+    return {"id": uid, "email": email, "tier": tier, "handle": handle}
 
 
 def logout(conn: psycopg.Connection, token: str | None) -> None:

@@ -69,6 +69,19 @@ export const fetchPerformance = () => get("/api/performance");
 export const askAssistant = (message) => post("/api/assistant", { message });
 export const fetchTrending = (hours = 48) => get(`/api/trending?hours=${hours}`);
 export const fetchSymbolSentiment = (symbol) => get(`/api/sentiment/${encodeURIComponent(symbol)}`);
+// Community (Slice F)
+export const fetchCommunityFeed = (scope = "public", beforeId) => get(`/api/community/feed?scope=${scope}${beforeId ? `&before_id=${beforeId}` : ""}`);
+export const fetchProfile = (handle) => get(`/api/u/${encodeURIComponent(handle)}`);
+export const setProfile = (handle, bio) => fetch("/api/profile", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ handle, bio }) }).then((r) => r.json());
+export const followUser = (handle) => post("/api/users/follow", { handle });
+export const unfollowUser = (handle) => fetch(`/api/users/follow/${encodeURIComponent(handle)}`, { method: "DELETE" }).then((r) => r.json());
+export const reactTrade = (id, kind) => post(`/api/trades/${id}/react`, { kind });
+export const unreactTrade = (id, kind) => fetch(`/api/trades/${id}/react/${kind}`, { method: "DELETE" }).then((r) => r.json());
+export const fetchComments = (id) => get(`/api/trades/${id}/comments`);
+export const addComment = (id, body) => post(`/api/trades/${id}/comments`, { body });
+export const deleteComment = (cid) => fetch(`/api/comments/${cid}`, { method: "DELETE" }).then((r) => r.json());
+export const reportContent = (target_type, target_id, reason) => post("/api/report", { target_type, target_id, reason });
+export const fetchTraderLeaderboard = () => get("/api/leaderboard/traders");
 
 export const fetchOnboarding = () => get("/api/onboarding");
 export const fetchReferral = () => get("/api/referral");
