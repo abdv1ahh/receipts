@@ -12,13 +12,20 @@ import { PortfoliosView } from "./portfolios.jsx";
 import { PricingView } from "./pricing.jsx";
 import { OptionsPreview } from "./previews.jsx";
 import { CryptoView } from "./crypto.jsx";
+import { LandingView, SearchView, ExploreView } from "./discover.jsx";
 
-const NAV = { home: "home", brief: "brief", community: "community", journal: "journal", assistant: "assistant", trending: "trending", crypto: "crypto", portfolios: "portfolios", watchlist: "watchlist", alerts: "alerts", screener: "screener", dashboard: "clusters", library: "library", methodology: "methodology" };
+const NAV_LABELS = { home: "home", explore: "explore", brief: "brief", community: "community", journal: "journal", assistant: "assistant", trending: "trending", crypto: "crypto", portfolios: "portfolios", watchlist: "watchlist", alerts: "alerts", screener: "screener", dashboard: "signals", library: "library", methodology: "methodology" };
+const NAV_GROUPS = [
+  ["home", "explore"],
+  ["assistant", "trending", "crypto", "dashboard", "screener"],
+  ["community", "journal", "portfolios", "watchlist", "alerts"],
+  ["brief", "library", "methodology"],
+];
 
 export default function App() {
   const [minC, setMinC] = useState("medium");
   const [horizon, setHorizon] = useState(90);
-  const [view, setView] = useState("home"); // 'home' is the consumer landing
+  const [view, setView] = useState("landing"); // marketing landing for logged-out; flips to home when authed
   const [clusters, setClusters] = useState(null);
   const [asOf, setAsOf] = useState(null);
   const [defVer, setDefVer] = useState(null);
@@ -31,6 +38,7 @@ export default function App() {
   const [explanation, setExplanation] = useState(null);
   const [assetSymbol, setAssetSymbol] = useState(null);
   const [profile, setProfile] = useState(null); // {kind, id}
+  const [communityHandle, setCommunityHandle] = useState(null);
   const [librarySlug, setLibrarySlug] = useState(null);
   const [search, setSearch] = useState("");
   const [err, setErr] = useState(null);
@@ -46,7 +54,7 @@ export default function App() {
     fetchFeeds().then(setFeeds).catch((e) => setErr(String(e)));
     fetchCalibration().then(setCalibration).catch((e) => setErr(String(e)));
     fetchDefinitions().then(setDefinitions).catch((e) => setErr(String(e)));
-    authMe().then((d) => setUser(d.user)).catch(() => {});
+    authMe().then((d) => { setUser(d.user); if (d.user) setView((v) => (v === "landing" ? "home" : v)); }).catch(() => {});
     const params = new URLSearchParams(window.location.search);
     if (params.get("symbol")) { setAssetSymbol(params.get("symbol").toUpperCase()); setView("asset"); }
     if (params.get("upgraded")) setView("pricing");   // returned from Stripe Checkout
@@ -86,6 +94,7 @@ export default function App() {
   const openSymbol = (sym) => { setAssetSymbol(sym.toUpperCase()); setDetail(null); setView("asset"); };
   const openProfile = (kind, id) => { setProfile({ kind, id }); setDetail(null); setView("profile"); };
   const openLibrary = (slug) => { setLibrarySlug(slug); setDetail(null); setView("library-entry"); };
+  const openTrader = (handle) => { setCommunityHandle(handle); setDetail(null); setView("community"); };
   const onAuthed = (u) => { setUser(u); setView("dashboard"); };
   const doLogout = async () => { await authLogout(); setUser(null); setView("dashboard"); };
 
@@ -95,7 +104,7 @@ export default function App() {
         <div className="glow" />
         <div className="hero-row">
           <div>
-            <h1>TradeOS</h1>
+            <h1 style={{ cursor: "pointer" }} onClick={() => { setView(user ? "home" : "landing"); setDetail(null); }}>TradeOS</h1>
             <div className="sub">
               See what the smartest money is quietly doing — insiders, activists and funds
               converging on one name, straight from the filings. {defVer && `Signal v${defVer}.`}
@@ -104,13 +113,18 @@ export default function App() {
           <nav className="nav">
             <input
               className="search"
-              placeholder="ticker…"
+              placeholder="search…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && search.trim()) openSymbol(search.trim()); }}
+              onKeyDown={(e) => { if (e.key === "Enter" && search.trim()) { setView("search"); setDetail(null); } }}
             />
-            {Object.keys(NAV).map((v) => (
-              <button key={v} className={(view === v || (v === "library" && view === "library-entry")) ? "on" : ""} onClick={() => { setView(v); setDetail(null); }}>{NAV[v]}</button>
+            {NAV_GROUPS.map((group, gi) => (
+              <span key={gi} className="nav-group">
+                {gi > 0 && <span className="nav-div" />}
+                {group.map((v) => (
+                  <button key={v} className={(view === v || (v === "library" && view === "library-entry")) ? "on" : ""} onClick={() => { setView(v); setDetail(null); }}>{NAV_LABELS[v]}</button>
+                ))}
+              </span>
             ))}
             <span className="nav-sep">roadmap</span>
             {["options"].map((v) => (
@@ -137,7 +151,13 @@ export default function App() {
       <StatusStrip feeds={feeds} />
       {err && <div className="err">error: {err}</div>}
 
-      {view === "home" ? (
+      {view === "landing" ? (
+        <LandingView onGetStarted={() => { setView("auth"); setDetail(null); }} onExplore={() => { setView("explore"); setDetail(null); }} />
+      ) : view === "explore" ? (
+        <ExploreView onOpenSymbol={openSymbol} onNav={(v) => { setView(v); setDetail(null); }} onOpenTrader={openTrader} />
+      ) : view === "search" ? (
+        <SearchView query={search} onOpenSymbol={openSymbol} onOpenProfile={openProfile} onOpenLibrary={openLibrary} onOpenTrader={openTrader} />
+      ) : view === "home" ? (
         <Home calibration={calibration} horizon={horizon} minC={minC} user={user}
               onLogin={() => { setView("auth"); setDetail(null); }}
               onNav={(v) => { setView(v); setDetail(null); }}
@@ -157,7 +177,7 @@ export default function App() {
       ) : view === "trending" ? (
         <ScannerView onOpenSymbol={openSymbol} />
       ) : view === "community" ? (
-        <CommunityView user={user} onLogin={() => { setView("auth"); setDetail(null); }} onOpenSymbol={openSymbol} refreshUser={refreshUser} />
+        <CommunityView user={user} onLogin={() => { setView("auth"); setDetail(null); }} onOpenSymbol={openSymbol} refreshUser={refreshUser} initialHandle={communityHandle} onConsumeHandle={() => setCommunityHandle(null)} />
       ) : view === "pricing" ? (
         <PricingView user={user} onUpgraded={refreshUser} onLogin={() => { setView("auth"); setDetail(null); }} />
       ) : view === "notifications" ? (

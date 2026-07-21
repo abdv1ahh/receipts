@@ -200,12 +200,13 @@ function Leaderboard({ onOpenProfile }) {
   );
 }
 
-export function CommunityView({ user, onLogin, onOpenSymbol, refreshUser }) {
+export function CommunityView({ user, onLogin, onOpenSymbol, refreshUser, initialHandle, onConsumeHandle }) {
   const [tab, setTab] = useState("explore");
   const [scope, setScope] = useState("public");
   const [feed, setFeed] = useState(null);
   const [openTradeId, setOpenTradeId] = useState(null);
   const [openHandle, setOpenHandle] = useState(null);
+  useEffect(() => { if (initialHandle) { setOpenHandle(initialHandle); onConsumeHandle?.(); } }, [initialHandle]);
 
   useEffect(() => {
     if (tab !== "explore" || openTradeId || openHandle) return;

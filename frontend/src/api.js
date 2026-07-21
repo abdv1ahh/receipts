@@ -84,6 +84,7 @@ export const reportContent = (target_type, target_id, reason) => post("/api/repo
 export const fetchTraderLeaderboard = () => get("/api/leaderboard/traders");
 export const fetchCryptoMarkets = (limit = 25) => get(`/api/crypto/markets?limit=${limit}`);
 export const fetchCryptoTrending = () => get("/api/crypto/trending");
+export const fetchSearch = (q) => get(`/api/search?q=${encodeURIComponent(q)}`);
 
 export const fetchOnboarding = () => get("/api/onboarding");
 export const fetchReferral = () => get("/api/referral");

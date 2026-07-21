@@ -24,7 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from psycopg.types.json import Json
 from pydantic import BaseModel
 
-from . import apikeys, assistant, authn, billing, community, crypto, db, portfolio, presentation, sentiment, trades
+from . import apikeys, assistant, authn, billing, community, crypto, db, portfolio, presentation, search, sentiment, trades
 
 SESSION_COOKIE = "tos_session"
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").lower() == "true"  # true behind TLS in prod
@@ -1292,6 +1292,15 @@ def leaderboard_traders() -> dict:
     with db.connect() as conn:
         board = community.trader_leaderboard_data(conn)
     return {"leaderboard": board, "min_closed": community.LEADERBOARD_MIN_CLOSED}
+
+
+@app.get("/api/search")
+def search_endpoint(q: str = "") -> dict:
+    """Unified search across issuers, institutions, insiders, the library, and public traders
+    (docs/threat-models — read-only; only public handles, never emails)."""
+    with db.connect() as conn:
+        results = search.search(conn, q)
+    return {"query": q.strip()[:64], "total": sum(len(v) for v in results.values()), "results": results}
 
 
 @app.get("/api/crypto/markets")
