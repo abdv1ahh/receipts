@@ -24,7 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from psycopg.types.json import Json
 from pydantic import BaseModel
 
-from . import apikeys, assistant, authn, billing, community, crypto, db, portfolio, presentation, search, sentiment, trades
+from . import admin, apikeys, assistant, authn, billing, community, crypto, db, flags, portfolio, presentation, search, sentiment, trades
 
 SESSION_COOKIE = "tos_session"
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").lower() == "true"  # true behind TLS in prod
@@ -121,6 +121,24 @@ class ReportReq(BaseModel):
     target_type: str
     target_id: int
     reason: str | None = None
+
+
+class AdminResolveReq(BaseModel):
+    target_type: str
+    target_id: int
+    action: str          # hide | unhide | dismiss
+
+
+class AdminTierReq(BaseModel):
+    tier: str            # free | retail | pro
+
+
+class AdminBanReq(BaseModel):
+    banned: bool
+
+
+class AdminFlagReq(BaseModel):
+    enabled: bool
 
 
 def _set_session_cookie(response: Response, token: str) -> None:
@@ -228,6 +246,9 @@ def health() -> dict:
 def auth_register(req: RegisterReq, request: Request, response: Response) -> dict:
     try:
         with db.connect() as conn:
+            if not flags.enabled(conn, "registration"):
+                response.status_code = 403
+                return {"error": "registration is temporarily closed"}
             token, user = authn.register(conn, req.email, req.password, req.invite_code,
                                          ip=request.client.host if request.client else None,
                                          ua=request.headers.get("user-agent"))
@@ -1049,7 +1070,9 @@ def trade_analysis(tid: int, tos_session: str | None = Cookie(None)) -> dict:
         m = dict(zip(_TRADE_COLS, row))
         if not m["is_public"] and not (me and me["id"] == m["user_id"]):
             return {"found": False}
-        analysis = trades.cached_analysis(conn, m)
+        # AI kill-switch: off -> deterministic template analysis, no LLM call
+        provider = flags.effective_provider(conn, "ai_trade_analysis")
+        analysis = trades.cached_analysis(conn, m, provider=provider)
     return {"found": True, "analysis": analysis}
 
 
@@ -1130,7 +1153,9 @@ def assistant_endpoint(req: AssistantReq, response: Response, tos_session: str |
             user = authn.session_user(conn, tos_session)
             tier = (user or {}).get("tier", "free")
             as_of = _effective_as_of(cur, "latest", tier)
-        return assistant.answer(conn, q, user, as_of)
+        # AI kill-switch: when the flag is off, force the deterministic grounded answer (no LLM call)
+        provider = flags.effective_provider(conn, "ai_assistant")
+        return assistant.answer(conn, q, user, as_of, provider=provider)
 
 
 @app.get("/api/trending")
@@ -1182,6 +1207,14 @@ def user_profile(handle: str, tos_session: str | None = Cookie(None)) -> dict:
     return prof
 
 
+def _community_open(conn, response: Response) -> bool:
+    """Community-writes kill-switch (admin flag). Off -> the social surface goes read-only."""
+    if not flags.enabled(conn, "community_writes"):
+        response.status_code = 403
+        return False
+    return True
+
+
 @app.post("/api/users/follow")
 def user_follow(req: FollowUserReq, response: Response, tos_session: str | None = Cookie(None)) -> dict:
     with db.connect() as conn:
@@ -1189,6 +1222,8 @@ def user_follow(req: FollowUserReq, response: Response, tos_session: str | None 
         if not user:
             response.status_code = 401
             return {"error": "log in to follow traders"}
+        if not _community_open(conn, response):
+            return {"error": "community posting is temporarily disabled"}
         res = community.follow_user(conn, user["id"], req.handle.strip().lstrip("@").lower())
         if res.get("error"):
             response.status_code = 400
@@ -1222,6 +1257,8 @@ def trade_react(tid: int, req: ReactReq, response: Response, tos_session: str | 
         if not user:
             response.status_code = 401
             return {"error": "log in to react"}
+        if not _community_open(conn, response):
+            return {"error": "community posting is temporarily disabled"}
         res = community.react(conn, user["id"], tid, req.kind)
         if res.get("error"):
             response.status_code = 400
@@ -1255,6 +1292,8 @@ def trade_comment_add(tid: int, req: CommentReq, response: Response, tos_session
         if not user:
             response.status_code = 401
             return {"error": "log in to comment"}
+        if not _community_open(conn, response):
+            return {"error": "community posting is temporarily disabled"}
         res = community.add_comment(conn, user["id"], tid, req.body)
         if res.get("error"):
             response.status_code = 400
@@ -1281,6 +1320,8 @@ def content_report(req: ReportReq, response: Response, tos_session: str | None =
         if not user:
             response.status_code = 401
             return {"error": "log in to report"}
+        if not _community_open(conn, response):
+            return {"error": "community posting is temporarily disabled"}
         res = community.report(conn, user["id"], req.target_type, req.target_id, req.reason)
         if res.get("error"):
             response.status_code = 400
@@ -1292,6 +1333,137 @@ def leaderboard_traders() -> dict:
     with db.connect() as conn:
         board = community.trader_leaderboard_data(conn)
     return {"leaderboard": board, "min_closed": community.LEADERBOARD_MIN_CLOSED}
+
+
+# ------------------------------------------------------------------ admin (Slice K)
+
+def _require_admin(conn, token: str | None, response: Response) -> dict | None:
+    """Return the admin user, or set 401/403 and return None. Admin is a real tier gated behind TOTP
+    at login (authn.login), so this is the same identity that MFA'd in — no separate admin flag."""
+    user = authn.session_user(conn, token)
+    if not user:
+        response.status_code = 401
+        return None
+    if user["tier"] != "admin":
+        response.status_code = 403
+        return None
+    return user
+
+
+@app.get("/api/admin/overview")
+def admin_overview(response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = _require_admin(conn, tos_session, response)
+        if not user:
+            return {"error": "admin only"}
+        return {"overview": admin.overview(conn), "flags": flags.all_states(conn),
+                "config": _ops_config()}
+
+
+@app.get("/api/admin/moderation")
+def admin_moderation(response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = _require_admin(conn, tos_session, response)
+        if not user:
+            return {"error": "admin only"}
+        return {"queue": admin.moderation_queue(conn), "reports_to_hide": community.REPORTS_TO_HIDE}
+
+
+@app.post("/api/admin/moderation/resolve")
+def admin_moderation_resolve(req: AdminResolveReq, response: Response,
+                             tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = _require_admin(conn, tos_session, response)
+        if not user:
+            return {"error": "admin only"}
+        res = admin.resolve(conn, user, req.target_type, req.target_id, req.action)
+        if res.get("error"):
+            response.status_code = 400
+        return res
+
+
+@app.get("/api/admin/users")
+def admin_users(q: str = "", response: Response = None, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = _require_admin(conn, tos_session, response)
+        if not user:
+            return {"error": "admin only"}
+        return {"users": admin.list_users(conn, q), "tiers": list(admin.TIER_TARGETS)}
+
+
+@app.post("/api/admin/users/{uid}/tier")
+def admin_set_tier(uid: int, req: AdminTierReq, response: Response,
+                   tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = _require_admin(conn, tos_session, response)
+        if not user:
+            return {"error": "admin only"}
+        res = admin.set_tier(conn, user, uid, req.tier)
+        if res.get("error"):
+            response.status_code = 400
+        return res
+
+
+@app.post("/api/admin/users/{uid}/ban")
+def admin_ban(uid: int, req: AdminBanReq, response: Response,
+              tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = _require_admin(conn, tos_session, response)
+        if not user:
+            return {"error": "admin only"}
+        res = admin.set_banned(conn, user, uid, req.banned)
+        if res.get("error"):
+            response.status_code = 400
+        return res
+
+
+@app.get("/api/admin/flags")
+def admin_flags(response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = _require_admin(conn, tos_session, response)
+        if not user:
+            return {"error": "admin only"}
+        return {"flags": flags.all_states(conn), "config": _ops_config()}
+
+
+@app.post("/api/admin/flags/{name}")
+def admin_set_flag(name: str, req: AdminFlagReq, response: Response,
+                   tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = _require_admin(conn, tos_session, response)
+        if not user:
+            return {"error": "admin only"}
+        res = flags.set_flag(conn, name, req.enabled)
+        if res.get("error"):
+            response.status_code = 400
+            return res
+        authn.audit(conn, user["email"], "admin_set_flag", name, {"enabled": req.enabled})
+        return res
+
+
+@app.get("/api/admin/audit")
+def admin_audit(action: str | None = None, limit: int = 100, response: Response = None,
+                tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = _require_admin(conn, tos_session, response)
+        if not user:
+            return {"error": "admin only"}
+        return {"entries": admin.audit_tail(conn, limit=limit, action=action),
+                "actions": admin.audit_actions(conn)}
+
+
+def _ops_config() -> dict:
+    """Real, READ-ONLY operational config the admin can see but not toggle from the web: it is
+    controlled by deployment env / third-party keys, so we show its true state instead of a fake
+    switch (same honesty rule as the 'not connected yet' sources)."""
+    from . import config
+    return {
+        "congress": {"enabled": config.congress_enabled(), "controlled_by": "ENABLE_CONGRESS (env)"},
+        "short_interest": {"enabled": config.short_interest_enabled(), "controlled_by": "ENABLE_SHORT_INTEREST (env)"},
+        "reddit": {"enabled": config.reddit_configured(), "controlled_by": "REDDIT_CLIENT_ID/SECRET (env)"},
+        "youtube": {"enabled": config.youtube_configured(), "controlled_by": "YOUTUBE_API_KEY (env)"},
+        "stripe": {"enabled": billing.provider_configured(), "controlled_by": "STRIPE_SECRET_KEY (env)"},
+    }
 
 
 @app.get("/api/search")
@@ -1308,6 +1480,10 @@ def crypto_markets(limit: int = 25) -> dict:
     """Real crypto market data from CoinGecko (docs/threat-models/crypto.md). Market data + risk
     labels, not advice; on any upstream failure returns an honest error, never a fabricated price."""
     limit = max(1, min(50, limit))
+    with db.connect() as conn:
+        if not flags.enabled(conn, "crypto"):
+            return {"markets": [], "source": "CoinGecko", "disabled": True,
+                    "error": "the crypto surface is currently disabled"}
     try:
         return {"markets": crypto.markets(limit), "source": "CoinGecko",
                 "note": "Market data, not advice. Crypto is high-risk and volatile."}
@@ -1318,6 +1494,9 @@ def crypto_markets(limit: int = 25) -> dict:
 
 @app.get("/api/crypto/trending")
 def crypto_trending() -> dict:
+    with db.connect() as conn:
+        if not flags.enabled(conn, "crypto"):
+            return {"trending": [], "source": "CoinGecko", "disabled": True}
     try:
         return {"trending": crypto.trending(), "source": "CoinGecko"}
     except Exception:

@@ -85,6 +85,16 @@ export const fetchTraderLeaderboard = () => get("/api/leaderboard/traders");
 export const fetchCryptoMarkets = (limit = 25) => get(`/api/crypto/markets?limit=${limit}`);
 export const fetchCryptoTrending = () => get("/api/crypto/trending");
 export const fetchSearch = (q) => get(`/api/search?q=${encodeURIComponent(q)}`);
+// Admin dashboard (Slice K) — every route is admin-only server-side (tier=admin, TOTP at login).
+export const adminOverview = () => get("/api/admin/overview");
+export const adminModeration = () => get("/api/admin/moderation");
+export const adminResolve = (target_type, target_id, action) => post("/api/admin/moderation/resolve", { target_type, target_id, action });
+export const adminUsers = (q = "") => get(`/api/admin/users?q=${encodeURIComponent(q)}`);
+export const adminSetTier = (uid, tier) => post(`/api/admin/users/${uid}/tier`, { tier });
+export const adminSetBanned = (uid, banned) => post(`/api/admin/users/${uid}/ban`, { banned });
+export const adminFlags = () => get("/api/admin/flags");
+export const adminSetFlag = (name, enabled) => post(`/api/admin/flags/${encodeURIComponent(name)}`, { enabled });
+export const adminAudit = (action = "", limit = 100) => get(`/api/admin/audit?limit=${limit}${action ? `&action=${encodeURIComponent(action)}` : ""}`);
 
 export const fetchOnboarding = () => get("/api/onboarding");
 export const fetchReferral = () => get("/api/referral");

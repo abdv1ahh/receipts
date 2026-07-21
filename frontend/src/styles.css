@@ -466,3 +466,47 @@ table.clusters { width: 100%; border-collapse: collapse; }
 .search-group { margin-top: 14px; }
 .search-row { display: block; width: 100%; text-align: left; background: var(--panel-2); border: 1px solid var(--border); border-radius: 9px; padding: 9px 12px; margin-top: 6px; color: var(--text); font: inherit; font-size: 13.5px; cursor: pointer; }
 .search-row:hover { border-color: var(--accent); }
+
+/* Admin dashboard (Slice K) */
+.admin-nav { color: #ffcd80; }
+.nav button.admin-nav.on { background: #ffcd80; color: #04070d; border-color: #ffcd80; }
+.admin .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; margin: 6px 0 4px; }
+.admin .seg button { background: var(--panel-2); border: 0; color: var(--muted); padding: 6px 15px; font: inherit; font-size: 12px; cursor: pointer; text-transform: capitalize; }
+.admin .seg button.on { background: var(--accent); color: #04070d; font-weight: 600; }
+.muted { color: var(--muted); }
+.mono { font-family: var(--mono); font-size: 11px; }
+.admin-stats { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.admin-stat { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px 16px; min-width: 92px; }
+.admin-stat .n { font-family: var(--mono); font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.admin-stat .l { color: var(--muted); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; margin-top: 2px; }
+.admin-tiers { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 0; }
+.flag-state.on { border-color: #2f4a2f; color: var(--green); }
+.flag-state.off { border-color: var(--border); color: var(--muted); }
+
+.mod-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; margin-top: 10px; }
+.mod-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.mod-author { font-weight: 600; font-size: 12.5px; }
+.mod-reports { color: var(--amber); font-size: 12px; font-weight: 700; }
+.mod-content { margin: 8px 0 4px; font-size: 13px; word-break: break-word; }
+.mod-reasons { color: var(--muted); font-size: 11.5px; }
+.mod-actions { display: flex; gap: 8px; margin-top: 10px; }
+
+.user-search { display: flex; gap: 8px; margin-top: 12px; align-items: center; flex-wrap: wrap; }
+.user-search .search { flex: 0 1 260px; }
+.admin-users .banned-row { opacity: 0.6; }
+.admin-users td select, .admin-audit select, .user-search select { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; font: inherit; font-size: 12px; }
+.mod-actions button, .user-search > button, .admin-users td button { background: var(--accent); color: #04070d; border: 0; border-radius: 7px; padding: 6px 12px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+button.ghost { background: var(--panel-2); color: var(--muted); border: 1px solid var(--border); }
+button.danger, button.ghost.danger { color: #ff9db0; }
+button:disabled { opacity: 0.5; cursor: default; }
+
+.flag-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 0; border-top: 1px solid var(--border); }
+.flag-row:first-of-type { border-top: 0; }
+.flag-info { flex: 1; }
+.flag-name { font-weight: 600; font-size: 13px; }
+.flag-desc { color: var(--muted); font-size: 11.5px; margin-top: 2px; line-height: 1.5; }
+.toggle { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--border); background: var(--panel-2); color: var(--muted); border-radius: 20px; padding: 4px 12px 4px 5px; font: inherit; font-size: 10.5px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.05em; min-width: 62px; }
+.toggle .knob { width: 15px; height: 15px; border-radius: 50%; background: var(--muted); transition: transform 0.15s, background 0.15s; }
+.toggle.on { border-color: #2f4a2f; color: var(--green); background: #12261a; }
+.toggle.on .knob { background: var(--green); transform: translateX(5px); }
+.admin-audit td.mono { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

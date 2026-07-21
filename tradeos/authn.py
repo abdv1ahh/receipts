@@ -90,7 +90,7 @@ def session_user(conn: psycopg.Connection, token: str | None) -> dict | None:
     with conn.cursor() as cur:
         cur.execute(
             """SELECT u.id, u.email, u.tier, u.handle FROM sessions s JOIN users u ON u.id = s.user_id
-               WHERE s.token_hash = %s AND s.expires_at > now()""",
+               WHERE s.token_hash = %s AND s.expires_at > now() AND NOT u.banned""",
             (_hash_token(token),),
         )
         r = cur.fetchone()
@@ -184,11 +184,13 @@ def login(conn: psycopg.Connection, email: str, password: str, totp_code: str | 
         _record_attempt(cur, ip)
         _record_attempt(cur, email)
         conn.commit()
-        cur.execute("SELECT id, password_hash, tier, totp_secret FROM users WHERE email = %s", (email,))
+        cur.execute("SELECT id, password_hash, tier, totp_secret, banned FROM users WHERE email = %s", (email,))
         row = cur.fetchone()
     if not row or not verify_password(row[1], password):
         raise AuthError("invalid credentials")  # uniform: never distinguish which field failed
-    uid, _h, tier, totp_secret = row
+    uid, _h, tier, totp_secret, banned = row
+    if banned:                                   # only reached with a correct password; honest signal
+        raise AuthError("this account has been suspended")
     # TOTP required for admin; enforced whenever a secret is set
     if tier == "admin" and not totp_secret:
         raise AuthError("invalid credentials")  # admin without MFA configured cannot log in

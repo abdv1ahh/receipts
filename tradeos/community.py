@@ -243,8 +243,8 @@ def report(conn: psycopg.Connection, reporter_id, target_type, target_id, reason
         cur.execute("INSERT INTO content_reports (reporter_id, target_type, target_id, reason) "
                     "VALUES (%s,%s,%s,%s) ON CONFLICT (reporter_id, target_type, target_id) DO NOTHING",
                     (reporter_id, target_type, target_id, (reason or "").strip()[:280] or None))
-        cur.execute("SELECT count(*) FROM content_reports WHERE target_type=%s AND target_id=%s",
-                    (target_type, target_id))
+        cur.execute("SELECT count(*) FROM content_reports WHERE target_type=%s AND target_id=%s "
+                    "AND resolved_at IS NULL", (target_type, target_id))
         n = cur.fetchone()[0]
         hidden = n >= REPORTS_TO_HIDE
         if hidden:                              # auto-hide pending review (Slice K console)

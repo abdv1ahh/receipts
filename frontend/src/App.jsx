@@ -13,6 +13,7 @@ import { PricingView } from "./pricing.jsx";
 import { OptionsPreview } from "./previews.jsx";
 import { CryptoView } from "./crypto.jsx";
 import { LandingView, SearchView, ExploreView } from "./discover.jsx";
+import { AdminView } from "./admin.jsx";
 
 const NAV_LABELS = { home: "home", explore: "explore", brief: "brief", community: "community", journal: "journal", assistant: "assistant", trending: "trending", crypto: "crypto", portfolios: "portfolios", watchlist: "watchlist", alerts: "alerts", screener: "screener", dashboard: "signals", library: "library", methodology: "methodology" };
 const NAV_GROUPS = [
@@ -126,6 +127,12 @@ export default function App() {
                 ))}
               </span>
             ))}
+            {user?.tier === "admin" && (
+              <span className="nav-group">
+                <span className="nav-div" />
+                <button className={`admin-nav ${view === "admin" ? "on" : ""}`} onClick={() => { setView("admin"); setDetail(null); }}>🛡️ admin</button>
+              </span>
+            )}
             <span className="nav-sep">roadmap</span>
             {["options"].map((v) => (
               <button key={v} className={`preview-nav ${view === v ? "on" : ""}`} onClick={() => { setView(v); setDetail(null); }}>{v}▹</button>
@@ -203,6 +210,8 @@ export default function App() {
         <OptionsPreview onBack={() => setView("dashboard")} />
       ) : view === "crypto" ? (
         <CryptoView />
+      ) : view === "admin" ? (
+        <AdminView user={user} />
       ) : detail ? (
         detail === "loading" ? (
           <div className="detail"><div className="skel" style={{ width: 220 }} /></div>
