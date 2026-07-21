@@ -19,7 +19,7 @@ import re
 
 import psycopg
 
-from . import trades
+from . import sentiment, trades
 from .explain.guards import allowed_numbers, directive_guard, numbers_guard
 
 log = logging.getLogger("tradeos.assistant")
@@ -87,6 +87,11 @@ def build_answer(question: str, ctx: dict) -> tuple[str, list[str]]:
                 f"{s['name']} ({s['symbol']}) has no active convergence cluster in the current data; "
                 f"its activity page shows any individual insider, activist, or fund disclosures on file.")
             sources.append(f"activity:{s['symbol']}")
+        att = s.get("attention")
+        if att:
+            parts.append(f"Public attention on {s['symbol']}: an attention score of {att['score']} from "
+                         f"{att['mentions']} recent mentions ({', '.join(att['sources'])}).")
+            sources.append(f"attention:{s['symbol']}")
     for u in ctx.get("unrecognized", []):
         parts.append(f"{u} isn't in the smart-money dataset (outside the covered filings, or not a "
                      f"recognized ticker).")
@@ -114,6 +119,13 @@ def build_answer(question: str, ctx: dict) -> tuple[str, list[str]]:
                          f"and habits once there are at least 10, so it never calls an edge from a small "
                          f"sample.")
         sources.append("your_performance")
+
+    tr = ctx.get("trending")
+    if tr:
+        listing = ", ".join(f"{t['symbol']} ({t['attention']})" for t in tr)
+        parts.append(f"By public attention right now, the most-discussed tracked names are {listing} "
+                     f"(attention is a velocity score against each name's own baseline).")
+        sources.append("trending")
 
     if ctx.get("sentiment"):
         parts.append("Live social sentiment — what Reddit, X, and YouTube are discussing — isn't "
@@ -190,31 +202,43 @@ def _user_performance(cur, user_id):
     return trades.summarize_performance(rows)
 
 
-def retrieve(cur, question: str, user, as_of) -> dict:
+def retrieve(conn: psycopg.Connection, question: str, user, as_of) -> dict:
     intents = classify(question)
-    ctx: dict = {"symbols": [], "unrecognized": [], "library": [],
-                 "sentiment": intents["sentiment"], "why_moving": intents["why_moving"]}
-    for sym in candidate_symbols(question):
-        r = _resolve(cur, sym)
-        if r:
-            ctx["symbols"].append({"symbol": sym, "name": r[1], "cluster": _latest_cluster(cur, r[0], as_of)})
-        elif f"${sym}".lower() in question.lower() or intents["why_moving"]:
-            ctx["unrecognized"].append(sym)
-    if intents["concept"] or not ctx["symbols"]:
-        ctx["library"] = _library_matches(cur, question)
-    if intents["performance"] and user:
-        perf = _user_performance(cur, user["id"])   # clean keys only (no raw fractions to restate)
-        ctx["performance"] = {k: perf[k] for k in ("n_closed", "sufficient", "win_rate", "avg_reward_risk")}
-    if not ctx["symbols"] and not intents["performance"]:   # general question -> always ground on real signals
-        ctx["top_signals"] = _top_signals(cur, as_of)
+    ctx: dict = {"symbols": [], "unrecognized": [], "library": [], "why_moving": intents["why_moving"]}
+    with conn.cursor() as cur:
+        for sym in candidate_symbols(question):
+            r = _resolve(cur, sym)
+            if r:
+                entry = {"symbol": sym, "name": r[1], "cluster": _latest_cluster(cur, r[0], as_of)}
+                sdata = sentiment.symbol_sentiment(conn, sym)   # real public-attention data, if any
+                if sdata:
+                    entry["attention"] = {"score": sdata["attention"], "mentions": sdata["mentions"],
+                                          "sources": sdata["sources"]}
+                ctx["symbols"].append(entry)
+            elif f"${sym}".lower() in question.lower() or intents["why_moving"]:
+                ctx["unrecognized"].append(sym)
+        if intents["concept"] or not ctx["symbols"]:
+            ctx["library"] = _library_matches(cur, question)
+        if intents["performance"] and user:
+            perf = _user_performance(cur, user["id"])   # clean keys only (no raw fractions to restate)
+            ctx["performance"] = {k: perf[k] for k in ("n_closed", "sufficient", "win_rate", "avg_reward_risk")}
+        if intents["sentiment"]:
+            board = sentiment.trending_board(conn, limit=6)
+            if board:
+                ctx["trending"] = [{"symbol": b["symbol"], "attention": b["attention"], "sentiment": b["sentiment"]}
+                                   for b in board]
+            else:
+                ctx["sentiment"] = True     # honest gap: asked about discussion, none connected/ingested yet
+        if not ctx["symbols"] and not intents["performance"]:   # general question -> ground on real signals
+            ctx["top_signals"] = _top_signals(cur, as_of)
     return ctx
 
 
 # ------------------------------------------------------------------ guarded orchestrator
 
-def answer(cur, question: str, user, as_of, provider=None) -> dict:
+def answer(conn: psycopg.Connection, question: str, user, as_of, provider=None) -> dict:
     provider = (provider or os.environ.get("EXPLAIN_PROVIDER", "template")).lower()
-    ctx = retrieve(cur, question, user, as_of)
+    ctx = retrieve(conn, question, user, as_of)
     det, sources = build_answer(question, ctx)
     grounded = bool(ctx.get("symbols") or ctx.get("library") or ctx.get("performance")
                     or ctx.get("top_signals"))

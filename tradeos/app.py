@@ -24,7 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from psycopg.types.json import Json
 from pydantic import BaseModel
 
-from . import apikeys, assistant, authn, billing, db, portfolio, presentation, trades
+from . import apikeys, assistant, authn, billing, db, portfolio, presentation, sentiment, trades
 
 SESSION_COOKIE = "tos_session"
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").lower() == "true"  # true behind TLS in prod
@@ -1091,11 +1091,33 @@ def assistant_endpoint(req: AssistantReq, response: Response, tos_session: str |
         return {"answer": "Ask me about a ticker's smart-money signal, a strategy or concept from the "
                           "library, or your own logged trades.", "sources": [], "model_id": "template",
                 "used_template": True}
-    with db.connect() as conn, conn.cursor() as cur:
-        user = authn.session_user(conn, tos_session)
-        tier = (user or {}).get("tier", "free")
-        as_of = _effective_as_of(cur, "latest", tier)
-        return assistant.answer(cur, q, user, as_of)
+    with db.connect() as conn:
+        with conn.cursor() as cur:
+            user = authn.session_user(conn, tos_session)
+            tier = (user or {}).get("tier", "free")
+            as_of = _effective_as_of(cur, "latest", tier)
+        return assistant.answer(conn, q, user, as_of)
+
+
+@app.get("/api/trending")
+def trending_endpoint(hours: int = 48) -> dict:
+    """The trend scanner: symbols ranked by public-attention velocity, with an honest source-status
+    map (docs/threat-models/sentiment.md). Public attention data, not the proprietary signal, so it
+    is not tier-gated. Empty until a source is ingested — never fabricated."""
+    hours = max(6, min(168, hours))
+    with db.connect() as conn:
+        board = sentiment.trending_board(conn, hours=hours)
+    return {"sources": sentiment.sources_status(), "hours": hours, "board": board,
+            "note": None if board else ("No attention data yet — run `ingest-sentiment` (Hacker News "
+                                        "needs no key), or connect Reddit/YouTube for sentiment.")}
+
+
+@app.get("/api/sentiment/{symbol}")
+def sentiment_endpoint(symbol: str) -> dict:
+    with db.connect() as conn:
+        d = sentiment.symbol_sentiment(conn, symbol)
+    return {"found": d is not None, "symbol": symbol.upper(), "detail": d,
+            "sources": sentiment.sources_status()}
 
 
 @app.get("/api/watchlist")

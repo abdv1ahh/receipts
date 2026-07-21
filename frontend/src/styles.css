@@ -418,3 +418,12 @@ table.clusters { width: 100%; border-collapse: collapse; }
 .chat-input { display: flex; gap: 8px; margin-top: 12px; }
 .chat-input input { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 9px; color: var(--text); padding: 10px 12px; font: inherit; font-size: 13.5px; }
 .chat-input input:focus { outline: none; border-color: var(--accent); }
+
+/* ---- Sentiment & Trend Scanner (Slice H) ---------------------------------------------------- */
+.src-status { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
+.src-stat { font-size: 11.5px; color: var(--muted); }
+.src-stat.s-connected { color: var(--text); }
+.att-bar { position: relative; height: 16px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.att-fill { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 6px 0 0 6px; }
+.att-num { position: absolute; right: 6px; top: 0; line-height: 16px; font-size: 10.5px; font-weight: 700; font-family: var(--mono); color: var(--text); }
+.flag-chip { border-color: rgba(255,182,72,0.5); color: #ffcd80; }

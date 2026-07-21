@@ -22,6 +22,10 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-flash-latest}
       EXPLAIN_PROVIDER: ${EXPLAIN_PROVIDER:-template}
+      # Sentiment sources (Slice H). HN needs no key; add these free keys to connect Reddit/YouTube.
+      REDDIT_CLIENT_ID: ${REDDIT_CLIENT_ID:-}
+      REDDIT_CLIENT_SECRET: ${REDDIT_CLIENT_SECRET:-}
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
       # Billing (Slice D). Empty = test mode (no charge). Set these + add `stripe` to requirements to go live.
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}

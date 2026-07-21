@@ -57,6 +57,14 @@ def test_answer_performance_sufficient_and_insufficient():
     assert _guarded(good) and _guarded(low)
 
 
+def test_answer_trending_when_sentiment_data_present():
+    ctx = {"trending": [{"symbol": "NVDA", "attention": 88, "sentiment": None},
+                        {"symbol": "TSLA", "attention": 61, "sentiment": 0.3}]}
+    ans, src = A.build_answer("what's trending", ctx)
+    assert "NVDA (88)" in ans and "TSLA (61)" in ans and "trending" in src
+    assert directive_guard(ans)
+
+
 def test_answer_empty_context_falls_back_to_top_signals_then_scope():
     top = A.build_answer("what's hot", {"top_signals": [{"symbol": "ABC", "bucket": "high"},
                                                         {"symbol": "XYZ", "bucket": "medium"}]})[0]
