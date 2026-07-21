@@ -16,6 +16,7 @@ services:
     build: .
     environment:
       DATABASE_URL: postgresql://tradeos:${POSTGRES_PASSWORD}@db:5432/tradeos
+      UPLOADS_DIR: /app/uploads
       SEC_USER_AGENT: ${SEC_USER_AGENT}
       TIINGO_API_KEY: ${TIINGO_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
@@ -27,9 +28,11 @@ services:
       STRIPE_PRICE_RETAIL: ${STRIPE_PRICE_RETAIL:-}
       STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO:-}
     ports: ["8000:8000"]
+    volumes: [uploads:/app/uploads]   # user trade screenshots (re-encoded); survives image rebuilds
     depends_on:
       db:
         condition: service_healthy
 
 volumes:
   pgdata:
+  uploads:

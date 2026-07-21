@@ -11,8 +11,11 @@ from __future__ import annotations
 
 import logging
 import os
+import re
+import secrets
 import time
 from datetime import date, datetime, timedelta, timezone
+from io import BytesIO
 from pathlib import Path
 
 from fastapi import Cookie, FastAPI, Request, Response
@@ -21,7 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from psycopg.types.json import Json
 from pydantic import BaseModel
 
-from . import apikeys, authn, billing, db, portfolio, presentation
+from . import apikeys, authn, billing, db, portfolio, presentation, trades
 
 SESSION_COOKIE = "tos_session"
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").lower() == "true"  # true behind TLS in prod
@@ -71,6 +74,28 @@ class ApiKeyReq(BaseModel):
     name: str | None = None
 
 
+class TradeReq(BaseModel):
+    symbol: str | None = None
+    asset_class: str = "equity"
+    direction: str = "long"
+    status: str = "planned"
+    entry_price: float | None = None
+    exit_price: float | None = None
+    stop_price: float | None = None
+    target_price: float | None = None
+    size: float | None = None
+    size_unit: str = "shares"
+    timeframe: str | None = None
+    strategy: str | None = None
+    reason_entry: str | None = None
+    reason_exit: str | None = None
+    confidence: int | None = None
+    expected_outcome: str | None = None
+    opened_on: str | None = None
+    closed_on: str | None = None
+    is_public: bool = False
+
+
 def _set_session_cookie(response: Response, token: str) -> None:
     response.set_cookie(SESSION_COOKIE, token, httponly=True, secure=COOKIE_SECURE,
                         samesite="lax", max_age=authn.SESSION_HOURS * 3600, path="/")
@@ -103,6 +128,38 @@ def _rate_ok(limit: int = 20, window: int = 60) -> bool:
         return False
     _extract_calls.append(now)
     return True
+
+
+# ---- user-uploaded trade screenshots: re-encoded, opaque-named, served through an authed route
+UPLOADS_DIR = Path(os.environ.get("UPLOADS_DIR", str(Path(__file__).parent.parent / "uploads")))
+_IMG_KEY = re.compile(r"[0-9a-f]{32}\.png")
+
+
+def _image_path(key: str | None) -> Path | None:
+    return UPLOADS_DIR / key if key and _IMG_KEY.fullmatch(key) else None
+
+
+def _store_image(body: bytes) -> str:
+    """Re-encode an upload to a normalized PNG under an opaque key: strips EXIF/metadata and
+    neutralizes any non-image payload (polyglots); a pixel cap bounds decompression bombs."""
+    from PIL import Image
+    Image.MAX_IMAGE_PIXELS = 40_000_000
+    Image.open(BytesIO(body)).verify()             # reject truncated / lying files
+    im = Image.open(BytesIO(body)).convert("RGB")  # re-open (verify consumed it); drop alpha/EXIF
+    im.thumbnail((2000, 2000))
+    UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+    key = secrets.token_hex(16) + ".png"
+    im.save(UPLOADS_DIR / key, format="PNG")
+    return key
+
+
+def _delete_image(key: str | None) -> None:
+    p = _image_path(key)
+    try:
+        if p and p.exists():
+            p.unlink()
+    except OSError:
+        pass
 
 
 _CSP = ("default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; "
@@ -783,6 +840,238 @@ async def extract_tickers_endpoint(request: Request) -> dict:
             "note": "Symbols only. The image was processed in-request and not stored; no prices or "
                     "positions were read.",
             "provider_available": bool(candidates) or None}
+
+
+# ------------------------------------------------------------------- trade journal (Slice E)
+
+_TRADE_COLS = ("id", "user_id", "symbol", "entity_id", "asset_class", "direction", "status",
+               "entry_price", "exit_price", "stop_price", "target_price", "size", "size_unit",
+               "timeframe", "strategy", "reason_entry", "reason_exit", "confidence",
+               "expected_outcome", "opened_on", "closed_on", "image_path", "is_public",
+               "created_at", "updated_at")
+_ASSET = {"equity", "crypto", "forex", "option", "future", "other"}
+_DIR = {"long", "short"}
+_STATUS = {"planned", "open", "closed"}
+_UNIT = {"shares", "contracts", "usd", "units", "lots"}
+
+
+def _num(x):
+    return float(x) if isinstance(x, (int, float)) and x >= 0 else None
+
+
+def _pdate(s):
+    try:
+        return date.fromisoformat(s[:10]) if s else None
+    except ValueError:
+        return None
+
+
+def _txt(x, n):
+    return ((x or "").strip()[:n]) or None
+
+
+def _sanitize_trade(req: "TradeReq", cur) -> dict:
+    """Validate enums, clamp text/numbers, resolve symbol->entity. Field names are fixed internal
+    identifiers (never user input), so building the column list from them is injection-safe."""
+    sym = _txt(req.symbol, 12)
+    sym = sym.upper() if sym else None
+    ent = _resolve_symbol(cur, sym) if sym else None
+    return {
+        "symbol": sym, "entity_id": ent[0] if ent else None,
+        "asset_class": req.asset_class if req.asset_class in _ASSET else "equity",
+        "direction": req.direction if req.direction in _DIR else "long",
+        "status": req.status if req.status in _STATUS else "planned",
+        "entry_price": _num(req.entry_price), "exit_price": _num(req.exit_price),
+        "stop_price": _num(req.stop_price), "target_price": _num(req.target_price),
+        "size": _num(req.size), "size_unit": req.size_unit if req.size_unit in _UNIT else "shares",
+        "timeframe": _txt(req.timeframe, 24), "strategy": _txt(req.strategy, 48),
+        "reason_entry": _txt(req.reason_entry, 2000), "reason_exit": _txt(req.reason_exit, 2000),
+        "confidence": req.confidence if req.confidence in (1, 2, 3, 4, 5) else None,
+        "expected_outcome": _txt(req.expected_outcome, 500),
+        "opened_on": _pdate(req.opened_on), "closed_on": _pdate(req.closed_on),
+        "is_public": bool(req.is_public),
+    }
+
+
+def _trade_to_dict(row) -> dict:
+    m = dict(zip(_TRADE_COLS, row))
+    d = m["direction"]
+    m["reward_risk"] = trades.reward_risk(m["entry_price"], m["stop_price"], m["target_price"], d)
+    m["rr"] = m["reward_risk"]  # alias consumed by summarize_performance
+    m["realized_pnl_pct"] = (trades.realized_pnl_pct(m["entry_price"], m["exit_price"], d)
+                             if m["status"] == "closed" else None)
+    m["has_image"] = bool(m.pop("image_path"))
+    for k in ("opened_on", "closed_on", "created_at", "updated_at"):
+        if m.get(k) is not None:
+            m[k] = m[k].isoformat()
+    m.pop("user_id", None)
+    return m
+
+
+def _load_trade(cur, tid: int):
+    cur.execute(f"SELECT {', '.join(_TRADE_COLS)} FROM trades WHERE id=%s", (tid,))
+    return cur.fetchone()
+
+
+@app.post("/api/trades")
+def trade_create(req: TradeReq, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "log in to journal your trades"}
+        max_t = billing.entitlements(user["tier"])["max_trades"]
+        cur.execute("SELECT count(*) FROM trades WHERE user_id=%s", (user["id"],))
+        if cur.fetchone()[0] >= max_t:
+            response.status_code = 403
+            return {"error": f"Your plan allows {max_t} journal entries. Upgrade for more.", "upgrade": True}
+        f = _sanitize_trade(req, cur)
+        cols = ", ".join(f.keys())
+        cur.execute(f"INSERT INTO trades (user_id, {cols}) VALUES (%s, {', '.join(['%s'] * len(f))}) RETURNING id",
+                    (user["id"], *f.values()))
+        tid = cur.fetchone()[0]
+        conn.commit()
+    return {"created": True, "id": tid}
+
+
+@app.get("/api/trades")
+def trades_list(user_id: int | None = None, tos_session: str | None = Cookie(None)) -> dict:
+    """Own journal when authenticated; a profile's PUBLIC trades when `user_id` is given."""
+    with db.connect() as conn, conn.cursor() as cur:
+        me = authn.session_user(conn, tos_session)
+        if user_id is not None:
+            cur.execute(f"SELECT {', '.join(_TRADE_COLS)} FROM trades WHERE user_id=%s AND is_public "
+                        f"ORDER BY created_at DESC LIMIT 200", (user_id,))
+            return {"scope": "public", "trades": [_trade_to_dict(r) for r in cur.fetchall()]}
+        if not me:
+            return {"authenticated": False, "trades": []}
+        cur.execute(f"SELECT {', '.join(_TRADE_COLS)} FROM trades WHERE user_id=%s "
+                    f"ORDER BY created_at DESC LIMIT 500", (me["id"],))
+        return {"authenticated": True, "trades": [_trade_to_dict(r) for r in cur.fetchall()]}
+
+
+@app.get("/api/trades/{tid}")
+def trade_get(tid: int, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn, conn.cursor() as cur:
+        me = authn.session_user(conn, tos_session)
+        row = _load_trade(cur, tid)
+        if not row:
+            return {"found": False}
+        m = dict(zip(_TRADE_COLS, row))
+        owner = bool(me and me["id"] == m["user_id"])
+        if not m["is_public"] and not owner:
+            return {"found": False}  # never reveal a private trade's existence
+    return {"found": True, "owner": owner, "trade": _trade_to_dict(row)}
+
+
+@app.patch("/api/trades/{tid}")
+def trade_update(tid: int, req: TradeReq, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "not authenticated"}
+        cur.execute("SELECT 1 FROM trades WHERE id=%s AND user_id=%s", (tid, user["id"]))
+        if not cur.fetchone():
+            response.status_code = 404
+            return {"error": "trade not found"}
+        f = _sanitize_trade(req, cur)
+        cur.execute(f"UPDATE trades SET {', '.join(k + '=%s' for k in f)}, updated_at=now() "
+                    f"WHERE id=%s AND user_id=%s", (*f.values(), tid, user["id"]))
+        cur.execute("DELETE FROM trade_analyses WHERE trade_id=%s", (tid,))  # inputs changed -> stale
+        conn.commit()
+    return {"updated": True}
+
+
+@app.delete("/api/trades/{tid}")
+def trade_delete(tid: int, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "not authenticated"}
+        cur.execute("SELECT image_path FROM trades WHERE id=%s AND user_id=%s", (tid, user["id"]))
+        row = cur.fetchone()
+        if not row:
+            response.status_code = 404
+            return {"error": "trade not found"}
+        cur.execute("DELETE FROM trades WHERE id=%s AND user_id=%s", (tid, user["id"]))
+        conn.commit()
+    _delete_image(row[0])
+    return {"deleted": True}
+
+
+@app.get("/api/trades/{tid}/analysis")
+def trade_analysis(tid: int, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn, conn.cursor() as cur:
+        me = authn.session_user(conn, tos_session)
+        row = _load_trade(cur, tid)
+        if not row:
+            return {"found": False}
+        m = dict(zip(_TRADE_COLS, row))
+        if not m["is_public"] and not (me and me["id"] == m["user_id"]):
+            return {"found": False}
+        analysis = trades.cached_analysis(conn, m)
+    return {"found": True, "analysis": analysis}
+
+
+@app.get("/api/performance")
+def performance(tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            return {"authenticated": False}
+        cur.execute(f"SELECT {', '.join(_TRADE_COLS)} FROM trades WHERE user_id=%s", (user["id"],))
+        rows = [_trade_to_dict(r) for r in cur.fetchall()]
+    return {"authenticated": True, "summary": trades.summarize_performance(rows), "total": len(rows)}
+
+
+@app.post("/api/trades/{tid}/image")
+async def trade_image_upload(tid: int, request: Request, tos_session: str | None = Cookie(None)):
+    if not _rate_ok():
+        return JSONResponse({"error": "rate limited; try again shortly"}, status_code=429)
+    mime = request.headers.get("content-type", "").split(";")[0].strip()
+    if mime not in _ALLOWED_IMAGE:
+        return JSONResponse({"error": "unsupported content-type; use png, jpeg, or webp"}, status_code=400)
+    body = await request.body()
+    if not body or len(body) > MAX_IMAGE_BYTES:
+        return JSONResponse({"error": "image missing or larger than 8MB"}, status_code=400)
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            return JSONResponse({"error": "not authenticated"}, status_code=401)
+        cur.execute("SELECT image_path FROM trades WHERE id=%s AND user_id=%s", (tid, user["id"]))
+        row = cur.fetchone()
+        if not row:
+            return JSONResponse({"error": "trade not found"}, status_code=404)
+        try:
+            key = _store_image(body)
+        except Exception:
+            return JSONResponse({"error": "could not read that image"}, status_code=400)
+        cur.execute("UPDATE trades SET image_path=%s, updated_at=now() WHERE id=%s AND user_id=%s",
+                    (key, tid, user["id"]))
+        conn.commit()
+    if row[0] and row[0] != key:
+        _delete_image(row[0])
+    return {"uploaded": True}
+
+
+@app.get("/api/trades/{tid}/image")
+def trade_image(tid: int, tos_session: str | None = Cookie(None)):
+    with db.connect() as conn, conn.cursor() as cur:
+        me = authn.session_user(conn, tos_session)
+        cur.execute("SELECT user_id, is_public, image_path FROM trades WHERE id=%s", (tid,))
+        r = cur.fetchone()
+    if not r or not r[2]:
+        return Response(status_code=404)
+    uid, pub, key = r
+    if not pub and not (me and me["id"] == uid):
+        return Response(status_code=404)
+    p = _image_path(key)
+    if not p or not p.exists():
+        return Response(status_code=404)
+    return Response(p.read_bytes(), media_type="image/png",
+                    headers={"Cache-Control": "private, max-age=3600", "X-Content-Type-Options": "nosniff"})
 
 
 @app.get("/api/watchlist")

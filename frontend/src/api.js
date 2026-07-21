@@ -56,6 +56,17 @@ export async function shadowSymbol(symbol) {
   if (!p) { const c = await createPortfolio("My shadows", "manual"); p = { id: c.id }; }
   return addPosition(p.id, symbol);
 }
+// Trade journal (Slice E). The analysis is guarded server-side; the UI renders only what it returns.
+export const fetchTrades = () => get("/api/trades");
+export const fetchPublicTrades = (userId) => get(`/api/trades?user_id=${userId}`);
+export const getTrade = (id) => get(`/api/trades/${id}`);
+export const createTrade = (t) => post("/api/trades", t);
+export const updateTrade = (id, t) => fetch(`/api/trades/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(t) }).then((r) => r.json());
+export const deleteTrade = (id) => fetch(`/api/trades/${id}`, { method: "DELETE" }).then((r) => r.json());
+export const fetchTradeAnalysis = (id) => get(`/api/trades/${id}/analysis`);
+export const uploadTradeImage = (id, file) => fetch(`/api/trades/${id}/image`, { method: "POST", headers: { "Content-Type": file.type }, body: file }).then((r) => r.json());
+export const fetchPerformance = () => get("/api/performance");
+
 export const fetchOnboarding = () => get("/api/onboarding");
 export const fetchReferral = () => get("/api/referral");
 export const fetchPlans = () => get("/api/billing/plans");

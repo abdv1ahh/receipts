@@ -89,6 +89,60 @@ def generate(detail: dict, cal: dict | None, horizon: int) -> str | None:
     return text or None
 
 
+TRADE_INSTRUCTION = (
+    "You are writing a short, neutral, educational review of a trade a user logged in their own "
+    "journal, for a financial-intelligence terminal. Follow these rules exactly:\n"
+    "- Rephrase ONLY the facts in the data below into 2 to 4 fluent sentences. This is post-hoc "
+    "journaling and risk framing, never advice.\n"
+    "- NEVER tell the user what to do. NEVER use the words buy, sell, hold, should, recommend, "
+    "price target, outperform, underperform, or any directive/advice language.\n"
+    "- NEVER introduce a number that is not present in the data (no invented prices, ratios, or "
+    "percentages).\n"
+    "- End with: this is an educational review of a logged trade, not advice about any position.\n"
+    "DATA (JSON):\n"
+)
+
+
+def generate_trade_prose(analysis: dict, trade: dict) -> str | None:
+    """Rephrase a computed trade analysis into fluent prose — it never measures. Given only the
+    computed values, instructed to add no number and no directive language; the caller re-checks
+    both guards. Returns None with no key or on failure, so the deterministic prose is used."""
+    key = os.environ.get("GEMINI_API_KEY")
+    if not key:
+        return None
+    payload = {
+        "symbol": trade.get("symbol"), "direction": trade.get("direction"),
+        "asset_class": trade.get("asset_class"), "status": trade.get("status"),
+        "reward_risk": analysis.get("reward_risk"), "realized_pnl_pct": analysis.get("realized_pnl_pct"),
+        "observations": analysis.get("observations"), "risk_flags": analysis.get("risk_flags"),
+        "context": analysis.get("context"),
+    }
+    model = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
+    url = GEMINI_URL.format(model=model)
+    if urlparse(url).hostname != GEMINI_HOST:
+        raise ValueError("Gemini host allowlist violation")
+    body = {
+        "contents": [{"parts": [{"text": TRADE_INSTRUCTION + json.dumps(payload)}]}],
+        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 512,
+                             "thinkingConfig": {"thinkingBudget": 0}},
+    }
+    with httpx.Client(timeout=45.0) as client:
+        for attempt in range(3):  # transient 429/503 -> brief retry, else template
+            resp = client.post(url, params={"key": key}, json=body)
+            if resp.status_code in (429, 503) and attempt < 2:
+                time.sleep(2 * (attempt + 1))
+                continue
+            resp.raise_for_status()
+            break
+        data = resp.json()
+    candidates = data.get("candidates") or []
+    if not candidates:
+        return None
+    parts = candidates[0].get("content", {}).get("parts") or []
+    text = "".join(p.get("text", "") for p in parts if not p.get("thought")).strip()
+    return text or None
+
+
 VISION_INSTRUCTION = (
     "Extract ONLY the stock ticker symbols visible in this image. Return ONLY a JSON array of "
     "uppercase ticker symbols, e.g. [\"AAPL\",\"MSFT\"]. Ignore all prices, quantities, dollar "

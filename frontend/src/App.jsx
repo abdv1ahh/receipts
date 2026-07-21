@@ -3,12 +3,13 @@ import { authLogout, authMe, fetchCalibration, fetchClusters, fetchClusterDetail
 import { ClusterDetail, ClusterTable, Disclaimer, Methodology, StatusStrip } from "./components.jsx";
 import { AssetView, AuthPanel, LibraryEntry, LibraryView, ProfileView, Screener, WatchlistView } from "./views.jsx";
 import { Home } from "./home.jsx";
+import { JournalView } from "./journal.jsx";
 import { AlertsView, BriefView, NotificationsView } from "./alerts.jsx";
 import { PortfoliosView } from "./portfolios.jsx";
 import { PricingView } from "./pricing.jsx";
 import { CryptoPreview, OptionsPreview } from "./previews.jsx";
 
-const NAV = { home: "home", brief: "brief", portfolios: "portfolios", watchlist: "watchlist", alerts: "alerts", screener: "screener", dashboard: "clusters", library: "library", methodology: "methodology" };
+const NAV = { home: "home", brief: "brief", journal: "journal", portfolios: "portfolios", watchlist: "watchlist", alerts: "alerts", screener: "screener", dashboard: "clusters", library: "library", methodology: "methodology" };
 
 export default function App() {
   const [minC, setMinC] = useState("medium");
@@ -145,6 +146,8 @@ export default function App() {
         <AlertsView onLogin={() => { setView("auth"); setDetail(null); }} onOpenSymbol={openSymbol} />
       ) : view === "portfolios" ? (
         <PortfoliosView user={user} onLogin={() => { setView("auth"); setDetail(null); }} onOpenSymbol={openSymbol} />
+      ) : view === "journal" ? (
+        <JournalView user={user} onLogin={() => { setView("auth"); setDetail(null); }} onOpenSymbol={openSymbol} onOpenLibrary={openLibrary} />
       ) : view === "pricing" ? (
         <PricingView user={user} onUpgraded={refreshUser} onLogin={() => { setView("auth"); setDetail(null); }} />
       ) : view === "notifications" ? (

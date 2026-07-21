@@ -26,10 +26,10 @@ PLANS = {
 # Server-side entitlements per tier. live_signals maps to the 48h delay (decision #36); the limits
 # are enforced in the write paths so a free user editing a request can never exceed them.
 ENTITLEMENTS = {
-    "free":   {"live_signals": False, "max_follows": 5,      "max_portfolios": 1,    "realtime_alerts": False, "api": False},
-    "retail": {"live_signals": True,  "max_follows": 1000,   "max_portfolios": 50,   "realtime_alerts": True,  "api": False},
-    "pro":    {"live_signals": True,  "max_follows": 100000, "max_portfolios": 1000, "realtime_alerts": True,  "api": True},
-    "admin":  {"live_signals": True,  "max_follows": 100000, "max_portfolios": 1000, "realtime_alerts": True,  "api": True},
+    "free":   {"live_signals": False, "max_follows": 5,      "max_portfolios": 1,    "max_trades": 50,     "realtime_alerts": False, "api": False},
+    "retail": {"live_signals": True,  "max_follows": 1000,   "max_portfolios": 50,   "max_trades": 5000,   "realtime_alerts": True,  "api": False},
+    "pro":    {"live_signals": True,  "max_follows": 100000, "max_portfolios": 1000, "max_trades": 100000, "realtime_alerts": True,  "api": True},
+    "admin":  {"live_signals": True,  "max_follows": 100000, "max_portfolios": 1000, "max_trades": 100000, "realtime_alerts": True,  "api": True},
 }
 
 
