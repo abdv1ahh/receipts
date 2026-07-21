@@ -10,9 +10,10 @@ import { CommunityView } from "./community.jsx";
 import { AlertsView, BriefView, NotificationsView } from "./alerts.jsx";
 import { PortfoliosView } from "./portfolios.jsx";
 import { PricingView } from "./pricing.jsx";
-import { CryptoPreview, OptionsPreview } from "./previews.jsx";
+import { OptionsPreview } from "./previews.jsx";
+import { CryptoView } from "./crypto.jsx";
 
-const NAV = { home: "home", brief: "brief", community: "community", journal: "journal", assistant: "assistant", trending: "trending", portfolios: "portfolios", watchlist: "watchlist", alerts: "alerts", screener: "screener", dashboard: "clusters", library: "library", methodology: "methodology" };
+const NAV = { home: "home", brief: "brief", community: "community", journal: "journal", assistant: "assistant", trending: "trending", crypto: "crypto", portfolios: "portfolios", watchlist: "watchlist", alerts: "alerts", screener: "screener", dashboard: "clusters", library: "library", methodology: "methodology" };
 
 export default function App() {
   const [minC, setMinC] = useState("medium");
@@ -112,7 +113,7 @@ export default function App() {
               <button key={v} className={(view === v || (v === "library" && view === "library-entry")) ? "on" : ""} onClick={() => { setView(v); setDetail(null); }}>{NAV[v]}</button>
             ))}
             <span className="nav-sep">roadmap</span>
-            {["options", "crypto"].map((v) => (
+            {["options"].map((v) => (
               <button key={v} className={`preview-nav ${view === v ? "on" : ""}`} onClick={() => { setView(v); setDetail(null); }}>{v}▹</button>
             ))}
             <button className="upgrade-btn" onClick={() => { setView("pricing"); setDetail(null); }}>
@@ -181,7 +182,7 @@ export default function App() {
       ) : view === "options" ? (
         <OptionsPreview onBack={() => setView("dashboard")} />
       ) : view === "crypto" ? (
-        <CryptoPreview onBack={() => setView("dashboard")} />
+        <CryptoView />
       ) : detail ? (
         detail === "loading" ? (
           <div className="detail"><div className="skel" style={{ width: 220 }} /></div>

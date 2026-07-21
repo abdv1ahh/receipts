@@ -438,3 +438,8 @@ table.clusters { width: 100%; border-collapse: collapse; }
 .comment-add { display: flex; gap: 8px; margin-top: 12px; }
 .comment-add input { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 8px 10px; font: inherit; font-size: 13px; }
 .profile-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+
+/* ---- Crypto (Slice I) ------------------------------------------------------------------------ */
+.trending-coins { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 0 2px; }
+.coin-chip { font-size: 12px; font-weight: 700; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 4px 8px; }
+.coin-chip .name { font-weight: 400; }

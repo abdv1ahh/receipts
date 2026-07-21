@@ -82,6 +82,8 @@ export const addComment = (id, body) => post(`/api/trades/${id}/comments`, { bod
 export const deleteComment = (cid) => fetch(`/api/comments/${cid}`, { method: "DELETE" }).then((r) => r.json());
 export const reportContent = (target_type, target_id, reason) => post("/api/report", { target_type, target_id, reason });
 export const fetchTraderLeaderboard = () => get("/api/leaderboard/traders");
+export const fetchCryptoMarkets = (limit = 25) => get(`/api/crypto/markets?limit=${limit}`);
+export const fetchCryptoTrending = () => get("/api/crypto/trending");
 
 export const fetchOnboarding = () => get("/api/onboarding");
 export const fetchReferral = () => get("/api/referral");

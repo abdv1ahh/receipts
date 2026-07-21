@@ -24,7 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from psycopg.types.json import Json
 from pydantic import BaseModel
 
-from . import apikeys, assistant, authn, billing, community, db, portfolio, presentation, sentiment, trades
+from . import apikeys, assistant, authn, billing, community, crypto, db, portfolio, presentation, sentiment, trades
 
 SESSION_COOKIE = "tos_session"
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").lower() == "true"  # true behind TLS in prod
@@ -1292,6 +1292,28 @@ def leaderboard_traders() -> dict:
     with db.connect() as conn:
         board = community.trader_leaderboard_data(conn)
     return {"leaderboard": board, "min_closed": community.LEADERBOARD_MIN_CLOSED}
+
+
+@app.get("/api/crypto/markets")
+def crypto_markets(limit: int = 25) -> dict:
+    """Real crypto market data from CoinGecko (docs/threat-models/crypto.md). Market data + risk
+    labels, not advice; on any upstream failure returns an honest error, never a fabricated price."""
+    limit = max(1, min(50, limit))
+    try:
+        return {"markets": crypto.markets(limit), "source": "CoinGecko",
+                "note": "Market data, not advice. Crypto is high-risk and volatile."}
+    except Exception:
+        log.warning("crypto markets fetch failed")
+        return {"markets": [], "source": "CoinGecko", "error": "crypto data temporarily unavailable"}
+
+
+@app.get("/api/crypto/trending")
+def crypto_trending() -> dict:
+    try:
+        return {"trending": crypto.trending(), "source": "CoinGecko"}
+    except Exception:
+        log.warning("crypto trending fetch failed")
+        return {"trending": [], "source": "CoinGecko", "error": "unavailable"}
 
 
 @app.get("/api/watchlist")
