@@ -143,6 +143,55 @@ def generate_trade_prose(analysis: dict, trade: dict) -> str | None:
     return text or None
 
 
+REPORT_INSTRUCTION = (
+    "You are writing a short, neutral, educational summary of a user's OWN trading journal for a "
+    "financial-intelligence terminal. Follow these rules exactly:\n"
+    "- Synthesise ONLY the aggregate facts in the data below (counts, win rate if present, recurring "
+    "risk-management habits) into 3 to 5 fluent sentences. This is post-hoc journaling and risk "
+    "framing, never advice.\n"
+    "- NEVER tell the user what to do or what to trade. NEVER use the words buy, sell, hold, should, "
+    "recommend, price target, outperform, underperform, or any directive/advice language.\n"
+    "- NEVER introduce a number that is not present in the data (no invented rates, counts, or "
+    "percentages). If win_rate is null, do not state a win rate.\n"
+    "- Speak to habits and patterns, encouragingly and neutrally. End with: this is an educational "
+    "summary of trades you logged, not advice about any position.\n"
+    "DATA (JSON):\n"
+)
+
+
+def generate_journal_report(report: dict) -> str | None:
+    """Rephrase an aggregate journal report into fluent prose — it never measures. Given only the
+    computed aggregates, instructed to add no number and no directive language; the caller re-checks
+    both guards. Returns None with no key or on failure, so the deterministic report is used."""
+    key = os.environ.get("GEMINI_API_KEY")
+    if not key:
+        return None
+    model = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
+    url = GEMINI_URL.format(model=model)
+    if urlparse(url).hostname != GEMINI_HOST:
+        raise ValueError("Gemini host allowlist violation")
+    body = {
+        "contents": [{"parts": [{"text": REPORT_INSTRUCTION + json.dumps(report)}]}],
+        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 640,
+                             "thinkingConfig": {"thinkingBudget": 0}},
+    }
+    with httpx.Client(timeout=45.0) as client:
+        for attempt in range(3):  # transient 429/503 -> brief retry, else template
+            resp = client.post(url, params={"key": key}, json=body)
+            if resp.status_code in (429, 503) and attempt < 2:
+                time.sleep(2 * (attempt + 1))
+                continue
+            resp.raise_for_status()
+            break
+        data = resp.json()
+    candidates = data.get("candidates") or []
+    if not candidates:
+        return None
+    parts = candidates[0].get("content", {}).get("parts") or []
+    text = "".join(p.get("text", "") for p in parts if not p.get("thought")).strip()
+    return text or None
+
+
 ASSISTANT_INSTRUCTION = (
     "You are the assistant inside a financial-intelligence terminal. Answer the user's question using "
     "ONLY the CONTEXT JSON below, which is real platform data. Rules, exactly:\n"

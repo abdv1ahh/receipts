@@ -24,7 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from psycopg.types.json import Json
 from pydantic import BaseModel
 
-from . import admin, apikeys, assistant, authn, billing, community, crypto, db, flags, portfolio, presentation, search, sentiment, trades
+from . import admin, apikeys, assistant, authn, billing, community, crypto, db, flags, insights, portfolio, presentation, search, sentiment, trades
 
 SESSION_COOKIE = "tos_session"
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").lower() == "true"  # true behind TLS in prod
@@ -98,6 +98,17 @@ class TradeReq(BaseModel):
 
 class AssistantReq(BaseModel):
     message: str
+
+
+class SimulateReq(BaseModel):
+    symbol: str | None = None
+    direction: str = "long"
+    entry_price: float | None = None
+    stop_price: float | None = None
+    target_price: float | None = None
+    size: float | None = None
+    size_unit: str = "shares"
+    account_size: float | None = None
 
 
 class ProfileReq(BaseModel):
@@ -1085,6 +1096,64 @@ def performance(tos_session: str | None = Cookie(None)) -> dict:
         cur.execute(f"SELECT {', '.join(_TRADE_COLS)} FROM trades WHERE user_id=%s", (user["id"],))
         rows = [_trade_to_dict(r) for r in cur.fetchall()]
     return {"authenticated": True, "summary": trades.summarize_performance(rows), "total": len(rows)}
+
+
+# ------------------------------------------------------------------ advanced AI (Slice L)
+
+@app.get("/api/trades/{tid}/similar")
+def trade_similar(tid: int, tos_session: str | None = Cookie(None)) -> dict:
+    """The OWNER's own trades most like this one, with an honest cohort outcome (descriptive history,
+    not a prediction). Restricted to the owner — a viewer never sees another trader's private journal."""
+    with db.connect() as conn, conn.cursor() as cur:
+        me = authn.session_user(conn, tos_session)
+        row = _load_trade(cur, tid)
+        if not row:
+            return {"found": False}
+        m = dict(zip(_TRADE_COLS, row))
+        if not (me and me["id"] == m["user_id"]):
+            return {"found": False}
+        target = {"id": m["id"], "symbol": m["symbol"], "direction": m["direction"],
+                  "asset_class": m["asset_class"], "strategy": m["strategy"], "timeframe": m["timeframe"],
+                  "reward_risk": trades.reward_risk(m["entry_price"], m["stop_price"], m["target_price"], m["direction"])}
+        res = insights.similar_for_trade(conn, target, me["id"])
+    return {"found": True, **res}
+
+
+@app.post("/api/simulate")
+def simulate_endpoint(req: SimulateReq, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    """Deterministic position scenario simulator (docs/threat-models/insights.md): P&L, R-multiple and
+    account-risk across price points the user names, plus a signal base-rate overlay when the symbol
+    maps to a real convergence signal — never a probability or a forecast for the trade."""
+    if not _rate_ok(limit=30):
+        response.status_code = 429
+        return {"ok": False, "reason": "slow down a moment and try again"}
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"ok": False, "reason": "log in to use the simulator"}
+        entity_id = None
+        if req.symbol:
+            ent = _resolve_symbol(cur, req.symbol)
+            entity_id = ent[0] if ent else None
+        trade = {"entry_price": req.entry_price, "stop_price": req.stop_price,
+                 "target_price": req.target_price, "direction": req.direction,
+                 "size": req.size, "size_unit": req.size_unit,
+                 "symbol": (req.symbol or "").strip().upper() or None}
+        return insights.simulate_with_context(conn, trade, req.account_size, entity_id)
+
+
+@app.get("/api/journal/report")
+def journal_report_endpoint(tos_session: str | None = Cookie(None)) -> dict:
+    """Auto journal report over the user's OWN journal — aggregate performance + recurring habits,
+    optionally phrased by the guarded model (AI kill-switch honored), cached by an inputs-hash."""
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            return {"authenticated": False}
+        provider = flags.effective_provider(conn, "ai_trade_analysis")
+        report = insights.journal_report(conn, user["id"], provider=provider)
+    return {"authenticated": True, "report": report}
 
 
 @app.post("/api/trades/{tid}/image")

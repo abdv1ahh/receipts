@@ -66,6 +66,10 @@ export const deleteTrade = (id) => fetch(`/api/trades/${id}`, { method: "DELETE"
 export const fetchTradeAnalysis = (id) => get(`/api/trades/${id}/analysis`);
 export const uploadTradeImage = (id, file) => fetch(`/api/trades/${id}/image`, { method: "POST", headers: { "Content-Type": file.type }, body: file }).then((r) => r.json());
 export const fetchPerformance = () => get("/api/performance");
+// Advanced AI (Slice L): similar-trade finder, scenario simulator, auto journal report.
+export const fetchSimilarTrades = (id) => get(`/api/trades/${id}/similar`);
+export const simulateTrade = (params) => post("/api/simulate", params);
+export const fetchJournalReport = () => get("/api/journal/report");
 export const askAssistant = (message) => post("/api/assistant", { message });
 export const fetchTrending = (hours = 48) => get(`/api/trending?hours=${hours}`);
 export const fetchSymbolSentiment = (symbol) => get(`/api/sentiment/${encodeURIComponent(symbol)}`);

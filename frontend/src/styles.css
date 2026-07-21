@@ -510,3 +510,12 @@ button:disabled { opacity: 0.5; cursor: default; }
 .toggle.on { border-color: #2f4a2f; color: var(--green); background: #12261a; }
 .toggle.on .knob { background: var(--green); transform: translateX(5px); }
 .admin-audit td.mono { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Advanced AI (Slice L): similar-trade rows, report + simulator reuse .analysis/.perf/.clusters */
+.analysis.similar, .analysis.report { border-left: 2px solid var(--accent); }
+.sim-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.sim-row { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; color: var(--text); font: inherit; font-size: 12.5px; cursor: pointer; }
+.sim-row:hover { border-color: var(--accent); }
+.sim-sym { font-weight: 700; min-width: 46px; }
+.sim-rr { color: var(--muted); margin-left: auto; font-variant-numeric: tabular-nums; }
+.sim-pnl { font-variant-numeric: tabular-nums; min-width: 56px; text-align: right; }
