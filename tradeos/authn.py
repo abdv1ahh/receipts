@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
 import secrets
 
 import psycopg
@@ -169,8 +170,18 @@ def register(conn: psycopg.Connection, email: str, password: str, invite_code: s
     conn.commit()
     if referred_by is not None:
         _grant_trial(conn, uid, days=14)   # welcome reward for a referred signup (lazily expiring)
+    # Pre-launch free access: until a real payment provider is configured, every new signup gets full
+    # Pro access at no charge (the pricing page stays visible in test mode). This auto-reverts to the
+    # normal free default the moment STRIPE_SECRET_KEY is set, so switching on paid billing at launch
+    # needs no code change — just the key.
+    launch_free = not os.environ.get("STRIPE_SECRET_KEY")
+    if launch_free and referred_by is None:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE users SET tier='pro' WHERE id=%s AND tier<>'admin'", (uid,))
+        conn.commit()
     audit(conn, email, "register", email, {"referred_by": referred_by} if referred_by else None)
-    return token, {"id": uid, "email": email, "tier": ("pro" if referred_by else tier)}
+    effective_tier = "pro" if (referred_by or launch_free) else tier
+    return token, {"id": uid, "email": email, "tier": effective_tier}
 
 
 def login(conn: psycopg.Connection, email: str, password: str, totp_code: str | None = None,
