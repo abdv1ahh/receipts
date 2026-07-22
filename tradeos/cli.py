@@ -242,6 +242,57 @@ def cmd_seed_admin(args) -> None:
     print(f"  otpauth: {uri}")
 
 
+def cmd_seed_demo(_args) -> None:
+    """A ready-to-use demo account: tier=pro (full features, no charge), NO TOTP (so it logs in with
+    just email + password), pre-populated with a handle, journal trades, a portfolio, and a watchlist
+    so the product looks alive on first login. Idempotent. Override creds via TRADEOS_DEMO_EMAIL /
+    TRADEOS_DEMO_PASSWORD."""
+    email = os.environ.get("TRADEOS_DEMO_EMAIL", "demo@tradeos.app").strip().lower()
+    pw = os.environ.get("TRADEOS_DEMO_PASSWORD", "<generated at seed time>")
+    with db.connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO users (email, password_hash, tier, handle, bio) VALUES (%s,%s,'pro',%s,%s) "
+                "ON CONFLICT (email) DO NOTHING RETURNING id",
+                (email, authn.hash_password(pw), "demo_trader",
+                 "Demo account — exploring smart-money convergence, journaling trades, and the AI tools."),
+            )
+            row = cur.fetchone()
+            if not row:
+                print(f"demo account {email} already exists; not modified")
+                return
+            uid = row[0]
+            eid = ("(SELECT entity_id FROM security_map WHERE symbol=%s AND source='sec_company_tickers' "
+                   "ORDER BY confidence DESC LIMIT 1)")
+            trades = [
+                ("NVDA", "long", "closed", 120, 138, 110, 145, 80, "breakout", True, "2026-06-02", "2026-06-20"),
+                ("MSFT", "long", "open", 410, None, 395, 465, 40, "pullback", True, "2026-06-25", None),
+                ("AAPL", "long", "closed", 195, 186, 188, 215, 60, "earnings", False, "2026-05-15", "2026-05-30"),
+                ("AMD", "long", "planned", 150, None, 138, 190, 50, "breakout", False, None, None),
+                ("TSLA", "short", "closed", 250, 232, 265, 220, 30, "reversal", True, "2026-06-10", "2026-06-24"),
+            ]
+            for (sym, d, st, e, ex, stp, tg, sz, strat, pub, op, cl) in trades:
+                cur.execute(
+                    f"""INSERT INTO trades (user_id, symbol, entity_id, asset_class, direction, status,
+                          entry_price, exit_price, stop_price, target_price, size, size_unit, strategy,
+                          is_public, opened_on, closed_on)
+                        VALUES (%s,%s,{eid},'equity',%s,%s,%s,%s,%s,%s,%s,'shares',%s,%s,%s,%s)""",
+                    (uid, sym, sym, d, st, e, ex, stp, tg, sz, strat, pub, op, cl),
+                )
+            cur.execute("INSERT INTO portfolios (user_id, name, kind) VALUES (%s,'My shadows','manual') RETURNING id", (uid,))
+            pid = cur.fetchone()[0]
+            for sym, op in (("NVDA", "2026-06-02"), ("MSFT", "2026-06-25")):
+                cur.execute(f"INSERT INTO portfolio_positions (portfolio_id, symbol, entity_id, opened_on) "
+                            f"VALUES (%s,%s,{eid},%s)", (pid, sym, sym, op))
+            for sym in ("NVDA", "MSFT", "AMD", "TSLA"):
+                cur.execute("INSERT INTO watchlists (user_key, symbol) VALUES ('demo',%s) ON CONFLICT DO NOTHING", (sym,))
+        conn.commit()
+        authn.audit(conn, "system", "seed_demo", email)
+    print(f"demo account created: {email}  (tier=pro, no MFA)")
+    print(f"  password: {pw}")
+    print("  Log in with that email + password — full Pro features, no charge.")
+
+
 def cmd_create_invites(args) -> None:
     with db.connect() as conn:
         codes = [authn.create_invite(conn, None) for _ in range(args.n)]
@@ -336,6 +387,7 @@ def main() -> None:
     sa = sub.add_parser("seed-admin")
     sa.add_argument("--email", required=True)
     sa.set_defaults(fn=cmd_seed_admin)
+    sub.add_parser("seed-demo").set_defaults(fn=cmd_seed_demo)
     ci = sub.add_parser("create-invites")
     ci.add_argument("--n", type=int, default=5)
     ci.set_defaults(fn=cmd_create_invites)
