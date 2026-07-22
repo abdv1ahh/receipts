@@ -15,7 +15,7 @@ COPY tradeos ./tradeos
 COPY content ./content
 COPY --from=web /web/dist ./tradeos/static
 # run as a non-root user (production additionally pins the base image by digest)
-RUN useradd --create-home --uid 10001 appuser && chown -R appuser:appuser /app
+RUN useradd --create-home --uid 10001 appuser && mkdir -p /app/uploads && chown -R appuser:appuser /app
 USER appuser
 EXPOSE 8000
 CMD ["uvicorn", "tradeos.app:app", "--host", "0.0.0.0", "--port", "8000"]

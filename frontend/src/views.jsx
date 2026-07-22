@@ -1,7 +1,7 @@
 // Deep-dive, screener, and profile surfaces. Every figure carries its freshness; a filer is
 // a link into its profile; nothing evaluates a user's position (the advice line).
 import { useEffect, useState } from "react";
-import { addWatchlist, authLogin, authRegister, extractTickers, fetchActivity, fetchAsset, fetchExplanation, fetchInsider, fetchInstitution, fetchLibrary, fetchLibraryEntry, fetchScreener, fetchWatchlist, removeWatchlist } from "./api";
+import { addFollow, addWatchlist, authLogin, authRegister, extractTickers, fetchActivity, fetchAsset, fetchExplanation, fetchInsider, fetchInstitution, fetchLibrary, fetchLibraryEntry, fetchScreener, fetchWatchlist, removeWatchlist } from "./api";
 import { Backtested, Disclaimer, Freshness } from "./components.jsx";
 
 function fmtDetail(o) {
@@ -271,11 +271,11 @@ export function WatchlistView({ onOpenSymbol }) {
   );
 }
 
-export function AuthPanel({ onAuthed, onBack }) {
-  const [mode, setMode] = useState("login");
+export function AuthPanel({ onAuthed, onBack, initialInvite }) {
+  const [mode, setMode] = useState(initialInvite ? "register" : "login");
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
-  const [invite, setInvite] = useState("");
+  const [invite, setInvite] = useState(initialInvite || "");
   const [totp, setTotp] = useState("");
   const [err, setErr] = useState(null);
   const submit = async () => {
@@ -289,10 +289,11 @@ export function AuthPanel({ onAuthed, onBack }) {
       <button className="back" onClick={onBack}>← back</button>
       <h2>{mode === "login" ? "Log in" : "Create account"}</h2>
       <div className="meta">Invite-only. Free tier sees signals on a 48-hour delay; paid tiers see them live.</div>
+      {initialInvite && mode === "register" && <div className="warn" style={{ borderColor: "#2f4a2f", color: "var(--green)", background: "#0f2417" }}>You were referred — register to start a 14-day Pro trial free.</div>}
       <div className="auth-form">
         <input className="search" style={{ width: "100%" }} placeholder="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         <input className="search" style={{ width: "100%" }} type="password" placeholder="password (10+ chars)" value={pw} onChange={(e) => setPw(e.target.value)} />
-        {mode === "register" && <input className="search" style={{ width: "100%" }} placeholder="invite code" value={invite} onChange={(e) => setInvite(e.target.value)} />}
+        {mode === "register" && <input className="search" style={{ width: "100%" }} placeholder="invite or referral code" value={invite} onChange={(e) => setInvite(e.target.value)} />}
         {mode === "login" && <input className="search" style={{ width: "100%" }} placeholder="TOTP code (admins only)" value={totp} onChange={(e) => setTotp(e.target.value)} />}
         <button className="shot-btn" onClick={submit}>{mode === "login" ? "log in" : "register"}</button>
         {err && <div className="warn">{err}</div>}
@@ -357,20 +358,29 @@ export function LibraryEntry({ slug, onBack, onOpenLibrary }) {
   );
 }
 
-export function ProfileView({ kind, id, onOpenSymbol, onBack }) {
+export function ProfileView({ kind, id, user, onOpenSymbol, onBack }) {
   const [data, setData] = useState(null);
+  const [followed, setFollowed] = useState(false);
   useEffect(() => {
-    setData(null);
+    setData(null); setFollowed(false);
     (kind === "insider" ? fetchInsider(id) : fetchInstitution(id)).then(setData).catch(() => setData({ found: false }));
   }, [kind, id]);
   if (!data) return <div className="detail"><div className="skel" style={{ width: 220 }} /></div>;
   if (data.found === false) return <div className="detail"><button className="back" onClick={onBack}>← back</button><div className="name" style={{ marginTop: 10 }}>profile not found.</div></div>;
 
+  const doFollow = async () => {
+    if (kind === "insider") await addFollow("insider", data.owner_cik, data.name);
+    else await addFollow("filer", String(id), data.name);
+    setFollowed(true);
+  };
   const Sym = ({ s }) => s ? <button className="linkish" onClick={() => onOpenSymbol(s)}>{s}</button> : <span>—</span>;
   return (
     <div className="detail">
       <button className="back" onClick={onBack}>← back</button>
-      <h2>{data.name}</h2>
+      <h2>
+        {data.name}
+        {user && <button className="act" style={{ marginLeft: 10, fontSize: 12, verticalAlign: "middle" }} onClick={doFollow}>{followed ? "following ✓" : "+ follow"}</button>}
+      </h2>
       <div className="meta">{kind === "insider" ? `insider · CIK ${data.owner_cik}` : `${data.kind} · CIK ${data.cik}`} · positioning from public filings only</div>
 
       {kind === "insider" ? (

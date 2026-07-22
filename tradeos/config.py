@@ -28,6 +28,17 @@ def short_interest_enabled() -> bool:
     return _flag("ENABLE_SHORT_INTEREST")
 
 
+def reddit_configured() -> bool:
+    """Reddit sentiment (Slice H) runs only when the operator supplies their own free API app
+    credentials; until then the source is 'not connected', honestly (never simulated)."""
+    return bool(os.environ.get("REDDIT_CLIENT_ID") and os.environ.get("REDDIT_CLIENT_SECRET"))
+
+
+def youtube_configured() -> bool:
+    """YouTube sentiment (Slice H) runs only with the operator's own free Data API key."""
+    return bool(os.environ.get("YOUTUBE_API_KEY"))
+
+
 def sec_user_agent() -> str:
     """SEC fair-access policy requires a declared User-Agent identifying the requester,
     conventionally 'Name contact@email'. We refuse to run without one."""

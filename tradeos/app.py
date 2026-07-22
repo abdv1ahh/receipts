@@ -11,16 +11,20 @@ from __future__ import annotations
 
 import logging
 import os
+import re
+import secrets
 import time
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
+from io import BytesIO
 from pathlib import Path
 
 from fastapi import Cookie, FastAPI, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from psycopg.types.json import Json
 from pydantic import BaseModel
 
-from . import authn, db
+from . import admin, apikeys, assistant, authn, billing, community, crypto, db, flags, insights, portfolio, presentation, search, sentiment, trades
 
 SESSION_COOKIE = "tos_session"
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").lower() == "true"  # true behind TLS in prod
@@ -36,6 +40,116 @@ class LoginReq(BaseModel):
     email: str
     password: str
     totp_code: str | None = None
+
+
+class FollowReq(BaseModel):
+    kind: str
+    ref: str
+    label: str | None = None
+
+
+class AlertPrefsReq(BaseModel):
+    new_high_conviction: bool
+    followed_activity: bool
+    min_score: int
+    email_enabled: bool
+
+
+class PortfolioReq(BaseModel):
+    name: str
+    kind: str = "manual"
+    buckets: list[str] | None = None
+
+
+class PositionReq(BaseModel):
+    symbol: str
+    opened_on: str | None = None
+
+
+class CheckoutReq(BaseModel):
+    plan: str
+
+
+class ApiKeyReq(BaseModel):
+    name: str | None = None
+
+
+class TradeReq(BaseModel):
+    symbol: str | None = None
+    asset_class: str = "equity"
+    direction: str = "long"
+    status: str = "planned"
+    entry_price: float | None = None
+    exit_price: float | None = None
+    stop_price: float | None = None
+    target_price: float | None = None
+    size: float | None = None
+    size_unit: str = "shares"
+    timeframe: str | None = None
+    strategy: str | None = None
+    reason_entry: str | None = None
+    reason_exit: str | None = None
+    confidence: int | None = None
+    expected_outcome: str | None = None
+    opened_on: str | None = None
+    closed_on: str | None = None
+    is_public: bool = False
+
+
+class AssistantReq(BaseModel):
+    message: str
+
+
+class SimulateReq(BaseModel):
+    symbol: str | None = None
+    direction: str = "long"
+    entry_price: float | None = None
+    stop_price: float | None = None
+    target_price: float | None = None
+    size: float | None = None
+    size_unit: str = "shares"
+    account_size: float | None = None
+
+
+class ProfileReq(BaseModel):
+    handle: str | None = None
+    bio: str | None = None
+
+
+class FollowUserReq(BaseModel):
+    handle: str
+
+
+class CommentReq(BaseModel):
+    body: str
+
+
+class ReactReq(BaseModel):
+    kind: str
+
+
+class ReportReq(BaseModel):
+    target_type: str
+    target_id: int
+    reason: str | None = None
+
+
+class AdminResolveReq(BaseModel):
+    target_type: str
+    target_id: int
+    action: str          # hide | unhide | dismiss
+
+
+class AdminTierReq(BaseModel):
+    tier: str            # free | retail | pro
+
+
+class AdminBanReq(BaseModel):
+    banned: bool
+
+
+class AdminFlagReq(BaseModel):
+    enabled: bool
 
 
 def _set_session_cookie(response: Response, token: str) -> None:
@@ -70,6 +184,38 @@ def _rate_ok(limit: int = 20, window: int = 60) -> bool:
         return False
     _extract_calls.append(now)
     return True
+
+
+# ---- user-uploaded trade screenshots: re-encoded, opaque-named, served through an authed route
+UPLOADS_DIR = Path(os.environ.get("UPLOADS_DIR", str(Path(__file__).parent.parent / "uploads")))
+_IMG_KEY = re.compile(r"[0-9a-f]{32}\.png")
+
+
+def _image_path(key: str | None) -> Path | None:
+    return UPLOADS_DIR / key if key and _IMG_KEY.fullmatch(key) else None
+
+
+def _store_image(body: bytes) -> str:
+    """Re-encode an upload to a normalized PNG under an opaque key: strips EXIF/metadata and
+    neutralizes any non-image payload (polyglots); a pixel cap bounds decompression bombs."""
+    from PIL import Image
+    Image.MAX_IMAGE_PIXELS = 40_000_000
+    Image.open(BytesIO(body)).verify()             # reject truncated / lying files
+    im = Image.open(BytesIO(body)).convert("RGB")  # re-open (verify consumed it); drop alpha/EXIF
+    im.thumbnail((2000, 2000))
+    UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+    key = secrets.token_hex(16) + ".png"
+    im.save(UPLOADS_DIR / key, format="PNG")
+    return key
+
+
+def _delete_image(key: str | None) -> None:
+    p = _image_path(key)
+    try:
+        if p and p.exists():
+            p.unlink()
+    except OSError:
+        pass
 
 
 _CSP = ("default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; "
@@ -111,6 +257,9 @@ def health() -> dict:
 def auth_register(req: RegisterReq, request: Request, response: Response) -> dict:
     try:
         with db.connect() as conn:
+            if not flags.enabled(conn, "registration"):
+                response.status_code = 403
+                return {"error": "registration is temporarily closed"}
             token, user = authn.register(conn, req.email, req.password, req.invite_code,
                                          ip=request.client.host if request.client else None,
                                          ua=request.headers.get("user-agent"))
@@ -147,6 +296,38 @@ def auth_logout(response: Response, tos_session: str | None = Cookie(None)) -> d
 def auth_me(tos_session: str | None = Cookie(None)) -> dict:
     with db.connect() as conn:
         return {"user": authn.session_user(conn, tos_session)}
+
+
+@app.get("/api/onboarding")
+def onboarding(tos_session: str | None = Cookie(None)) -> dict:
+    """Per-user activation progress, so a new account gets a short 'get value fast' checklist."""
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            return {"authenticated": False}
+        uid = user["id"]
+        cur.execute("SELECT count(*) FROM follows WHERE user_id=%s", (uid,))
+        follows = cur.fetchone()[0]
+        cur.execute("SELECT count(*) FROM portfolios WHERE user_id=%s", (uid,))
+        portfolios = cur.fetchone()[0]
+        cur.execute("SELECT 1 FROM alert_prefs WHERE user_id=%s", (uid,))
+        has_prefs = cur.fetchone() is not None
+        cur.execute("SELECT count(*) FROM notifications WHERE user_id=%s", (uid,))
+        notifs = cur.fetchone()[0]
+    alerts_on = has_prefs or notifs > 0
+    return {"authenticated": True, "follows": follows, "portfolios": portfolios,
+            "alerts_configured": alerts_on, "complete": follows > 0 and portfolios > 0 and alerts_on}
+
+
+@app.get("/api/referral")
+def referral(tos_session: str | None = Cookie(None)) -> dict:
+    """A user's reusable referral code + how many people have joined through it. Sharing the code as
+    an invite opens signup, and a referred user gets a 14-day Pro trial (authn._grant_trial)."""
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            return {"authenticated": False}
+        return {"authenticated": True, **authn.referral_stats(conn, user["id"])}
 
 
 def _tier_of(conn, token: str | None) -> str:
@@ -225,6 +406,35 @@ def _staleness(event_time, knowable_time) -> dict:
         "staleness_days": (now.date() - event_time).days,
         "knowable_lag_days": (knowable_time.date() - event_time).days,
     }
+
+
+def _voice_names(cur, contribution_lists: list[list[dict]]) -> dict[str, str]:
+    """Batch-resolve the display name behind every voice key across a set of clusters, in two
+    queries. Voice keys are 'insider:<cik>' (owner name) or 'filer:<entity_id>' (institution
+    name). Names come straight from the filings — nothing invented."""
+    ciks: set[str] = set()
+    filer_ids: set[int] = set()
+    for contribs in contribution_lists:
+        for c in contribs or []:
+            kind, _, ident = (c.get("voice") or "").partition(":")
+            if kind == "insider" and ident:
+                ciks.add(ident)
+            elif kind == "filer" and ident.isdigit():
+                filer_ids.add(int(ident))
+    names: dict[str, str] = {}
+    if ciks:
+        cur.execute(
+            "SELECT DISTINCT ON (owner_cik) owner_cik, owner_name FROM insider_transactions "
+            "WHERE owner_cik = ANY(%s) AND owner_name IS NOT NULL ORDER BY owner_cik, knowable_time DESC",
+            (list(ciks),),
+        )
+        for cik, nm in cur.fetchall():
+            names[f"insider:{cik}"] = nm
+    if filer_ids:
+        cur.execute("SELECT id, name FROM entities WHERE id = ANY(%s)", (list(filer_ids),))
+        for fid, nm in cur.fetchall():
+            names[f"filer:{fid}"] = nm
+    return names
 
 
 @app.get("/api/activity")
@@ -315,7 +525,8 @@ def clusters(as_of: str = "latest", min_confidence: str = "medium", source_class
             defver = dv
             out.append({
                 "issuer_entity": issuer, "symbol": symbol, "name": name,
-                "score": float(score), "confidence_bucket": bucket,
+                "score": float(score), "smart_money_score": presentation.smart_money_score(float(score)),
+                "confidence_bucket": bucket,
                 "voices": voices, "source_classes": classes, "definition_version": dv,
                 "freshest_contributing_knowable": fresh, "stalest_contributing_knowable": stale,
                 "above_liquidity_floor": floor == "true",
@@ -344,9 +555,12 @@ def _build_cluster_detail(cur, issuer_id: int, aso) -> dict:
         (classes,),
     )
     library_links = [{"slug": s, "title": t} for s, t in cur.fetchall()]
+    contributions = inputs.get("contributions", [])
+    story = presentation.cluster_story(contributions, _voice_names(cur, [contributions]))
     return {
         "found": True, "cluster_id": cid, "issuer_entity": issuer_id, "symbol": _symbol_for(cur, issuer_id),
         "name": name, "cik": cik, "as_of": aso2.isoformat(), "score": float(score),
+        "smart_money_score": presentation.smart_money_score(float(score)), "story": story,
         "confidence_bucket": bucket, "voices": voices,
         "source_classes": classes, "definition_version": inputs.get("definition_version"), "inputs": inputs,
         "library_links": library_links,
@@ -410,6 +624,161 @@ def definitions() -> dict:
                  "resolved-episode sample is sufficient (min 30 episodes), and read 'insufficient sample' "
                  "otherwise; higher-conviction buckets remain sample-limited by historical price coverage."),
     }
+
+
+@app.get("/api/home")
+def home(min_confidence: str = "medium", limit: int = 40, tos_session: str | None = Cookie(None)) -> dict:
+    """The consumer feed — "Smart Money Today". Today's convergences ranked by Smart Money
+    Score, each with the plain-language story of who is piling in (named where the filing makes
+    it public) and how fresh it is. Tier-delay aware (free sees the 48h-old set). Backtested
+    rates are attached client-side from /api/calibration; nothing here promises returns."""
+    min_rank = _BUCKET_RANK.get(min_confidence, 1)
+    limit = max(1, min(100, limit))
+    with db.connect() as conn, conn.cursor() as cur:
+        tier = _tier_of(conn, tos_session)
+        aso = _effective_as_of(cur, "latest", tier)
+        if aso is None:
+            return {"as_of": None, "tier": tier, "delayed_hours": authn.delay_hours(tier), "count": 0, "feed": []}
+        cur.execute(
+            """SELECT c.issuer_entity, e.name, c.score, c.confidence_bucket, c.voices, c.source_classes, c.inputs,
+                      (SELECT symbol FROM security_map m WHERE m.entity_id = c.issuer_entity
+                         AND m.source = 'sec_company_tickers' ORDER BY confidence DESC LIMIT 1)
+               FROM signal_clusters c JOIN entities e ON e.id = c.issuer_entity
+               WHERE c.as_of = %s ORDER BY c.score DESC""",
+            (aso,),
+        )
+        rows = [r for r in cur.fetchall() if _BUCKET_RANK[r[3]] >= min_rank][:limit]
+        names = _voice_names(cur, [(r[6] or {}).get("contributions", []) for r in rows])
+        feed = []
+        for issuer, name, score, bucket, voices, classes, inputs, symbol in rows:
+            story = presentation.cluster_story((inputs or {}).get("contributions", []), names)
+            feed.append({
+                "issuer_entity": issuer, "symbol": symbol, "name": name,
+                "smart_money_score": presentation.smart_money_score(float(score)),
+                "score": float(score), "confidence_bucket": bucket,
+                "voices": voices, "source_classes": classes,
+                "headline": story["headline"], "story": story,
+                "freshest_contributing_knowable": (inputs or {}).get("freshest_knowable"),
+                "stalest_contributing_knowable": (inputs or {}).get("stalest_knowable"),
+            })
+    return {"as_of": aso.isoformat(), "tier": tier, "delayed_hours": authn.delay_hours(tier),
+            "count": len(feed), "feed": feed}
+
+
+@app.get("/api/leaderboards")
+def leaderboards(tos_session: str | None = Cookie(None)) -> dict:
+    """Consumer leaderboards built only from public filings, anchored to the most recent data
+    actually on hand (not wall-clock), so windows are never empty and never overstated."""
+    with db.connect() as conn, conn.cursor() as cur:
+        tier = _tier_of(conn, tos_session)
+        cur.execute(
+            """SELECT t.issuer_entity, e.name,
+                      (SELECT symbol FROM security_map m WHERE m.entity_id=t.issuer_entity
+                         AND m.source='sec_company_tickers' ORDER BY confidence DESC LIMIT 1) AS symbol,
+                      count(DISTINCT t.owner_cik) AS buyers
+               FROM insider_transactions t JOIN entities e ON e.id=t.issuer_entity
+               WHERE t.transaction_code='P' AND t.acquired_disposed='A' AND t.issuer_entity IS NOT NULL
+                 AND t.knowable_time > (SELECT max(knowable_time) FROM insider_transactions) - interval '30 days'
+               GROUP BY t.issuer_entity, e.name HAVING count(DISTINCT t.owner_cik) >= 2
+               ORDER BY buyers DESC, e.name LIMIT 12""",
+        )
+        most_bought = [{"issuer_entity": i, "name": n, "symbol": s, "buyers": b} for i, n, s, b in cur.fetchall()]
+        cur.execute(
+            """SELECT s.filer_entity, f.name AS filer, s.issuer_entity, e.name AS issuer,
+                      (SELECT symbol FROM security_map m WHERE m.entity_id=s.issuer_entity
+                         AND m.source='sec_company_tickers' ORDER BY confidence DESC LIMIT 1) AS symbol,
+                      s.knowable_time
+               FROM stake_events s JOIN entities f ON f.id=s.filer_entity JOIN entities e ON e.id=s.issuer_entity
+               WHERE s.form_type='SCHEDULE 13D' AND s.issuer_entity IS NOT NULL
+               ORDER BY s.knowable_time DESC LIMIT 12""",
+        )
+        new_activist = [{"filer_entity": fe, "filer": f, "issuer_entity": ie, "issuer": iss,
+                         "symbol": sym, "knowable_time": kn.isoformat()}
+                        for fe, f, ie, iss, sym, kn in cur.fetchall()]
+        aso = _effective_as_of(cur, "latest", tier)
+        top = []
+        if aso is not None:
+            cur.execute(
+                """SELECT c.issuer_entity, e.name, c.score, c.confidence_bucket,
+                          (SELECT symbol FROM security_map m WHERE m.entity_id=c.issuer_entity
+                             AND m.source='sec_company_tickers' ORDER BY confidence DESC LIMIT 1)
+                   FROM signal_clusters c JOIN entities e ON e.id=c.issuer_entity
+                   WHERE c.as_of=%s ORDER BY c.score DESC LIMIT 12""",
+                (aso,),
+            )
+            top = [{"issuer_entity": i, "name": n, "symbol": s,
+                    "smart_money_score": presentation.smart_money_score(float(sc)), "confidence_bucket": b}
+                   for i, n, sc, b, s in cur.fetchall()]
+    return {"most_bought": most_bought, "new_activist_stakes": new_activist, "top_convergence": top,
+            "note": "Built from public SEC filings, anchored to the most recent data on hand. "
+                    "Counts and stakes are facts from the filings; nothing here is advice."}
+
+
+@app.get("/api/brief")
+def brief(tos_session: str | None = Cookie(None)) -> dict:
+    """The Daily Smart-Money Brief — an auto-composed digest of what smart money did, tier-delay
+    aware. Every figure is a fact from the filings; the intro is a deterministic template that
+    states counts, never a recommendation."""
+    with db.connect() as conn, conn.cursor() as cur:
+        tier = _tier_of(conn, tos_session)
+        aso = _effective_as_of(cur, "latest", tier)
+        top: list[dict] = []
+        if aso is not None:
+            cur.execute(
+                """SELECT c.issuer_entity, e.name, c.score, c.confidence_bucket, c.inputs,
+                          (SELECT symbol FROM security_map m WHERE m.entity_id=c.issuer_entity
+                             AND m.source='sec_company_tickers' ORDER BY confidence DESC LIMIT 1)
+                   FROM signal_clusters c JOIN entities e ON e.id=c.issuer_entity
+                   WHERE c.as_of=%s ORDER BY c.score DESC LIMIT 6""",
+                (aso,),
+            )
+            rows = cur.fetchall()
+            names = _voice_names(cur, [(r[4] or {}).get("contributions", []) for r in rows])
+            for ent, name, score, bucket, inputs, sym in rows:
+                story = presentation.cluster_story((inputs or {}).get("contributions", []), names)
+                top.append({"issuer_entity": ent, "symbol": sym, "name": name,
+                            "smart_money_score": presentation.smart_money_score(float(score)),
+                            "confidence_bucket": bucket, "headline": story["headline"]})
+        cur.execute(
+            """SELECT t.owner_name, t.issuer_entity, e.name,
+                      (SELECT symbol FROM security_map m WHERE m.entity_id=t.issuer_entity
+                         AND m.source='sec_company_tickers' ORDER BY confidence DESC LIMIT 1),
+                      round(sum(t.shares * t.price_per_share)) AS value_usd, t.knowable_time::date AS day
+               FROM insider_transactions t JOIN entities e ON e.id=t.issuer_entity
+               WHERE t.transaction_code='P' AND t.acquired_disposed='A'
+                 AND t.shares IS NOT NULL AND t.price_per_share IS NOT NULL AND t.issuer_entity IS NOT NULL
+                 AND t.knowable_time <= COALESCE(%s, now())
+                 AND t.knowable_time > (SELECT max(knowable_time) FROM insider_transactions) - interval '30 days'
+               GROUP BY t.owner_name, t.issuer_entity, e.name, t.knowable_time::date
+               ORDER BY value_usd DESC LIMIT 40""",
+            (aso,),
+        )
+        biggest_buys, seen_issuers = [], set()  # one row per company (the largest buy) for variety
+        for nm, ent, name, sym, v, d in cur.fetchall():
+            if ent in seen_issuers:
+                continue
+            seen_issuers.add(ent)
+            biggest_buys.append({"insider": nm, "issuer_entity": ent, "name": name, "symbol": sym,
+                                 "value_usd": float(v) if v is not None else None, "date": d.isoformat()})
+            if len(biggest_buys) >= 6:
+                break
+        cur.execute(
+            """SELECT s.filer_entity, f.name, s.issuer_entity, e.name,
+                      (SELECT symbol FROM security_map m WHERE m.entity_id=s.issuer_entity
+                         AND m.source='sec_company_tickers' ORDER BY confidence DESC LIMIT 1), s.knowable_time::date
+               FROM stake_events s JOIN entities f ON f.id=s.filer_entity JOIN entities e ON e.id=s.issuer_entity
+               WHERE s.form_type='SCHEDULE 13D' AND s.issuer_entity IS NOT NULL
+               ORDER BY s.knowable_time DESC LIMIT 6""",
+        )
+        new_activist = [{"filer_entity": fe, "filer": f, "issuer_entity": ie, "issuer": iss,
+                         "symbol": sym, "date": d.isoformat()} for fe, f, ie, iss, sym, d in cur.fetchall()]
+    lead = top[0] if top else None
+    intro = (f"{len(top)} name{'s' if len(top) != 1 else ''} show smart-money convergence right now"
+             + (f", led by {lead['symbol'] or lead['name']} (score {lead['smart_money_score']})." if lead else ".")
+             + " Below: the biggest recent insider buys and the newest activist stakes. Each name carries"
+             + " its backtested rate; nothing here is investment advice.")
+    return {"as_of": aso.isoformat() if aso else None, "tier": tier, "delayed_hours": authn.delay_hours(tier),
+            "intro": intro, "top_convergences": top, "biggest_buys": biggest_buys, "new_activist_stakes": new_activist}
 
 
 @app.get("/api/asset/{symbol}")
@@ -532,6 +901,678 @@ async def extract_tickers_endpoint(request: Request) -> dict:
             "provider_available": bool(candidates) or None}
 
 
+# ------------------------------------------------------------------- trade journal (Slice E)
+
+_TRADE_COLS = ("id", "user_id", "symbol", "entity_id", "asset_class", "direction", "status",
+               "entry_price", "exit_price", "stop_price", "target_price", "size", "size_unit",
+               "timeframe", "strategy", "reason_entry", "reason_exit", "confidence",
+               "expected_outcome", "opened_on", "closed_on", "image_path", "is_public",
+               "created_at", "updated_at")
+_ASSET = {"equity", "crypto", "forex", "option", "future", "other"}
+_DIR = {"long", "short"}
+_STATUS = {"planned", "open", "closed"}
+_UNIT = {"shares", "contracts", "usd", "units", "lots"}
+
+
+def _num(x):
+    return float(x) if isinstance(x, (int, float)) and x >= 0 else None
+
+
+def _pdate(s):
+    try:
+        return date.fromisoformat(s[:10]) if s else None
+    except ValueError:
+        return None
+
+
+def _txt(x, n):
+    return ((x or "").strip()[:n]) or None
+
+
+def _sanitize_trade(req: "TradeReq", cur) -> dict:
+    """Validate enums, clamp text/numbers, resolve symbol->entity. Field names are fixed internal
+    identifiers (never user input), so building the column list from them is injection-safe."""
+    sym = _txt(req.symbol, 12)
+    sym = sym.upper() if sym else None
+    ent = _resolve_symbol(cur, sym) if sym else None
+    return {
+        "symbol": sym, "entity_id": ent[0] if ent else None,
+        "asset_class": req.asset_class if req.asset_class in _ASSET else "equity",
+        "direction": req.direction if req.direction in _DIR else "long",
+        "status": req.status if req.status in _STATUS else "planned",
+        "entry_price": _num(req.entry_price), "exit_price": _num(req.exit_price),
+        "stop_price": _num(req.stop_price), "target_price": _num(req.target_price),
+        "size": _num(req.size), "size_unit": req.size_unit if req.size_unit in _UNIT else "shares",
+        "timeframe": _txt(req.timeframe, 24), "strategy": _txt(req.strategy, 48),
+        "reason_entry": _txt(req.reason_entry, 2000), "reason_exit": _txt(req.reason_exit, 2000),
+        "confidence": req.confidence if req.confidence in (1, 2, 3, 4, 5) else None,
+        "expected_outcome": _txt(req.expected_outcome, 500),
+        "opened_on": _pdate(req.opened_on), "closed_on": _pdate(req.closed_on),
+        "is_public": bool(req.is_public),
+    }
+
+
+def _trade_to_dict(row) -> dict:
+    m = dict(zip(_TRADE_COLS, row))
+    d = m["direction"]
+    m["reward_risk"] = trades.reward_risk(m["entry_price"], m["stop_price"], m["target_price"], d)
+    m["rr"] = m["reward_risk"]  # alias consumed by summarize_performance
+    m["realized_pnl_pct"] = (trades.realized_pnl_pct(m["entry_price"], m["exit_price"], d)
+                             if m["status"] == "closed" else None)
+    m["has_image"] = bool(m.pop("image_path"))
+    for k in ("opened_on", "closed_on", "created_at", "updated_at"):
+        if m.get(k) is not None:
+            m[k] = m[k].isoformat()
+    m.pop("user_id", None)
+    return m
+
+
+def _load_trade(cur, tid: int):
+    cur.execute(f"SELECT {', '.join(_TRADE_COLS)} FROM trades WHERE id=%s", (tid,))
+    return cur.fetchone()
+
+
+@app.post("/api/trades")
+def trade_create(req: TradeReq, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "log in to journal your trades"}
+        max_t = billing.entitlements(user["tier"])["max_trades"]
+        cur.execute("SELECT count(*) FROM trades WHERE user_id=%s", (user["id"],))
+        if cur.fetchone()[0] >= max_t:
+            response.status_code = 403
+            return {"error": f"Your plan allows {max_t} journal entries. Upgrade for more.", "upgrade": True}
+        f = _sanitize_trade(req, cur)
+        cols = ", ".join(f.keys())
+        cur.execute(f"INSERT INTO trades (user_id, {cols}) VALUES (%s, {', '.join(['%s'] * len(f))}) RETURNING id",
+                    (user["id"], *f.values()))
+        tid = cur.fetchone()[0]
+        conn.commit()
+    return {"created": True, "id": tid}
+
+
+@app.get("/api/trades")
+def trades_list(user_id: int | None = None, tos_session: str | None = Cookie(None)) -> dict:
+    """Own journal when authenticated; a profile's PUBLIC trades when `user_id` is given."""
+    with db.connect() as conn, conn.cursor() as cur:
+        me = authn.session_user(conn, tos_session)
+        if user_id is not None:
+            cur.execute(f"SELECT {', '.join(_TRADE_COLS)} FROM trades WHERE user_id=%s AND is_public "
+                        f"ORDER BY created_at DESC LIMIT 200", (user_id,))
+            return {"scope": "public", "trades": [_trade_to_dict(r) for r in cur.fetchall()]}
+        if not me:
+            return {"authenticated": False, "trades": []}
+        cur.execute(f"SELECT {', '.join(_TRADE_COLS)} FROM trades WHERE user_id=%s "
+                    f"ORDER BY created_at DESC LIMIT 500", (me["id"],))
+        return {"authenticated": True, "trades": [_trade_to_dict(r) for r in cur.fetchall()]}
+
+
+@app.get("/api/trades/{tid}")
+def trade_get(tid: int, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn, conn.cursor() as cur:
+        me = authn.session_user(conn, tos_session)
+        row = _load_trade(cur, tid)
+        if not row:
+            return {"found": False}
+        m = dict(zip(_TRADE_COLS, row))
+        owner = bool(me and me["id"] == m["user_id"])
+        if not m["is_public"] and not owner:
+            return {"found": False}  # never reveal a private trade's existence
+        cur.execute("SELECT handle FROM users WHERE id=%s", (m["user_id"],))
+        author = cur.fetchone()[0]
+        cur.execute("SELECT count(*) FROM trade_reactions WHERE trade_id=%s AND kind='like'", (tid,))
+        likes = cur.fetchone()[0]
+        cur.execute("SELECT count(*) FROM trade_comments WHERE trade_id=%s AND NOT hidden", (tid,))
+        comments = cur.fetchone()[0]
+        mine: set = set()
+        if me:
+            cur.execute("SELECT kind FROM trade_reactions WHERE trade_id=%s AND user_id=%s", (tid, me["id"]))
+            mine = {r[0] for r in cur.fetchall()}
+    return {"found": True, "owner": owner, "author": author, "likes": likes, "comments": comments,
+            "my_reactions": sorted(mine), "trade": _trade_to_dict(row)}
+
+
+@app.patch("/api/trades/{tid}")
+def trade_update(tid: int, req: TradeReq, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "not authenticated"}
+        cur.execute("SELECT 1 FROM trades WHERE id=%s AND user_id=%s", (tid, user["id"]))
+        if not cur.fetchone():
+            response.status_code = 404
+            return {"error": "trade not found"}
+        f = _sanitize_trade(req, cur)
+        cur.execute(f"UPDATE trades SET {', '.join(k + '=%s' for k in f)}, updated_at=now() "
+                    f"WHERE id=%s AND user_id=%s", (*f.values(), tid, user["id"]))
+        cur.execute("DELETE FROM trade_analyses WHERE trade_id=%s", (tid,))  # inputs changed -> stale
+        conn.commit()
+    return {"updated": True}
+
+
+@app.delete("/api/trades/{tid}")
+def trade_delete(tid: int, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "not authenticated"}
+        cur.execute("SELECT image_path FROM trades WHERE id=%s AND user_id=%s", (tid, user["id"]))
+        row = cur.fetchone()
+        if not row:
+            response.status_code = 404
+            return {"error": "trade not found"}
+        cur.execute("DELETE FROM trades WHERE id=%s AND user_id=%s", (tid, user["id"]))
+        conn.commit()
+    _delete_image(row[0])
+    return {"deleted": True}
+
+
+@app.get("/api/trades/{tid}/analysis")
+def trade_analysis(tid: int, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn, conn.cursor() as cur:
+        me = authn.session_user(conn, tos_session)
+        row = _load_trade(cur, tid)
+        if not row:
+            return {"found": False}
+        m = dict(zip(_TRADE_COLS, row))
+        if not m["is_public"] and not (me and me["id"] == m["user_id"]):
+            return {"found": False}
+        # AI kill-switch: off -> deterministic template analysis, no LLM call
+        provider = flags.effective_provider(conn, "ai_trade_analysis")
+        analysis = trades.cached_analysis(conn, m, provider=provider)
+    return {"found": True, "analysis": analysis}
+
+
+@app.get("/api/performance")
+def performance(tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            return {"authenticated": False}
+        cur.execute(f"SELECT {', '.join(_TRADE_COLS)} FROM trades WHERE user_id=%s", (user["id"],))
+        rows = [_trade_to_dict(r) for r in cur.fetchall()]
+    return {"authenticated": True, "summary": trades.summarize_performance(rows), "total": len(rows)}
+
+
+# ------------------------------------------------------------------ advanced AI (Slice L)
+
+@app.get("/api/trades/{tid}/similar")
+def trade_similar(tid: int, tos_session: str | None = Cookie(None)) -> dict:
+    """The OWNER's own trades most like this one, with an honest cohort outcome (descriptive history,
+    not a prediction). Restricted to the owner — a viewer never sees another trader's private journal."""
+    with db.connect() as conn, conn.cursor() as cur:
+        me = authn.session_user(conn, tos_session)
+        row = _load_trade(cur, tid)
+        if not row:
+            return {"found": False}
+        m = dict(zip(_TRADE_COLS, row))
+        if not (me and me["id"] == m["user_id"]):
+            return {"found": False}
+        target = {"id": m["id"], "symbol": m["symbol"], "direction": m["direction"],
+                  "asset_class": m["asset_class"], "strategy": m["strategy"], "timeframe": m["timeframe"],
+                  "reward_risk": trades.reward_risk(m["entry_price"], m["stop_price"], m["target_price"], m["direction"])}
+        res = insights.similar_for_trade(conn, target, me["id"])
+    return {"found": True, **res}
+
+
+@app.post("/api/simulate")
+def simulate_endpoint(req: SimulateReq, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    """Deterministic position scenario simulator (docs/threat-models/insights.md): P&L, R-multiple and
+    account-risk across price points the user names, plus a signal base-rate overlay when the symbol
+    maps to a real convergence signal — never a probability or a forecast for the trade."""
+    if not _rate_ok(limit=30):
+        response.status_code = 429
+        return {"ok": False, "reason": "slow down a moment and try again"}
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"ok": False, "reason": "log in to use the simulator"}
+        entity_id = None
+        if req.symbol:
+            ent = _resolve_symbol(cur, req.symbol)
+            entity_id = ent[0] if ent else None
+        trade = {"entry_price": req.entry_price, "stop_price": req.stop_price,
+                 "target_price": req.target_price, "direction": req.direction,
+                 "size": req.size, "size_unit": req.size_unit,
+                 "symbol": (req.symbol or "").strip().upper() or None}
+        return insights.simulate_with_context(conn, trade, req.account_size, entity_id)
+
+
+@app.get("/api/journal/report")
+def journal_report_endpoint(tos_session: str | None = Cookie(None)) -> dict:
+    """Auto journal report over the user's OWN journal — aggregate performance + recurring habits,
+    optionally phrased by the guarded model (AI kill-switch honored), cached by an inputs-hash."""
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            return {"authenticated": False}
+        provider = flags.effective_provider(conn, "ai_trade_analysis")
+        report = insights.journal_report(conn, user["id"], provider=provider)
+    return {"authenticated": True, "report": report}
+
+
+@app.post("/api/trades/{tid}/image")
+async def trade_image_upload(tid: int, request: Request, tos_session: str | None = Cookie(None)):
+    if not _rate_ok():
+        return JSONResponse({"error": "rate limited; try again shortly"}, status_code=429)
+    mime = request.headers.get("content-type", "").split(";")[0].strip()
+    if mime not in _ALLOWED_IMAGE:
+        return JSONResponse({"error": "unsupported content-type; use png, jpeg, or webp"}, status_code=400)
+    body = await request.body()
+    if not body or len(body) > MAX_IMAGE_BYTES:
+        return JSONResponse({"error": "image missing or larger than 8MB"}, status_code=400)
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            return JSONResponse({"error": "not authenticated"}, status_code=401)
+        cur.execute("SELECT image_path FROM trades WHERE id=%s AND user_id=%s", (tid, user["id"]))
+        row = cur.fetchone()
+        if not row:
+            return JSONResponse({"error": "trade not found"}, status_code=404)
+        try:
+            key = _store_image(body)
+        except Exception:
+            return JSONResponse({"error": "could not read that image"}, status_code=400)
+        cur.execute("UPDATE trades SET image_path=%s, updated_at=now() WHERE id=%s AND user_id=%s",
+                    (key, tid, user["id"]))
+        conn.commit()
+    if row[0] and row[0] != key:
+        _delete_image(row[0])
+    return {"uploaded": True}
+
+
+@app.get("/api/trades/{tid}/image")
+def trade_image(tid: int, tos_session: str | None = Cookie(None)):
+    with db.connect() as conn, conn.cursor() as cur:
+        me = authn.session_user(conn, tos_session)
+        cur.execute("SELECT user_id, is_public, image_path FROM trades WHERE id=%s", (tid,))
+        r = cur.fetchone()
+    if not r or not r[2]:
+        return Response(status_code=404)
+    uid, pub, key = r
+    if not pub and not (me and me["id"] == uid):
+        return Response(status_code=404)
+    p = _image_path(key)
+    if not p or not p.exists():
+        return Response(status_code=404)
+    return Response(p.read_bytes(), media_type="image/png",
+                    headers={"Cache-Control": "private, max-age=3600", "X-Content-Type-Options": "nosniff"})
+
+
+@app.post("/api/assistant")
+def assistant_endpoint(req: AssistantReq, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    """Grounded, guarded Q&A over real platform data (docs/threat-models/assistant.md). Tier-honest
+    (clusters read at the tier's effective as_of) and object-scoped (only the requester's trades)."""
+    if not _rate_ok(limit=15):
+        response.status_code = 429
+        return {"answer": "I'm getting a lot of questions right now — try again in a moment.",
+                "sources": [], "model_id": "template", "used_template": True}
+    q = (req.message or "").strip()[:500]
+    if not q:
+        return {"answer": "Ask me about a ticker's smart-money signal, a strategy or concept from the "
+                          "library, or your own logged trades.", "sources": [], "model_id": "template",
+                "used_template": True}
+    with db.connect() as conn:
+        with conn.cursor() as cur:
+            user = authn.session_user(conn, tos_session)
+            tier = (user or {}).get("tier", "free")
+            as_of = _effective_as_of(cur, "latest", tier)
+        # AI kill-switch: when the flag is off, force the deterministic grounded answer (no LLM call)
+        provider = flags.effective_provider(conn, "ai_assistant")
+        return assistant.answer(conn, q, user, as_of, provider=provider)
+
+
+@app.get("/api/trending")
+def trending_endpoint(hours: int = 48) -> dict:
+    """The trend scanner: symbols ranked by public-attention velocity, with an honest source-status
+    map (docs/threat-models/sentiment.md). Public attention data, not the proprietary signal, so it
+    is not tier-gated. Empty until a source is ingested — never fabricated."""
+    hours = max(6, min(168, hours))
+    with db.connect() as conn:
+        board = sentiment.trending_board(conn, hours=hours)
+    return {"sources": sentiment.sources_status(), "hours": hours, "board": board,
+            "note": None if board else ("No attention data yet — run `ingest-sentiment` (Hacker News "
+                                        "needs no key), or connect Reddit/YouTube for sentiment.")}
+
+
+@app.get("/api/sentiment/{symbol}")
+def sentiment_endpoint(symbol: str) -> dict:
+    with db.connect() as conn:
+        d = sentiment.symbol_sentiment(conn, symbol)
+    return {"found": d is not None, "symbol": symbol.upper(), "detail": d,
+            "sources": sentiment.sources_status()}
+
+
+# ------------------------------------------------------------------- community & social (Slice F)
+
+@app.patch("/api/profile")
+def profile_set(req: ProfileReq, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "log in to set your profile"}
+        res = community.set_profile(conn, user["id"], handle=req.handle, bio=req.bio)
+        if res.get("error"):
+            response.status_code = 400
+        return res
+
+
+@app.get("/api/u/{handle}")
+def user_profile(handle: str, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        viewer = authn.session_user(conn, tos_session)
+        prof = community.public_profile(conn, handle.lower(), viewer["id"] if viewer else None)
+        if prof.get("found"):
+            with conn.cursor() as cur:
+                cur.execute(f"SELECT {', '.join(_TRADE_COLS)} FROM trades WHERE user_id=%s AND is_public "
+                            f"AND hidden=false ORDER BY created_at DESC LIMIT 100", (prof["id"],))
+                prof["trades"] = [_trade_to_dict(r) for r in cur.fetchall()]
+    return prof
+
+
+def _community_open(conn, response: Response) -> bool:
+    """Community-writes kill-switch (admin flag). Off -> the social surface goes read-only."""
+    if not flags.enabled(conn, "community_writes"):
+        response.status_code = 403
+        return False
+    return True
+
+
+@app.post("/api/users/follow")
+def user_follow(req: FollowUserReq, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "log in to follow traders"}
+        if not _community_open(conn, response):
+            return {"error": "community posting is temporarily disabled"}
+        res = community.follow_user(conn, user["id"], req.handle.strip().lstrip("@").lower())
+        if res.get("error"):
+            response.status_code = 400
+        return res
+
+
+@app.delete("/api/users/follow/{handle}")
+def user_unfollow(handle: str, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "not authenticated"}
+        return community.unfollow_user(conn, user["id"], handle.strip().lstrip("@").lower())
+
+
+@app.get("/api/community/feed")
+def community_feed(scope: str = "public", before_id: int | None = None,
+                   tos_session: str | None = Cookie(None)) -> dict:
+    scope = scope if scope in ("public", "following") else "public"
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        feed = community.public_feed(conn, viewer_id=user["id"] if user else None, scope=scope, before_id=before_id)
+    return {"scope": scope, "authenticated": bool(user), "feed": feed}
+
+
+@app.post("/api/trades/{tid}/react")
+def trade_react(tid: int, req: ReactReq, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "log in to react"}
+        if not _community_open(conn, response):
+            return {"error": "community posting is temporarily disabled"}
+        res = community.react(conn, user["id"], tid, req.kind)
+        if res.get("error"):
+            response.status_code = 400
+        return res
+
+
+@app.delete("/api/trades/{tid}/react/{kind}")
+def trade_unreact(tid: int, kind: str, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "not authenticated"}
+        return community.unreact(conn, user["id"], tid, kind)
+
+
+@app.get("/api/trades/{tid}/comments")
+def trade_comments_list(tid: int, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        return community.list_comments(conn, tid, user["id"] if user else None)
+
+
+@app.post("/api/trades/{tid}/comments")
+def trade_comment_add(tid: int, req: CommentReq, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    if not _rate_ok(limit=10):
+        response.status_code = 429
+        return {"error": "slow down a moment and try again"}
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "log in to comment"}
+        if not _community_open(conn, response):
+            return {"error": "community posting is temporarily disabled"}
+        res = community.add_comment(conn, user["id"], tid, req.body)
+        if res.get("error"):
+            response.status_code = 400
+        return res
+
+
+@app.delete("/api/comments/{cid}")
+def comment_delete(cid: int, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "not authenticated"}
+        res = community.delete_comment(conn, user["id"], cid, is_admin=user["tier"] == "admin")
+        if res.get("error"):
+            response.status_code = 403
+        return res
+
+
+@app.post("/api/report")
+def content_report(req: ReportReq, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "log in to report"}
+        if not _community_open(conn, response):
+            return {"error": "community posting is temporarily disabled"}
+        res = community.report(conn, user["id"], req.target_type, req.target_id, req.reason)
+        if res.get("error"):
+            response.status_code = 400
+        return res
+
+
+@app.get("/api/leaderboard/traders")
+def leaderboard_traders() -> dict:
+    with db.connect() as conn:
+        board = community.trader_leaderboard_data(conn)
+    return {"leaderboard": board, "min_closed": community.LEADERBOARD_MIN_CLOSED}
+
+
+# ------------------------------------------------------------------ admin (Slice K)
+
+def _require_admin(conn, token: str | None, response: Response) -> dict | None:
+    """Return the admin user, or set 401/403 and return None. Admin is a real tier gated behind TOTP
+    at login (authn.login), so this is the same identity that MFA'd in — no separate admin flag."""
+    user = authn.session_user(conn, token)
+    if not user:
+        response.status_code = 401
+        return None
+    if user["tier"] != "admin":
+        response.status_code = 403
+        return None
+    return user
+
+
+@app.get("/api/admin/overview")
+def admin_overview(response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = _require_admin(conn, tos_session, response)
+        if not user:
+            return {"error": "admin only"}
+        return {"overview": admin.overview(conn), "flags": flags.all_states(conn),
+                "config": _ops_config()}
+
+
+@app.get("/api/admin/moderation")
+def admin_moderation(response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = _require_admin(conn, tos_session, response)
+        if not user:
+            return {"error": "admin only"}
+        return {"queue": admin.moderation_queue(conn), "reports_to_hide": community.REPORTS_TO_HIDE}
+
+
+@app.post("/api/admin/moderation/resolve")
+def admin_moderation_resolve(req: AdminResolveReq, response: Response,
+                             tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = _require_admin(conn, tos_session, response)
+        if not user:
+            return {"error": "admin only"}
+        res = admin.resolve(conn, user, req.target_type, req.target_id, req.action)
+        if res.get("error"):
+            response.status_code = 400
+        return res
+
+
+@app.get("/api/admin/users")
+def admin_users(q: str = "", response: Response = None, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = _require_admin(conn, tos_session, response)
+        if not user:
+            return {"error": "admin only"}
+        return {"users": admin.list_users(conn, q), "tiers": list(admin.TIER_TARGETS)}
+
+
+@app.post("/api/admin/users/{uid}/tier")
+def admin_set_tier(uid: int, req: AdminTierReq, response: Response,
+                   tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = _require_admin(conn, tos_session, response)
+        if not user:
+            return {"error": "admin only"}
+        res = admin.set_tier(conn, user, uid, req.tier)
+        if res.get("error"):
+            response.status_code = 400
+        return res
+
+
+@app.post("/api/admin/users/{uid}/ban")
+def admin_ban(uid: int, req: AdminBanReq, response: Response,
+              tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = _require_admin(conn, tos_session, response)
+        if not user:
+            return {"error": "admin only"}
+        res = admin.set_banned(conn, user, uid, req.banned)
+        if res.get("error"):
+            response.status_code = 400
+        return res
+
+
+@app.get("/api/admin/flags")
+def admin_flags(response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = _require_admin(conn, tos_session, response)
+        if not user:
+            return {"error": "admin only"}
+        return {"flags": flags.all_states(conn), "config": _ops_config()}
+
+
+@app.post("/api/admin/flags/{name}")
+def admin_set_flag(name: str, req: AdminFlagReq, response: Response,
+                   tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = _require_admin(conn, tos_session, response)
+        if not user:
+            return {"error": "admin only"}
+        res = flags.set_flag(conn, name, req.enabled)
+        if res.get("error"):
+            response.status_code = 400
+            return res
+        authn.audit(conn, user["email"], "admin_set_flag", name, {"enabled": req.enabled})
+        return res
+
+
+@app.get("/api/admin/audit")
+def admin_audit(action: str | None = None, limit: int = 100, response: Response = None,
+                tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = _require_admin(conn, tos_session, response)
+        if not user:
+            return {"error": "admin only"}
+        return {"entries": admin.audit_tail(conn, limit=limit, action=action),
+                "actions": admin.audit_actions(conn)}
+
+
+def _ops_config() -> dict:
+    """Real, READ-ONLY operational config the admin can see but not toggle from the web: it is
+    controlled by deployment env / third-party keys, so we show its true state instead of a fake
+    switch (same honesty rule as the 'not connected yet' sources)."""
+    from . import config
+    return {
+        "congress": {"enabled": config.congress_enabled(), "controlled_by": "ENABLE_CONGRESS (env)"},
+        "short_interest": {"enabled": config.short_interest_enabled(), "controlled_by": "ENABLE_SHORT_INTEREST (env)"},
+        "reddit": {"enabled": config.reddit_configured(), "controlled_by": "REDDIT_CLIENT_ID/SECRET (env)"},
+        "youtube": {"enabled": config.youtube_configured(), "controlled_by": "YOUTUBE_API_KEY (env)"},
+        "stripe": {"enabled": billing.provider_configured(), "controlled_by": "STRIPE_SECRET_KEY (env)"},
+    }
+
+
+@app.get("/api/search")
+def search_endpoint(q: str = "") -> dict:
+    """Unified search across issuers, institutions, insiders, the library, and public traders
+    (docs/threat-models — read-only; only public handles, never emails)."""
+    with db.connect() as conn:
+        results = search.search(conn, q)
+    return {"query": q.strip()[:64], "total": sum(len(v) for v in results.values()), "results": results}
+
+
+@app.get("/api/crypto/markets")
+def crypto_markets(limit: int = 25) -> dict:
+    """Real crypto market data from CoinGecko (docs/threat-models/crypto.md). Market data + risk
+    labels, not advice; on any upstream failure returns an honest error, never a fabricated price."""
+    limit = max(1, min(50, limit))
+    with db.connect() as conn:
+        if not flags.enabled(conn, "crypto"):
+            return {"markets": [], "source": "CoinGecko", "disabled": True,
+                    "error": "the crypto surface is currently disabled"}
+    try:
+        return {"markets": crypto.markets(limit), "source": "CoinGecko",
+                "note": "Market data, not advice. Crypto is high-risk and volatile."}
+    except Exception:
+        log.warning("crypto markets fetch failed")
+        return {"markets": [], "source": "CoinGecko", "error": "crypto data temporarily unavailable"}
+
+
+@app.get("/api/crypto/trending")
+def crypto_trending() -> dict:
+    with db.connect() as conn:
+        if not flags.enabled(conn, "crypto"):
+            return {"trending": [], "source": "CoinGecko", "disabled": True}
+    try:
+        return {"trending": crypto.trending(), "source": "CoinGecko"}
+    except Exception:
+        log.warning("crypto trending fetch failed")
+        return {"trending": [], "source": "CoinGecko", "error": "unavailable"}
+
+
 @app.get("/api/watchlist")
 def watchlist_get(user: str = "demo") -> dict:
     with db.connect() as conn, conn.cursor() as cur:
@@ -575,6 +1616,398 @@ def watchlist_remove(symbol: str, user: str = "demo") -> dict:
     return {"user": user, "symbol": symbol.strip().upper(), "removed": True}
 
 
+# ------------------------------------------------------------ follows / alerts (Slice B)
+# All per-user surfaces enforce object-level authorization: every read and write is scoped to the
+# session's user_id, so no id in the URL or body can reach another account's follows or alerts.
+
+@app.get("/api/follows")
+def follows_list(tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            return {"authenticated": False, "follows": []}
+        cur.execute("SELECT id, kind, ref, label, created_at FROM follows WHERE user_id=%s ORDER BY created_at DESC",
+                    (user["id"],))
+        follows = [{"id": i, "kind": k, "ref": r, "label": l, "created_at": ca.isoformat()}
+                   for i, k, r, l, ca in cur.fetchall()]
+    return {"authenticated": True, "follows": follows}
+
+
+@app.post("/api/follows")
+def follows_add(req: FollowReq, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    if req.kind not in ("symbol", "insider", "filer"):
+        response.status_code = 400
+        return {"error": "invalid follow kind"}
+    ref = req.ref.strip()
+    ref = ref.upper() if req.kind == "symbol" else ref
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "log in to follow and get alerts"}
+        max_follows = billing.entitlements(user["tier"])["max_follows"]
+        cur.execute("SELECT count(*) FROM follows WHERE user_id=%s", (user["id"],))
+        if cur.fetchone()[0] >= max_follows:
+            response.status_code = 403
+            return {"error": f"Your plan allows {max_follows} follows. Upgrade for more.", "upgrade": True}
+        cur.execute(
+            "INSERT INTO follows (user_id, kind, ref, label) VALUES (%s,%s,%s,%s) "
+            "ON CONFLICT (user_id, kind, ref) DO NOTHING RETURNING id",
+            (user["id"], req.kind, ref, (req.label or "").strip() or None),
+        )
+        row = cur.fetchone()
+        conn.commit()
+    return {"followed": True, "kind": req.kind, "ref": ref, "id": row[0] if row else None}
+
+
+@app.delete("/api/follows/{follow_id}")
+def follows_remove(follow_id: int, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "not authenticated"}
+        cur.execute("DELETE FROM follows WHERE id=%s AND user_id=%s", (follow_id, user["id"]))  # object-level check
+        conn.commit()
+        removed = cur.rowcount
+    return {"removed": bool(removed)}
+
+
+@app.get("/api/notifications")
+def notifications_list(limit: int = 50, tos_session: str | None = Cookie(None)) -> dict:
+    limit = max(1, min(100, limit))
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            return {"authenticated": False, "unread": 0, "notifications": []}
+        cur.execute(
+            """SELECT id, kind, title, body, symbol, entity_id, created_at, read_at
+               FROM notifications WHERE user_id=%s ORDER BY created_at DESC LIMIT %s""",
+            (user["id"], limit),
+        )
+        items = [{"id": i, "kind": k, "title": t, "body": b, "symbol": s, "entity_id": e,
+                  "created_at": ca.isoformat(), "read": ra is not None}
+                 for i, k, t, b, s, e, ca, ra in cur.fetchall()]
+        cur.execute("SELECT count(*) FROM notifications WHERE user_id=%s AND read_at IS NULL", (user["id"],))
+        unread = cur.fetchone()[0]
+    return {"authenticated": True, "unread": unread, "notifications": items}
+
+
+@app.post("/api/notifications/read")
+def notifications_read(response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "not authenticated"}
+        cur.execute("UPDATE notifications SET read_at=now() WHERE user_id=%s AND read_at IS NULL", (user["id"],))
+        conn.commit()
+        marked = cur.rowcount
+    return {"marked_read": marked}
+
+
+@app.get("/api/alert-prefs")
+def alert_prefs_get(tos_session: str | None = Cookie(None)) -> dict:
+    from .alerts import DEFAULT_PREFS
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            return {"authenticated": False, "prefs": dict(DEFAULT_PREFS)}
+        cur.execute("SELECT new_high_conviction, followed_activity, min_score, email_enabled FROM alert_prefs WHERE user_id=%s",
+                    (user["id"],))
+        r = cur.fetchone()
+        prefs = ({"new_high_conviction": r[0], "followed_activity": r[1], "min_score": r[2], "email_enabled": r[3]}
+                 if r else dict(DEFAULT_PREFS))
+    return {"authenticated": True, "prefs": prefs}
+
+
+@app.put("/api/alert-prefs")
+def alert_prefs_set(req: AlertPrefsReq, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    ms = max(0, min(100, req.min_score))
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "not authenticated"}
+        cur.execute(
+            """INSERT INTO alert_prefs (user_id, new_high_conviction, followed_activity, min_score, email_enabled, updated_at)
+               VALUES (%s,%s,%s,%s,%s, now())
+               ON CONFLICT (user_id) DO UPDATE SET new_high_conviction=EXCLUDED.new_high_conviction,
+                   followed_activity=EXCLUDED.followed_activity, min_score=EXCLUDED.min_score,
+                   email_enabled=EXCLUDED.email_enabled, updated_at=now()""",
+            (user["id"], req.new_high_conviction, req.followed_activity, ms, req.email_enabled),
+        )
+        conn.commit()
+    return {"saved": True, "prefs": {"new_high_conviction": req.new_high_conviction,
+            "followed_activity": req.followed_activity, "min_score": ms, "email_enabled": req.email_enabled}}
+
+
+# ------------------------------------------------------------ paper portfolios (Slice C)
+
+def _default_opened_on(cur, symbol: str, entity_id: int | None):
+    """Entry for a paper position: the name's first convergence date if it has one (shadow from
+    the signal), else ~90 days before its latest price so there is a real window, else today."""
+    if entity_id is not None:
+        cur.execute("SELECT min(as_of)::date FROM signal_clusters WHERE issuer_entity=%s", (entity_id,))
+        r = cur.fetchone()
+        if r and r[0]:
+            return r[0]
+    cur.execute("SELECT max(day) FROM prices_eod WHERE symbol=%s", (symbol,))
+    r = cur.fetchone()
+    if r and r[0]:
+        return r[0] - timedelta(days=90)
+    return datetime.now(timezone.utc).date()
+
+
+@app.post("/api/portfolios")
+def portfolio_create(req: PortfolioReq, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    kind = req.kind if req.kind in ("manual", "shadow_bucket") else "manual"
+    buckets = [b for b in (req.buckets or ["high", "medium"]) if b in ("low", "medium", "high")] or ["high", "medium"]
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "log in to build a portfolio"}
+        max_p = billing.entitlements(user["tier"])["max_portfolios"]
+        cur.execute("SELECT count(*) FROM portfolios WHERE user_id=%s", (user["id"],))
+        if cur.fetchone()[0] >= max_p:
+            response.status_code = 403
+            return {"error": f"Your plan allows {max_p} portfolio(s). Upgrade for more.", "upgrade": True}
+        spec = {"buckets": buckets} if kind == "shadow_bucket" else {}
+        cur.execute("INSERT INTO portfolios (user_id, name, kind, spec) VALUES (%s,%s,%s,%s) RETURNING id",
+                    (user["id"], (req.name.strip()[:80] or "Portfolio"), kind, Json(spec)))
+        pid = cur.fetchone()[0]
+        conn.commit()
+    added = 0
+    if kind == "shadow_bucket":
+        with db.connect() as conn:
+            added = portfolio.populate_shadow(conn, pid, buckets)
+    return {"created": True, "id": pid, "kind": kind, "positions_added": added}
+
+
+@app.get("/api/portfolios")
+def portfolios_list(tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            return {"authenticated": False, "portfolios": []}
+        return {"authenticated": True, "portfolios": portfolio.list_for_user(conn, user["id"])}
+
+
+@app.get("/api/portfolios/{pid}")
+def portfolio_get(pid: int, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            return {"found": False, "authenticated": False}
+        return portfolio.detail(conn, pid, user["id"])  # scoped to user_id inside
+
+
+@app.post("/api/portfolios/{pid}/positions")
+def portfolio_add_position(pid: int, req: PositionReq, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    sym = req.symbol.strip().upper()
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "not authenticated"}
+        cur.execute("SELECT 1 FROM portfolios WHERE id=%s AND user_id=%s", (pid, user["id"]))
+        if not cur.fetchone():
+            response.status_code = 404
+            return {"error": "portfolio not found"}
+        ent = _resolve_symbol(cur, sym)
+        entity_id = ent[0] if ent else None
+        if req.opened_on:
+            try:
+                opened = date.fromisoformat(req.opened_on)
+            except ValueError:
+                response.status_code = 400
+                return {"error": "opened_on must be YYYY-MM-DD"}
+        else:
+            opened = _default_opened_on(cur, sym, entity_id)
+        cur.execute("INSERT INTO portfolio_positions (portfolio_id, symbol, entity_id, opened_on) "
+                    "VALUES (%s,%s,%s,%s) ON CONFLICT (portfolio_id, symbol) DO NOTHING RETURNING id",
+                    (pid, sym, entity_id, opened))
+        row = cur.fetchone()
+        conn.commit()
+    return {"added": bool(row), "symbol": sym, "opened_on": opened.isoformat()}
+
+
+@app.delete("/api/portfolios/{pid}")
+def portfolio_delete(pid: int, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "not authenticated"}
+        cur.execute("DELETE FROM portfolios WHERE id=%s AND user_id=%s", (pid, user["id"]))
+        conn.commit()
+        return {"removed": bool(cur.rowcount)}
+
+
+@app.delete("/api/portfolios/{pid}/positions/{pos_id}")
+def portfolio_remove_position(pid: int, pos_id: int, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "not authenticated"}
+        cur.execute("DELETE FROM portfolio_positions p USING portfolios pf "
+                    "WHERE p.id=%s AND p.portfolio_id=pf.id AND pf.id=%s AND pf.user_id=%s",
+                    (pos_id, pid, user["id"]))
+        conn.commit()
+        return {"removed": bool(cur.rowcount)}
+
+
+@app.get("/api/track-record")
+def track_record() -> dict:
+    """Live public track record: the realized excess return vs SPY of shadowing each convergence
+    bucket, straight from the backtest. Published even when unflattering — calibration is the brand."""
+    from .backtest.run import compute_calibration
+    with db.connect() as conn:
+        cal = compute_calibration(conn)
+    return {"per_bucket": cal["per_bucket"], "horizons": cal.get("horizons", [30, 90, 180]),
+            "episodes_total": cal.get("episodes_total"),
+            "note": "The realized excess return vs SPY of shadowing each convergence bucket, updated as "
+                    "episodes resolve. Buckets under 30 resolved episodes read 'insufficient sample'. We "
+                    "publish this even when it is unflattering. Nothing here is advice or a promise of future results."}
+
+
+# ------------------------------------------------------------ billing + Pro API (Slice D)
+
+@app.get("/api/billing/plans")
+def billing_plans(tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        sub = billing.current_subscription(conn, user["id"]) if user else {"plan": "free", "status": "active"}
+    plans = [{"id": k, "name": v["name"], "price": v["price"], "tier": v["tier"],
+              "entitlements": billing.ENTITLEMENTS[v["tier"]]} for k, v in billing.PLANS.items()]
+    return {"plans": plans, "current": sub, "provider_configured": billing.provider_configured(),
+            "authenticated": bool(user)}
+
+
+@app.post("/api/billing/checkout")
+def billing_checkout(req: CheckoutReq, request: Request, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "log in to upgrade"}
+        out = billing.create_checkout(conn, user, req.plan, str(request.base_url).rstrip("/"))
+    if out.get("error"):
+        response.status_code = 400
+    return out
+
+
+@app.post("/api/billing/test-activate")
+def billing_test_activate(req: CheckoutReq, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "not authenticated"}
+        out = billing.test_activate(conn, user, req.plan)
+    if out.get("error"):
+        response.status_code = 403
+    return out
+
+
+@app.post("/api/billing/cancel")
+def billing_cancel(response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "not authenticated"}
+        return billing.cancel(conn, user)
+
+
+@app.post("/api/billing/webhook")
+async def billing_webhook(request: Request) -> JSONResponse:
+    body = await request.body()
+    with db.connect() as conn:
+        out = billing.handle_webhook(conn, body, request.headers.get("stripe-signature"))
+    return JSONResponse(out, status_code=200 if out.get("ok") else 400)
+
+
+@app.post("/api/keys")
+def keys_create(req: ApiKeyReq, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "not authenticated"}
+        if not billing.entitlements(user["tier"])["api"]:
+            response.status_code = 403
+            return {"error": "API access requires the Pro plan", "upgrade": True}
+        out = apikeys.generate(conn, user["id"], req.name)
+        authn.audit(conn, user["email"], "api_key_create", out["prefix"])
+    return out
+
+
+@app.get("/api/keys")
+def keys_list(tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            return {"authenticated": False, "api_enabled": False, "keys": []}
+        return {"authenticated": True, "api_enabled": billing.entitlements(user["tier"])["api"],
+                "keys": apikeys.list_keys(conn, user["id"])}
+
+
+@app.delete("/api/keys/{key_id}")
+def keys_revoke(key_id: int, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "not authenticated"}
+        return {"revoked": apikeys.revoke(conn, user["id"], key_id)}
+
+
+@app.get("/api/v1/clusters")
+def v1_clusters(request: Request, min_confidence: str = "medium", limit: int = 50) -> JSONResponse:
+    """The Pro data API. Authenticated by a scoped, hashed API key (Bearer). Every response carries
+    a per-key `meta.trace` canary so a resold dataset is traceable to the leaking key."""
+    auth = request.headers.get("authorization", "")
+    raw = auth[7:].strip() if auth[:7].lower() == "bearer " else None
+    min_rank = _BUCKET_RANK.get(min_confidence, 1)
+    limit = max(1, min(200, limit))
+    with db.connect() as conn:
+        key = apikeys.verify(conn, raw)
+        if not key:
+            return JSONResponse({"error": "invalid or missing API key"}, status_code=401)
+        if key["tier"] not in ("pro", "admin"):
+            return JSONResponse({"error": "API access requires the Pro plan"}, status_code=403)
+        if not apikeys.rate_ok(key["id"]):
+            return JSONResponse({"error": "rate limit exceeded"}, status_code=429)
+        rows: list[dict] = []
+        with conn.cursor() as cur:
+            aso = _effective_as_of(cur, "latest", key["tier"])
+            if aso is not None:
+                cur.execute(
+                    """SELECT c.issuer_entity, e.name, c.score, c.confidence_bucket, c.voices, c.source_classes,
+                              (SELECT symbol FROM security_map m WHERE m.entity_id=c.issuer_entity
+                                 AND m.source='sec_company_tickers' ORDER BY confidence DESC LIMIT 1)
+                       FROM signal_clusters c JOIN entities e ON e.id=c.issuer_entity
+                       WHERE c.as_of=%s ORDER BY c.score DESC""",
+                    (aso,),
+                )
+                for ent, name, score, bucket, voices, classes, sym in cur.fetchall():
+                    if _BUCKET_RANK[bucket] < min_rank:
+                        continue
+                    rows.append({"symbol": sym, "name": name,
+                                 "smart_money_score": presentation.smart_money_score(float(score)),
+                                 "score": float(score), "confidence_bucket": bucket,
+                                 "voices": voices, "source_classes": classes})
+                    if len(rows) >= limit:
+                        break
+        trace = apikeys.canary_trace(key["canary"], date.today().isoformat())
+    return JSONResponse({"as_of": aso.isoformat() if aso else None, "count": len(rows), "clusters": rows,
+                         "meta": {"trace": trace, "plan": key["tier"],
+                                  "terms": "Licensed to your account. Redistribution is traceable via meta.trace."}})
+
+
 @app.get("/api/library")
 def library() -> dict:
     with db.connect() as conn, conn.cursor() as cur:
@@ -600,6 +2033,62 @@ def library_entry(slug: str) -> dict:
         return {"found": False, "slug": slug}
     return {"found": True, "slug": r[0], "kind": r[1], "title": r[2], "body_md": r[3],
             "sources": r[4], "linked_source_classes": r[5], "review_status": r[6]}
+
+
+# --------------------------------------------------------------- shareable cards (Slice C)
+
+def _card_data(cur, symbol: str) -> dict | None:
+    ent = _resolve_symbol(cur, symbol)
+    if ent is None:
+        return None
+    eid, _cik, name = ent
+    aso = _effective_as_of(cur, "latest", "free")  # a public card uses the free (delayed) view
+    r = None
+    if aso is not None:
+        cur.execute("SELECT score, confidence_bucket, inputs FROM signal_clusters WHERE issuer_entity=%s AND as_of=%s",
+                    (eid, aso))
+        r = cur.fetchone()
+    if not r:
+        return {"symbol": symbol, "name": name, "score": None, "bucket": None,
+                "headline": "No active convergence right now"}
+    score, bucket, inputs = r
+    contribs = (inputs or {}).get("contributions", [])
+    story = presentation.cluster_story(contribs, _voice_names(cur, [contribs]))
+    return {"symbol": symbol, "name": name, "score": presentation.smart_money_score(float(score)),
+            "bucket": bucket, "headline": story["headline"]}
+
+
+@app.get("/api/card/{symbol}.svg")
+def card_svg(symbol: str) -> Response:
+    sym = symbol.strip().upper()
+    with db.connect() as conn, conn.cursor() as cur:
+        d = _card_data(cur, sym) or {"symbol": sym, "name": "", "score": None, "bucket": None,
+                                     "headline": "Not a resolved issuer"}
+    svg = presentation.score_card_svg(d["symbol"], d["name"], d["score"], d["bucket"], d["headline"])
+    return Response(content=svg, media_type="image/svg+xml", headers={"Cache-Control": "public, max-age=300"})
+
+
+@app.get("/s/{symbol}", response_class=HTMLResponse)
+def share_page(symbol: str) -> str:
+    sym = symbol.strip().upper()
+    with db.connect() as conn, conn.cursor() as cur:
+        d = _card_data(cur, sym) or {"symbol": sym, "name": "", "score": None, "headline": "Not a resolved issuer"}
+    e = presentation._xml_escape
+    title = f"{sym} · Smart Money Score {d['score']}" if d.get("score") is not None else f"{sym} · TradeOS"
+    card = f"/api/card/{sym}.svg"
+    return f'''<!doctype html><html lang="en"><head><meta charset="utf-8">
+<title>{e(title)}</title>
+<meta property="og:title" content="{e(title)}">
+<meta property="og:description" content="{e(d.get('headline') or '')}">
+<meta property="og:image" content="{card}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>body{{background:#090b11;color:#d7e0ee;font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:flex;flex-direction:column;align-items:center;gap:22px;padding:44px 16px}}img{{max-width:100%;width:640px;border-radius:16px;border:1px solid #222b3a}}a{{color:#5b8cff;text-decoration:none;font-weight:600;font-size:18px}}p{{color:#7a8699;font-size:13px;max-width:560px;text-align:center;line-height:1.5}}</style>
+</head><body>
+<img src="{card}" alt="{e(title)}">
+<a href="/?symbol={e(sym)}">Open {e(sym)} on TradeOS &#8594;</a>
+<p>TradeOS shows what the smartest money is quietly doing, with backtested, probability-framed context. Not investment advice.</p>
+</body></html>'''
 
 
 # ------------------------------------------------------------------- frontend (SPA)

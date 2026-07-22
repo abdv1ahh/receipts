@@ -19,7 +19,7 @@ import logging
 import os
 from datetime import date, datetime, time, timedelta, timezone
 
-from . import authn, db
+from . import alerts, authn, db
 from .config import sec_user_agent
 from .ingestion import form13f, schedule13
 from .ingestion.edgar_client import EdgarClient
@@ -172,6 +172,17 @@ def cmd_ingest_short_interest(args) -> None:
         client.close()
 
 
+def cmd_ingest_sentiment(args) -> None:
+    from . import sentiment
+    from .ingestion.sentiment_hn import ingest_hn
+    with db.connect() as conn:
+        universe = sentiment.tracked_symbols(conn, limit=args.limit)
+        total = 0
+        if args.source in ("hn", "all"):
+            total += ingest_hn(conn, universe, window_hours=args.window)
+    print(f"ingest-sentiment: recorded {total} observations across {len(universe)} tracked symbols")
+
+
 def cmd_run_backtest(_args) -> None:
     with db.connect() as conn:
         counters = backtest.run_backtest(conn)
@@ -195,6 +206,11 @@ def cmd_calibration(_args) -> None:
 def cmd_sync_library(_args) -> None:
     with db.connect() as conn:
         print(f"sync-library: {sync_library(conn)}")
+
+
+def cmd_generate_alerts(_args) -> None:
+    with db.connect() as conn:
+        print(f"generate-alerts: {alerts.generate_alerts(conn)}")
 
 
 def cmd_seed_admin(args) -> None:
@@ -306,9 +322,16 @@ def main() -> None:
     si.add_argument("--start", default="2026-05-01")
     si.set_defaults(fn=cmd_ingest_short_interest)
 
+    isent = sub.add_parser("ingest-sentiment")
+    isent.add_argument("--source", default="hn", choices=["hn", "all"])
+    isent.add_argument("--limit", type=int, default=40)
+    isent.add_argument("--window", type=int, default=48)
+    isent.set_defaults(fn=cmd_ingest_sentiment)
+
     sub.add_parser("run-backtest").set_defaults(fn=cmd_run_backtest)
     sub.add_parser("calibration").set_defaults(fn=cmd_calibration)
     sub.add_parser("sync-library").set_defaults(fn=cmd_sync_library)
+    sub.add_parser("generate-alerts").set_defaults(fn=cmd_generate_alerts)
 
     sa = sub.add_parser("seed-admin")
     sa.add_argument("--email", required=True)

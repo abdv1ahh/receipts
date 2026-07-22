@@ -70,17 +70,36 @@ def _create_session(cur, user_id: int, ip: str | None, ua: str | None) -> str:
     return token
 
 
+def _expire_trial_if_lapsed(cur, conn, user_id: int, tier: str) -> str:
+    """Lazy trial enforcement: a lapsed 'trialing' subscription downgrades the user to free on read,
+    so a referral (or Stripe) trial expires on its own without a running cron."""
+    cur.execute("SELECT 1 FROM subscriptions WHERE user_id=%s AND status='trialing' AND current_period_end < now()",
+                (user_id,))
+    if cur.fetchone():
+        cur.execute("UPDATE users SET tier='free' WHERE id=%s AND tier<>'admin'", (user_id,))
+        cur.execute("UPDATE subscriptions SET status='canceled', plan='free', updated_at=now() WHERE user_id=%s",
+                    (user_id,))
+        conn.commit()
+        return "free"
+    return tier
+
+
 def session_user(conn: psycopg.Connection, token: str | None) -> dict | None:
     if not token:
         return None
     with conn.cursor() as cur:
         cur.execute(
-            """SELECT u.id, u.email, u.tier FROM sessions s JOIN users u ON u.id = s.user_id
-               WHERE s.token_hash = %s AND s.expires_at > now()""",
+            """SELECT u.id, u.email, u.tier, u.handle FROM sessions s JOIN users u ON u.id = s.user_id
+               WHERE s.token_hash = %s AND s.expires_at > now() AND NOT u.banned""",
             (_hash_token(token),),
         )
         r = cur.fetchone()
-    return {"id": r[0], "email": r[1], "tier": r[2]} if r else None
+        if not r:
+            return None
+        uid, email, tier, handle = r
+        if tier in ("retail", "pro"):
+            tier = _expire_trial_if_lapsed(cur, conn, uid, tier)
+    return {"id": uid, "email": email, "tier": tier, "handle": handle}
 
 
 def logout(conn: psycopg.Connection, token: str | None) -> None:
@@ -136,13 +155,22 @@ def register(conn: psycopg.Connection, email: str, password: str, invite_code: s
         uid, tier = cur.fetchone()
         cur.execute("UPDATE invites SET used_by = %s, used_at = now() WHERE code = %s AND used_by IS NULL",
                     (uid, invite_code))
+        referred_by = None
         if cur.rowcount != 1:
-            conn.rollback()
-            raise AuthError("invalid or already-used invite code")
+            # not a single-use invite — it may be another user's reusable referral code
+            cur.execute("SELECT id FROM users WHERE referral_code = %s", (invite_code,))
+            ref = cur.fetchone()
+            if not ref:
+                conn.rollback()
+                raise AuthError("invalid or already-used invite code")
+            referred_by = ref[0]
+            cur.execute("UPDATE users SET referred_by = %s WHERE id = %s", (referred_by, uid))
         token = _create_session(cur, uid, ip, ua)
     conn.commit()
-    audit(conn, email, "register", email)
-    return token, {"id": uid, "email": email, "tier": tier}
+    if referred_by is not None:
+        _grant_trial(conn, uid, days=14)   # welcome reward for a referred signup (lazily expiring)
+    audit(conn, email, "register", email, {"referred_by": referred_by} if referred_by else None)
+    return token, {"id": uid, "email": email, "tier": ("pro" if referred_by else tier)}
 
 
 def login(conn: psycopg.Connection, email: str, password: str, totp_code: str | None = None,
@@ -156,11 +184,13 @@ def login(conn: psycopg.Connection, email: str, password: str, totp_code: str | 
         _record_attempt(cur, ip)
         _record_attempt(cur, email)
         conn.commit()
-        cur.execute("SELECT id, password_hash, tier, totp_secret FROM users WHERE email = %s", (email,))
+        cur.execute("SELECT id, password_hash, tier, totp_secret, banned FROM users WHERE email = %s", (email,))
         row = cur.fetchone()
     if not row or not verify_password(row[1], password):
         raise AuthError("invalid credentials")  # uniform: never distinguish which field failed
-    uid, _h, tier, totp_secret = row
+    uid, _h, tier, totp_secret, banned = row
+    if banned:                                   # only reached with a correct password; honest signal
+        raise AuthError("this account has been suspended")
     # TOTP required for admin; enforced whenever a secret is set
     if tier == "admin" and not totp_secret:
         raise AuthError("invalid credentials")  # admin without MFA configured cannot log in
@@ -186,6 +216,48 @@ def create_invite(conn: psycopg.Connection, actor_user_id: int | None) -> str:
 
 def new_totp_secret() -> str:
     return pyotp.random_base32()
+
+
+# ------------------------------------------------------------------ referrals
+
+def get_or_create_referral_code(conn: psycopg.Connection, user_id: int) -> str:
+    with conn.cursor() as cur:
+        cur.execute("SELECT referral_code FROM users WHERE id=%s", (user_id,))
+        r = cur.fetchone()
+        if r and r[0]:
+            return r[0]
+        for _ in range(5):
+            code = secrets.token_urlsafe(6)
+            try:
+                cur.execute("UPDATE users SET referral_code=%s WHERE id=%s", (code, user_id))
+                conn.commit()
+                return code
+            except psycopg.errors.UniqueViolation:
+                conn.rollback()
+    raise AuthError("could not allocate a referral code")
+
+
+def referral_stats(conn: psycopg.Connection, user_id: int) -> dict:
+    code = get_or_create_referral_code(conn, user_id)
+    with conn.cursor() as cur:
+        cur.execute("SELECT count(*) FROM users WHERE referred_by=%s", (user_id,))
+        n = cur.fetchone()[0]
+    return {"code": code, "referred": n}
+
+
+def _grant_trial(conn: psycopg.Connection, user_id: int, days: int = 14) -> None:
+    """Grant/extend a Pro trial. Expiry is enforced lazily by session_user, so no cron is needed."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """INSERT INTO subscriptions (user_id, plan, status, provider, current_period_end, updated_at)
+               VALUES (%s,'pro','trialing','referral', now() + make_interval(days => %s), now())
+               ON CONFLICT (user_id) DO UPDATE SET plan='pro', status='trialing', provider='referral',
+                   current_period_end = GREATEST(subscriptions.current_period_end, now() + make_interval(days => %s)),
+                   updated_at=now()""",
+            (user_id, days, days),
+        )
+        cur.execute("UPDATE users SET tier='pro' WHERE id=%s AND tier='free'", (user_id,))
+    conn.commit()
 
 
 # ------------------------------------------------------------------ entitlements

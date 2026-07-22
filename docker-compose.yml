@@ -16,15 +16,27 @@ services:
     build: .
     environment:
       DATABASE_URL: postgresql://tradeos:${POSTGRES_PASSWORD}@db:5432/tradeos
+      UPLOADS_DIR: /app/uploads
       SEC_USER_AGENT: ${SEC_USER_AGENT}
       TIINGO_API_KEY: ${TIINGO_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-flash-latest}
       EXPLAIN_PROVIDER: ${EXPLAIN_PROVIDER:-template}
+      # Sentiment sources (Slice H). HN needs no key; add these free keys to connect Reddit/YouTube.
+      REDDIT_CLIENT_ID: ${REDDIT_CLIENT_ID:-}
+      REDDIT_CLIENT_SECRET: ${REDDIT_CLIENT_SECRET:-}
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
+      # Billing (Slice D). Empty = test mode (no charge). Set these + add `stripe` to requirements to go live.
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_PRICE_RETAIL: ${STRIPE_PRICE_RETAIL:-}
+      STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO:-}
     ports: ["8000:8000"]
+    volumes: [uploads:/app/uploads]   # user trade screenshots (re-encoded); survives image rebuilds
     depends_on:
       db:
         condition: service_healthy
 
 volumes:
   pgdata:
+  uploads:
