@@ -22,6 +22,10 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-flash-latest}
       EXPLAIN_PROVIDER: ${EXPLAIN_PROVIDER:-template}
+      # Free live AI via any OpenAI-compatible endpoint (GitHub Models / Groq / OpenRouter). See FREE-AI.md.
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-}
       # Sentiment sources (Slice H). HN needs no key; add these free keys to connect Reddit/YouTube.
       REDDIT_CLIENT_ID: ${REDDIT_CLIENT_ID:-}
       REDDIT_CLIENT_SECRET: ${REDDIT_CLIENT_SECRET:-}
@@ -33,6 +37,27 @@ services:
       STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO:-}
     ports: ["8000:8000"]
     volumes: [uploads:/app/uploads]   # user trade screenshots (re-encoded); survives image rebuilds
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Continuous updates (Milestone 3): the same image, running the scheduler loop so news, signals and
+  # attention refresh on their own. Keeps the API process stateless. Shares the DB and .env config.
+  worker:
+    build: .
+    command: ["python", "-m", "tradeos.cli", "scheduler"]
+    environment:
+      DATABASE_URL: postgresql://tradeos:${POSTGRES_PASSWORD}@db:5432/tradeos
+      SEC_USER_AGENT: ${SEC_USER_AGENT}
+      TIINGO_API_KEY: ${TIINGO_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-flash-latest}
+      EXPLAIN_PROVIDER: ${EXPLAIN_PROVIDER:-template}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-}
+      REDDIT_CLIENT_ID: ${REDDIT_CLIENT_ID:-}
+      REDDIT_CLIENT_SECRET: ${REDDIT_CLIENT_SECRET:-}
     depends_on:
       db:
         condition: service_healthy

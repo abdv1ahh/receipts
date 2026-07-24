@@ -1,0 +1,65 @@
+# TradeOS — production stack: Postgres + API + scheduler worker + Caddy (automatic HTTPS).
+#
+#   cp .env.production.example .env.production      # then edit: strong DB password, domain, keys
+#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+#   docker compose -f docker-compose.prod.yml --env-file .env.production run --rm api python -m tradeos.cli migrate
+#
+# See DEPLOY.md for the full runbook. The DB is not exposed to the host; Caddy terminates TLS and
+# proxies to the API; the worker keeps everything fresh. Everything restarts on reboot.
+services:
+  db:
+    image: postgres:16
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tradeos}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set a strong POSTGRES_PASSWORD in .env.production}
+      POSTGRES_DB: ${POSTGRES_DB:-tradeos}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tradeos}"]
+      interval: 5s
+      retries: 12
+    # deliberately NO published ports: the database is reachable only on the internal compose network
+
+  api:
+    build: .
+    restart: always
+    command: ["uvicorn", "tradeos.app:app", "--host", "0.0.0.0", "--port", "8000",
+              "--proxy-headers", "--forwarded-allow-ips", "*", "--workers", "2"]
+    env_file: [.env.production]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-tradeos}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-tradeos}
+      COOKIE_SECURE: "true"            # HTTPS-only session cookies + HSTS (safe behind Caddy TLS)
+      UPLOADS_DIR: /app/uploads
+    volumes: [uploads:/app/uploads]
+    depends_on:
+      db: {condition: service_healthy}
+    # no published ports: Caddy is the only thing the internet talks to
+
+  worker:
+    build: .
+    restart: always
+    command: ["python", "-m", "tradeos.cli", "scheduler"]
+    env_file: [.env.production]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-tradeos}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-tradeos}
+    depends_on:
+      db: {condition: service_healthy}
+
+  caddy:
+    image: caddy:2
+    restart: always
+    ports: ["80:80", "443:443"]
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN (e.g. tradeos.example.com) in .env.production}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [api]
+
+volumes:
+  pgdata: {}
+  uploads: {}
+  caddy_data: {}
+  caddy_config: {}

@@ -36,17 +36,14 @@ def _cal_for(detail: dict, calibration: dict | None, horizon: int) -> dict | Non
 
 
 def _try_llm(provider: str, detail: dict, cal: dict | None, horizon: int) -> str | None:
-    """Dispatch to an optional model provider. Returns prose, or None if the provider is not
-    available (module missing, key unset, or call failed) — the caller then uses the template."""
-    try:
-        if provider == "gemini":
+    """Dispatch to the configured model provider (gemini, or any OpenAI-compatible endpoint via llm.py).
+    Returns prose, or None if unavailable (no key, in cooldown, or call failed) — caller uses template."""
+    if provider in ("gemini", "openai"):
+        try:
             from . import gemini
             return gemini.generate(detail, cal, horizon)
-        if provider == "anthropic":
-            from . import anthropic_provider
-            return anthropic_provider.generate(detail, cal, horizon)
-    except Exception as exc:  # missing module / missing key / API error -> template
-        log.warning("explanation provider %s unavailable (%s); using template", provider, type(exc).__name__)
+        except Exception as exc:  # missing key / API error -> template
+            log.warning("explanation provider %s unavailable (%s); using template", provider, type(exc).__name__)
     return None
 
 
@@ -92,7 +89,7 @@ def explain(conn: psycopg.Connection, detail: dict, calibration: dict | None,
     template_prose = template.render(detail, cal, horizon)
 
     result: Explanation | None = None
-    if provider in ("gemini", "anthropic"):
+    if provider in ("gemini", "openai"):
         llm = _try_llm(provider, detail, cal, horizon)
         if llm is not None:
             allowed = allowed_numbers(detail, calibration or {})
@@ -116,8 +113,8 @@ def explain(conn: psycopg.Connection, detail: dict, calibration: dict | None,
 
 
 def _model_id(provider: str) -> str:
-    return {"gemini": os.environ.get("GEMINI_MODEL", "gemini"),
-            "anthropic": os.environ.get("ANTHROPIC_MODEL", "anthropic")}.get(provider, provider)
+    from .. import llm
+    return llm.model_id(provider)
 
 
 def to_dict(exp: Explanation) -> dict:
@@ -135,7 +132,7 @@ def extract_tickers(image_bytes: bytes, mime: str, provider: str | None = None) 
     provider = (provider or os.environ.get("EXPLAIN_PROVIDER", "template")).lower()
     candidates: list = []
     try:
-        if provider == "gemini":
+        if provider in ("gemini", "openai"):
             from . import gemini
             candidates = gemini.extract_tickers(image_bytes, mime)
     except Exception as exc:  # any provider failure -> manual entry

@@ -1,77 +1,94 @@
-// Slice H: Sentiment & Trend Scanner. Symbols ranked by public-attention velocity from real, free
-// sources (Hacker News by default; Reddit/YouTube when the operator adds a free key). Honest: a name
-// appears only above a mention floor, attention is a velocity vs its own baseline, manipulation is
-// flagged, and unconnected sources say so rather than showing fabricated numbers.
+// Social & Attention Intelligence (Milestone 2). Names ranked by public-attention VELOCITY across
+// real sources — Wikipedia pageviews + Hacker News now, Reddit discussion when its free key is set —
+// each with the analyst's "why it's drawing attention" connecting the spike to its likely news
+// catalyst. Honest by construction: velocity is vs a name's own baseline, manipulation is flagged,
+// sentiment shows only where a source measures it, and unconnected sources say so.
 import { useEffect, useState } from "react";
 import { fetchTrending } from "./api";
 
 const FLAG_LABEL = { single_source: "single source", bot_heavy: "bot-heavy" };
+const SRC_LABEL = { wikipedia: "Wikipedia", hn: "Hacker News", reddit: "Reddit", youtube: "YouTube" };
+const band = (n) => (n >= 70 ? "high" : n >= 45 ? "medium" : "low");
 
-function AttentionBar({ score }) {
-  return (
-    <div className="att-bar" title={`attention ${score}/100`}>
-      <div className="att-fill" style={{ width: `${score}%` }} />
-      <span className="att-num">{score}</span>
-    </div>
-  );
+function Sentiment({ v }) {
+  if (v == null) return <span className="sent-na" title="This source measures attention, not sentiment">attention only</span>;
+  const s = v > 0.2 ? ["bull", "bullish"] : v < -0.2 ? ["bear", "bearish"] : ["neutral", "mixed"];
+  return <span className={`sent sent-${s[0]}`}>{s[1]} {v.toFixed(2)}</span>;
 }
 
 function SourceStatus({ sources }) {
   if (!sources) return null;
-  const dot = (s) => (s === "connected" ? "🟢" : s === "needs_key" ? "🟡" : "⚪");
-  const suffix = (s) => (s === "needs_key" ? " · add free key" : s === "unavailable" ? " · no free tier" : "");
   return (
-    <div className="src-status">
+    <div className="src-strip">
       {Object.entries(sources).map(([k, s]) => (
-        <span key={k} className={`src-stat s-${s.state}`}>{dot(s.state)} {s.label}{suffix(s.state)}</span>
+        <span key={k} className={`src-dot ${s.state === "connected" ? "on" : s.state === "needs_key" ? "warn" : "off"}`}
+              title={s.state === "needs_key" ? "add a free key to connect" : s.state === "unavailable" ? "no reachable free tier" : "connected"}>
+          <i /> {s.label}{s.state === "needs_key" ? " · add key" : s.state === "unavailable" ? " · n/a" : ""}
+        </span>
       ))}
+    </div>
+  );
+}
+
+function AttentionCard({ r, rank, onOpenSymbol }) {
+  return (
+    <div className="att-card">
+      <div className="att-rank">{rank}</div>
+      <div className={`att-score band-${band(r.attention)}`}>
+        <span className="att-n num">{r.attention}</span><span className="att-l">ATTN</span>
+      </div>
+      <div className="att-body">
+        <div className="att-head">
+          <button className="tkr" onClick={() => onOpenSymbol(r.symbol)}>{r.symbol}</button>
+          <span className="att-name">{r.name}</span>
+          {r.velocity != null && <span className="att-vel">{r.velocity}× usual</span>}
+          <Sentiment v={r.sentiment} />
+          {r.is_new && <span className="chip s-open">new</span>}
+          {r.flags?.map((f) => <span key={f} className="chip flag-chip" title="manipulation-resistance flag">⚠ {FLAG_LABEL[f] || f}</span>)}
+          <span className="spacer" />
+          {(r.sources || []).map((s) => <span key={s} className="src-badge">{SRC_LABEL[s] || s}</span>)}
+        </div>
+        {r.why?.text && (
+          <div className="att-why">
+            {r.why.text}
+            {r.why.confidence && <span className={`conf conf-${r.why.confidence}`} style={{ marginLeft: 8 }}>{r.why.confidence} confidence</span>}
+          </div>
+        )}
+        {r.news?.length > 0 && (
+          <div className="att-news">
+            {r.news.map((n) => <a key={n.id} className="att-news-link" href={n.url} target="_blank" rel="noreferrer">↗ {n.headline}</a>)}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
 export function ScannerView({ onOpenSymbol }) {
   const [data, setData] = useState(null);
-  const [hours, setHours] = useState(48);
+  const [hours, setHours] = useState(96);
   useEffect(() => { setData(null); fetchTrending(hours).then(setData).catch(() => setData({ board: [], sources: null })); }, [hours]);
 
   return (
-    <div className="detail">
-      <div className="j-head">
-        <h2>📈 Trending now</h2>
+    <div>
+      <div className="page-head">
+        <div>
+          <h1 className="page-title">Social &amp; Attention Intelligence</h1>
+          <div className="page-sub">What the crowd is discovering — ranked by attention velocity, with the likely catalyst. Never fabricated.</div>
+        </div>
         <div className="seg">
-          {[24, 48, 168].map((h) => <button key={h} className={hours === h ? "on" : ""} onClick={() => setHours(h)}>{h === 168 ? "7d" : `${h}h`}</button>)}
+          {[24, 96, 168, 336].map((h) => <button key={h} className={hours === h ? "on" : ""} onClick={() => setHours(h)}>{h >= 168 ? `${h / 24}d` : `${h}h`}</button>)}
         </div>
       </div>
-      <div className="meta">Symbols ranked by public-attention velocity — how much more they're being discussed than usual — from real, free sources. A name appears only above a mention floor; attention is a velocity vs its own baseline; possible manipulation is flagged, never hidden.</div>
-      <SourceStatus sources={data?.sources} />
-
-      {data === null ? <div className="skel" style={{ width: "50%", marginTop: 14 }} />
-        : data.board?.length === 0 ? (
-          <div className="empty" style={{ marginTop: 14 }}>{data.note || "No attention data yet."}</div>
-        ) : (
-          <table className="clusters" style={{ marginTop: 12 }}>
-            <thead><tr><th>#</th><th>Symbol</th><th>Attention</th><th>Velocity</th><th>Mentions</th><th>Sentiment</th><th>Sources</th></tr></thead>
-            <tbody>
-              {data.board.map((r, i) => (
-                <tr className="row" key={r.symbol} onClick={() => onOpenSymbol(r.symbol)}>
-                  <td className="board-rank">{i + 1}</td>
-                  <td>
-                    <span className="sym">{r.symbol}</span>
-                    {r.is_new && <span className="chip s-open" style={{ marginLeft: 6 }}>new</span>}
-                    {r.flags?.map((f) => <span key={f} className="chip flag-chip" style={{ marginLeft: 6 }} title="manipulation-resistance flag">⚠ {FLAG_LABEL[f] || f}</span>)}
-                    <div className="name">{r.name}</div>
-                  </td>
-                  <td style={{ minWidth: 120 }}><AttentionBar score={r.attention} /></td>
-                  <td className="num">{r.velocity != null ? `${r.velocity}×` : "—"}</td>
-                  <td className="num">{r.mentions}</td>
-                  <td className="num">{r.sentiment != null ? r.sentiment.toFixed(2) : "—"}</td>
-                  <td>{r.sources.map((s) => <span key={s} className="src-chip">{s}</span>)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      <div className="disc" style={{ marginTop: 16 }}>Attention reflects public discussion volume, not a recommendation. A “—” sentiment means the connected source measures attention but not sentiment; connect Reddit or YouTube (free keys) to add it.</div>
+      {data && <SourceStatus sources={data.sources} />}
+      {data === null ? (
+        [...Array(5)].map((_, i) => <div key={i} className="att-card news-skel"><div className="skel" style={{ width: `${65 - i * 7}%` }} /></div>)
+      ) : data.board?.length === 0 ? (
+        <div className="empty" style={{ marginTop: 14 }}>{data.note || "No attention data yet."}</div>
+      ) : (
+        data.board.map((r, i) => <AttentionCard key={r.symbol} r={r} rank={i + 1} onOpenSymbol={onOpenSymbol} />)
+      )}
+      <div className="disc" style={{ marginTop: 16 }}>Attention reflects public discussion/lookup volume, not a recommendation. "attention only" means the connected source measures attention but not mood; connect Reddit (free key) to add discussion sentiment.</div>
     </div>
   );
 }

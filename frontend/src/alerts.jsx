@@ -2,10 +2,9 @@
 // Daily Smart-Money Brief. These make TradeOS reach out instead of waiting to be visited.
 import { useEffect, useState } from "react";
 import {
-  fetchAlertPrefs, fetchBrief, fetchFollows, fetchNotifications, markNotificationsRead,
+  fetchAlertPrefs, fetchFollows, fetchNotifications, markNotificationsRead,
   removeFollow, saveAlertPrefs,
 } from "./api";
-import { Backtested } from "./components.jsx";
 
 function timeAgo(iso) {
   const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
@@ -126,45 +125,3 @@ export function AlertsView({ onLogin, onOpenSymbol }) {
   );
 }
 
-export function BriefView({ calibration, horizon, onOpenSymbol, onOpenProfile }) {
-  const [b, setB] = useState(null);
-  useEffect(() => { fetchBrief().then(setB).catch(() => setB(null)); }, []);
-  if (!b) return <div className="detail"><div className="skel" style={{ width: 260 }} /></div>;
-  const calFor = (bucket) => calibration?.per_bucket?.[bucket]?.[String(horizon)];
-  const money = (v) => (v == null ? "—" : "$" + Number(v).toLocaleString());
-  return (
-    <div className="detail">
-      <h2>Daily Smart-Money Brief</h2>
-      <div className="meta">
-        {b.delayed_hours > 0 ? <span className="fresh a">{b.delayed_hours}h delayed</span> : <span className="fresh g">live</span>}
-        {b.as_of ? ` · as of ${b.as_of.slice(0, 10)}` : ""}
-      </div>
-      <p className="explain-prose" style={{ marginTop: 10 }}>{b.intro}</p>
-
-      <div className="section">Top convergences</div>
-      {b.top_convergences.map((c) => (
-        <button key={c.issuer_entity} className="brief-row" onClick={() => c.symbol && onOpenSymbol(c.symbol)}>
-          <span className={`brief-score band-${c.confidence_bucket}`}>{c.smart_money_score}</span>
-          <span className="brief-main"><b>{c.symbol || c.name}</b> <span className="name">{c.headline}</span></span>
-          <Backtested cal={calFor(c.confidence_bucket)} />
-        </button>
-      ))}
-
-      <div className="section">Biggest insider buys</div>
-      {b.biggest_buys.map((x, i) => (
-        <button key={i} className="brief-row" onClick={() => x.symbol && onOpenSymbol(x.symbol)}>
-          <span className="brief-main"><b>{x.symbol || x.name}</b> <span className="name">{x.insider} · {x.date}</span></span>
-          <b className="num">{money(x.value_usd)}</b>
-        </button>
-      ))}
-
-      <div className="section">New activist stakes</div>
-      {b.new_activist_stakes.map((a, i) => (
-        <button key={i} className="brief-row" onClick={() => onOpenProfile("institution", a.filer_entity)}>
-          <span className="brief-main"><b>{a.symbol || a.issuer}</b> <span className="name">{a.filer} · {a.date}</span></span>
-          <span className="pill pill-medium">13D</span>
-        </button>
-      ))}
-    </div>
-  );
-}

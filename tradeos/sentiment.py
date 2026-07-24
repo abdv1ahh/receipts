@@ -80,13 +80,17 @@ def trending(grouped, min_mentions=MIN_MENTIONS, limit=25) -> list[dict]:
 # ------------------------------------------------------------------ honest source status
 
 def sources_status() -> dict:
-    """Which sources are actually connected, derived from config — never fabricated. HN is keyless;
-    Reddit/YouTube need the operator's free key; X has no free tier and stays unavailable."""
+    """Which sources are actually connected, derived from config — never fabricated. Wikipedia + HN are
+    keyless attention/discussion sources wired by default; Reddit/YouTube need the operator's free key
+    (Reddit via a ToS-compliant OAuth app); StockTwits and X have no reachable free tier and stay
+    unavailable rather than faked. `attention` = measures public attention; `sentiment` = measures mood."""
     return {
-        "hn": {"label": "Hacker News", "state": "connected", "sentiment": False},
-        "reddit": {"label": "Reddit", "state": "connected" if config.reddit_configured() else "needs_key", "sentiment": True},
-        "youtube": {"label": "YouTube", "state": "connected" if config.youtube_configured() else "needs_key", "sentiment": True},
-        "x": {"label": "X / Twitter", "state": "unavailable", "sentiment": True},
+        "wikipedia": {"label": "Wikipedia attention", "state": "connected", "attention": True, "sentiment": False},
+        "hn": {"label": "Hacker News", "state": "connected", "attention": True, "sentiment": False},
+        "reddit": {"label": "Reddit", "state": "connected" if config.reddit_configured() else "needs_key", "attention": True, "sentiment": True},
+        "youtube": {"label": "YouTube", "state": "connected" if config.youtube_configured() else "needs_key", "attention": True, "sentiment": True},
+        "stocktwits": {"label": "StockTwits", "state": "unavailable", "attention": True, "sentiment": True},
+        "x": {"label": "X / Twitter", "state": "unavailable", "attention": True, "sentiment": True},
     }
 
 

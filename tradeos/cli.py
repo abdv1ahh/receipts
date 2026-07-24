@@ -173,14 +173,110 @@ def cmd_ingest_short_interest(args) -> None:
 
 
 def cmd_ingest_sentiment(args) -> None:
-    from . import sentiment
+    from . import sentiment, social
+    from .ingestion import attention_wiki, social_reddit
     from .ingestion.sentiment_hn import ingest_hn
+    totals = {}
     with db.connect() as conn:
         universe = sentiment.tracked_symbols(conn, limit=args.limit)
-        total = 0
         if args.source in ("hn", "all"):
-            total += ingest_hn(conn, universe, window_hours=args.window)
-    print(f"ingest-sentiment: recorded {total} observations across {len(universe)} tracked symbols")
+            totals["hn"] = ingest_hn(conn, universe, window_hours=args.window)
+        if args.source in ("wikipedia", "wiki", "all"):
+            totals["wikipedia"] = attention_wiki.ingest(conn, social.attention_universe(conn, universe))
+        if args.source in ("reddit", "all"):
+            totals["reddit"] = social_reddit.ingest(conn)   # honest no-op until REDDIT_CLIENT_ID/SECRET set
+    print(f"ingest-sentiment: {totals}")
+
+
+def cmd_ingest_news(args) -> None:
+    from .ingestion import news_rss, news_sec
+    out: dict = {}
+    if args.source in ("sec", "all"):
+        client = EdgarClient(sec_user_agent())
+        try:
+            with db.connect() as conn:
+                day = date.fromisoformat(args.date) if args.date else date.today()
+                out["sec"] = news_sec.ingest_day(conn, client, day, limit=args.limit)
+        finally:
+            client.close()
+    if args.source in ("rss", "all"):
+        rc = news_rss.RssClient()
+        try:
+            with db.connect() as conn:
+                out["rss"] = news_rss.ingest(conn, rc, limit_per_feed=args.limit or 40)
+        finally:
+            rc.close()
+    print(f"ingest-news: {out}")
+
+
+def cmd_analyze_news(args) -> None:
+    from .intelligence import analyst
+    provider = os.environ.get("EXPLAIN_PROVIDER", "template")
+    with db.connect() as conn:
+        print(f"analyze-news: {analyst.analyze_recent(conn, hours=args.hours, limit=args.limit, provider=provider)}")
+
+
+def cmd_ingest_calendar(args) -> None:
+    from .ingestion import calendar_nasdaq
+    with db.connect() as conn:
+        out = {}
+        if args.source in ("earnings", "all"):
+            out["earnings"] = calendar_nasdaq.ingest_earnings(conn, days_ahead=args.days)
+        if args.source in ("economic", "all"):
+            out["economic"] = calendar_nasdaq.ingest_economic(conn, days_ahead=args.days)
+    print(f"ingest-calendar: {out}")
+
+
+def cmd_preflight(_args) -> None:
+    """Verify the environment is production-ready before boot: DB reachable + migrated, SEC UA set,
+    a valid AI provider, secure cookies, and no dev-default secrets. Non-zero exit on any hard problem."""
+    import re
+    from pathlib import Path
+    problems, warnings = [], []
+    dburl = os.environ.get("DATABASE_URL", "")
+    try:
+        with db.connect() as conn, conn.cursor() as cur:
+            cur.execute("SELECT 1")
+            applied = db.applied_versions(conn)
+        files = sorted(int(re.match(r"(\d+)_", p.name).group(1)) for p in Path(db.MIGRATIONS_DIR).glob("*.sql") if re.match(r"\d+_", p.name))
+        pending = [v for v in files if v not in applied]
+        if pending:
+            warnings.append(f"migrations not applied: {pending} — run `python -m tradeos.cli migrate`.")
+    except Exception as e:
+        problems.append(f"cannot connect to DATABASE_URL ({type(e).__name__}: {e}).")
+    if ":tradeos@" in dburl:
+        warnings.append("DATABASE_URL uses the dev-default password 'tradeos' — set a strong POSTGRES_PASSWORD in production.")
+    if "@" not in os.environ.get("SEC_USER_AGENT", ""):
+        problems.append("SEC_USER_AGENT must be like 'YourName you@example.com' (SEC fair-access policy).")
+    prov = os.environ.get("EXPLAIN_PROVIDER", "template").lower()
+    if prov not in ("template", "gemini", "anthropic"):
+        problems.append(f"EXPLAIN_PROVIDER '{prov}' is invalid (template|gemini|anthropic).")
+    if prov == "gemini" and not os.environ.get("GEMINI_API_KEY"):
+        warnings.append("EXPLAIN_PROVIDER=gemini but GEMINI_API_KEY is empty — AI prose falls back to deterministic templates.")
+    if prov == "anthropic":
+        warnings.append("EXPLAIN_PROVIDER=anthropic but no Anthropic provider module ships yet — AI falls back to templates.")
+    if os.environ.get("COOKIE_SECURE", "false").lower() != "true":
+        warnings.append("COOKIE_SECURE is not 'true' — set it in production so session cookies require HTTPS (also enables HSTS).")
+    for w in warnings:
+        print(f"  ⚠ {w}")
+    for p in problems:
+        print(f"  ✗ {p}")
+    if problems:
+        print(f"preflight: {len(problems)} problem(s), {len(warnings)} warning(s) — NOT ready.")
+        raise SystemExit(1)
+    print(f"preflight: OK ({len(warnings)} warning(s)).")
+
+
+def cmd_scheduler(args) -> None:
+    from . import scheduler
+    if args.once:
+        with db.connect() as conn:
+            results = scheduler.run_once(conn, force=args.force)
+        for r in results:
+            print(f"  {r['job']}: {r['status']} ({r['duration_ms']}ms) {r['detail']}")
+        print(f"scheduler: ran {len(results)} job(s)")
+    else:
+        scheduler.run_forever(tick_seconds=args.tick)
 
 
 def cmd_run_backtest(_args) -> None:
@@ -286,6 +382,10 @@ def cmd_seed_demo(_args) -> None:
                             f"VALUES (%s,%s,{eid},%s)", (pid, sym, sym, op))
             for sym in ("NVDA", "MSFT", "AMD", "TSLA"):
                 cur.execute("INSERT INTO watchlists (user_key, symbol) VALUES ('demo',%s) ON CONFLICT DO NOTHING", (sym,))
+            # follow a few names so the Morning Brief's "Your names" section is alive on first login
+            for sym in ("NVDA", "MSFT", "TSLA", "AMD"):
+                cur.execute("INSERT INTO follows (user_id, kind, ref, label) VALUES (%s,'symbol',%s,%s) "
+                            "ON CONFLICT DO NOTHING", (uid, sym, sym))
         conn.commit()
         authn.audit(conn, "system", "seed_demo", email)
     print(f"demo account created: {email}  (tier=pro, no MFA)")
@@ -374,10 +474,32 @@ def main() -> None:
     si.set_defaults(fn=cmd_ingest_short_interest)
 
     isent = sub.add_parser("ingest-sentiment")
-    isent.add_argument("--source", default="hn", choices=["hn", "all"])
-    isent.add_argument("--limit", type=int, default=40)
+    isent.add_argument("--source", default="all", choices=["hn", "wikipedia", "wiki", "reddit", "all"])
+    isent.add_argument("--limit", type=int, default=60)
     isent.add_argument("--window", type=int, default=48)
     isent.set_defaults(fn=cmd_ingest_sentiment)
+
+    inn = sub.add_parser("ingest-news")
+    inn.add_argument("--source", default="all", choices=["sec", "rss", "all"])
+    inn.add_argument("--date", default=None, help="SEC 8-K day (default today); RSS ignores it")
+    inn.add_argument("--limit", type=int, default=None, help="cap SEC filings / RSS items per feed")
+    inn.set_defaults(fn=cmd_ingest_news)
+
+    ann = sub.add_parser("analyze-news")
+    ann.add_argument("--hours", type=int, default=72)
+    ann.add_argument("--limit", type=int, default=12, help="max items to (LLM) analyze this pass")
+    ann.set_defaults(fn=cmd_analyze_news)
+
+    ical = sub.add_parser("ingest-calendar")
+    ical.add_argument("--source", default="all", choices=["earnings", "economic", "all"])
+    ical.add_argument("--days", type=int, default=14, help="days ahead to fetch")
+    ical.set_defaults(fn=cmd_ingest_calendar)
+
+    sch = sub.add_parser("scheduler")
+    sch.add_argument("--once", action="store_true", help="run one pass of due jobs and exit")
+    sch.add_argument("--force", action="store_true", help="with --once, run every job regardless of interval")
+    sch.add_argument("--tick", type=int, default=60, help="seconds between scheduler passes (run-forever)")
+    sch.set_defaults(fn=cmd_scheduler)
 
     sub.add_parser("run-backtest").set_defaults(fn=cmd_run_backtest)
     sub.add_parser("calibration").set_defaults(fn=cmd_calibration)
@@ -393,6 +515,7 @@ def main() -> None:
     ci.set_defaults(fn=cmd_create_invites)
 
     sub.add_parser("status").set_defaults(fn=cmd_status)
+    sub.add_parser("preflight").set_defaults(fn=cmd_preflight)
 
     args = p.parse_args()
     args.fn(args)

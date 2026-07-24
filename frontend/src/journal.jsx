@@ -4,8 +4,8 @@
 // server (no advice language, no invented numbers); the UI renders only what it returns.
 import { useEffect, useState } from "react";
 import {
-  createTrade, deleteTrade, extractTickers, fetchJournalReport, fetchPerformance, fetchSimilarTrades,
-  fetchTrades, fetchTradeAnalysis, getTrade, simulateTrade, updateTrade, uploadTradeImage,
+  createTrade, deleteTrade, extractTickers, fetchChartAnalysis, fetchJournalReport, fetchPerformance,
+  fetchSimilarTrades, fetchTrades, fetchTradeAnalysis, getTrade, simulateTrade, updateTrade, uploadTradeImage,
 } from "./api";
 
 const pct = (v) => (v == null ? "—" : `${v >= 0 ? "+" : ""}${(v * 100).toFixed(1)}%`);
@@ -193,6 +193,35 @@ function SimilarTrades({ id, onOpen }) {
   );
 }
 
+function ChartAnalysisPanel({ id }) {
+  const [a, setA] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const load = (refresh) => {
+    setBusy(true);
+    fetchChartAnalysis(id, refresh).then((d) => setA(d.analysis || {})).catch(() => setA({})).finally(() => setBusy(false));
+  };
+  useEffect(() => { load(false); }, [id]);
+  if (!a) return <div className="analysis"><div className="skel" style={{ width: "60%" }} /></div>;
+  const ai = a.source === "ai";
+  return (
+    <div className="analysis chart-analysis">
+      <div className="ca-head">
+        <b>AI chart read</b>
+        <span className={`ai-tag ${ai ? "ai-on" : ""}`}>{ai ? "✦ AI vision" : "levels only"}</span>
+        <span className="spacer" style={{ flex: 1 }} />
+        <button className="linkish" onClick={() => load(true)} disabled={busy}>{busy ? "reading…" : "re-analyze"}</button>
+      </div>
+      {a.pattern && <div className="ca-row"><span className="ca-l">Pattern</span> {a.pattern}</div>}
+      {a.structure && <p className="explain-prose" style={{ marginTop: 6 }}>{a.structure}</p>}
+      {a.risk_reward && <div className="ca-row"><span className="ca-l">Risk : reward</span> {a.risk_reward}</div>}
+      {a.observations?.length > 0 && <Section title="Observations" items={a.observations} />}
+      {a.risk_flags?.length > 0 && <Section title="Risk flags" items={a.risk_flags} warn />}
+      {a.psychology && <div className="ca-row"><span className="ca-l">Psychology</span> {a.psychology}</div>}
+      <div className="disc" style={{ marginTop: 8 }}>{a.disclaimer || "Educational, not advice."}</div>
+    </div>
+  );
+}
+
 function TradeDetail({ id, onBack, onEdit, onChanged, onOpenSymbol, onOpenLibrary, onOpenTrade }) {
   const [d, setD] = useState(null);
   const load = () => getTrade(id).then(setD);
@@ -215,6 +244,7 @@ function TradeDetail({ id, onBack, onEdit, onChanged, onOpenSymbol, onOpenLibrar
         {owner && <span className="chip">{t.is_public ? "🌐 public" : "🔒 private"}</span>}
       </div>
       {t.has_image && <img className="td-img" src={`/api/trades/${id}/image`} alt="trade screenshot" />}
+      {owner && t.has_image && <ChartAnalysisPanel id={id} />}
       <div className="kv-grid">
         {kv("Entry", money(t.entry_price))}
         {kv("Exit", money(t.exit_price))}

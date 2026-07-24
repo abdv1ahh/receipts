@@ -229,7 +229,7 @@ def _prose(analysis, trade, provider):
     """Return (prose, model_id, used_template). Optional model rephrasing held to the SAME directive
     and numbers guards as the signal explanation, with deterministic fallback on any failure or trip —
     the model can never widen the compliance envelope. Mirrors `explain.base`."""
-    if provider == "gemini":
+    if provider in ("gemini", "openai"):
         try:
             from .explain import gemini
             llm = gemini.generate_trade_prose(analysis, trade)
@@ -239,7 +239,8 @@ def _prose(analysis, trade, provider):
         if llm:
             allowed = allowed_numbers(analysis, _material(trade), {"_const": [1, 5, 100]})
             if directive_guard(llm) and numbers_guard(llm, allowed):
-                return llm, os.environ.get("GEMINI_MODEL", "gemini"), False
+                return llm, (os.environ.get("OPENAI_MODEL", "openai") if provider == "openai"
+                             else os.environ.get("GEMINI_MODEL", "gemini")), False
             log.warning("trade prose guard tripped; using deterministic prose")
     return render_prose(analysis, trade), "template", True
 

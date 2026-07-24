@@ -581,3 +581,113 @@ button:disabled { opacity: 0.5; cursor: default; }
 .sim-sym { font-weight: 700; min-width: 46px; }
 .sim-rr { color: var(--muted); margin-left: auto; font-variant-numeric: tabular-nums; }
 .sim-pnl { font-variant-numeric: tabular-nums; min-width: 56px; text-align: right; }
+
+/* ------------------------------------------------------------------ News Intelligence + Morning Brief (Milestone 1) */
+.news-card { display: flex; gap: 14px; background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 14px; margin-bottom: 10px; }
+.news-card:hover { border-color: var(--border-2); }
+.news-skel { min-height: 66px; align-items: center; }
+.impact { flex: 0 0 52px; width: 52px; height: 52px; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid var(--border-2); }
+.impact.band-high { background: linear-gradient(160deg, rgba(51,209,122,0.22), rgba(51,209,122,0.05)); border-color: rgba(51,209,122,0.45); color: #7ef0ad; }
+.impact.band-medium { background: linear-gradient(160deg, rgba(255,182,72,0.20), rgba(255,182,72,0.05)); border-color: rgba(255,182,72,0.40); color: #ffce85; }
+.impact.band-low { background: linear-gradient(160deg, rgba(91,140,255,0.16), rgba(91,140,255,0.04)); border-color: rgba(91,140,255,0.34); color: #a8c2ff; }
+.impact-n { font-size: 19px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.impact-l { font-size: 8px; letter-spacing: 0.08em; color: var(--muted); margin-top: 3px; }
+.news-body { flex: 1; min-width: 0; }
+.news-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.news-head .spacer, .news-foot .spacer { flex: 1; }
+.tkr { background: rgba(109,140,255,0.14); color: var(--accent); border: 0; border-radius: 6px; padding: 2px 8px; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.tkr:hover { background: rgba(109,140,255,0.26); }
+.cat-tag { font-size: 10.5px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; }
+.sig-badge { font-size: 11px; color: var(--amber); font-weight: 600; }
+.news-time { color: var(--faint); font-size: 11.5px; }
+.news-headline { display: block; color: var(--text); font-weight: 650; font-size: 14.5px; line-height: 1.35; text-decoration: none; }
+.news-headline:hover { color: #fff; text-decoration: underline; }
+.news-why { color: var(--muted); font-size: 13px; line-height: 1.5; margin-top: 5px; }
+.news-foot { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.conf { font-size: 11px; border-radius: 5px; padding: 1px 7px; }
+.conf-high { background: rgba(51,209,122,0.14); color: #6fe6a2; }
+.conf-medium { background: rgba(255,182,72,0.14); color: #ffcd80; }
+.conf-low { background: rgba(139,147,171,0.14); color: var(--muted); }
+.ai-tag { font-size: 11px; color: var(--faint); }
+.ai-tag.ai-on { color: var(--accent2); font-weight: 600; }
+.src { color: var(--faint); font-size: 11.5px; }
+
+.brief { max-width: 1000px; }
+.brief-hero { background: var(--grad-soft); border: 1px solid var(--border-2); border-radius: 18px; padding: 22px 24px; margin-bottom: 18px; }
+.brief-hero-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.brief-kicker { color: var(--accent2); font-size: 11px; letter-spacing: 0.12em; font-weight: 700; }
+.brief-title { margin: 4px 0 0; font-size: 26px; letter-spacing: -0.02em; }
+.brief-exec { color: var(--text); font-size: 15.5px; line-height: 1.6; margin: 14px 0 8px; }
+.brief-exec-tag { color: var(--faint); font-size: 12px; display: flex; align-items: center; gap: 6px; }
+.dot-sep { color: var(--border-2); }
+.brief-sec { margin: 22px 0; }
+.brief .section { color: var(--muted); font-size: 11px; letter-spacing: 0.06em; margin: 0 0 10px; text-transform: uppercase; font-weight: 600; display: flex; align-items: center; }
+.brief-nudge { background: var(--card); border: 1px dashed var(--border-2); border-radius: 12px; padding: 12px 16px; color: var(--muted); font-size: 13px; display: flex; gap: 8px; align-items: center; }
+.brief-nudge .linkish { color: var(--accent); }
+.sm-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.sm-col { min-width: 0; }
+.sm-h { color: var(--text); font-weight: 650; font-size: 13px; margin-bottom: 6px; }
+.src-strip { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 14px; }
+.brief-src { padding-top: 14px; border-top: 1px solid var(--border); }
+.src-dot { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--muted); }
+.src-dot i { width: 7px; height: 7px; border-radius: 999px; background: var(--faint); }
+.src-dot.on i { background: var(--green); }
+@media (max-width: 760px) { .sm-grid { grid-template-columns: 1fr; } .brief-title { font-size: 22px; } }
+
+/* ------------------------------------------------------------------ Social & Attention Intelligence (Milestone 2) */
+.att-card { display: flex; align-items: flex-start; gap: 12px; background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 13px 14px; margin-bottom: 10px; }
+.att-card:hover { border-color: var(--border-2); }
+.att-rank { color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; min-width: 16px; padding-top: 16px; }
+.att-score { flex: 0 0 48px; width: 48px; height: 48px; border-radius: 11px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid var(--border-2); }
+.att-score.band-high { background: linear-gradient(160deg, rgba(51,209,122,0.22), rgba(51,209,122,0.05)); border-color: rgba(51,209,122,0.45); color: #7ef0ad; }
+.att-score.band-medium { background: linear-gradient(160deg, rgba(255,182,72,0.20), rgba(255,182,72,0.05)); border-color: rgba(255,182,72,0.40); color: #ffce85; }
+.att-score.band-low { background: linear-gradient(160deg, rgba(91,140,255,0.16), rgba(91,140,255,0.04)); border-color: rgba(91,140,255,0.34); color: #a8c2ff; }
+.att-n { font-size: 18px; font-weight: 800; line-height: 1; }
+.att-l { font-size: 8px; letter-spacing: 0.08em; color: var(--muted); margin-top: 3px; }
+.att-body { flex: 1; min-width: 0; }
+.att-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.att-head .spacer { flex: 1; }
+.att-name { color: var(--muted); font-size: 12.5px; }
+.att-vel { color: var(--accent2); font-size: 12px; font-weight: 600; }
+.sent { font-size: 11px; border-radius: 5px; padding: 1px 7px; }
+.sent-bull { background: rgba(51,209,122,0.14); color: #6fe6a2; }
+.sent-bear { background: rgba(255,107,129,0.14); color: #ff9db0; }
+.sent-neutral { background: rgba(139,147,171,0.14); color: var(--muted); }
+.sent-na { font-size: 11px; color: var(--faint); }
+.src-badge { font-size: 10px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; }
+.att-why { color: var(--text); font-size: 13px; line-height: 1.5; margin-top: 7px; }
+.att-news { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
+.att-news-link { color: var(--accent); font-size: 12px; text-decoration: none; }
+.att-news-link:hover { text-decoration: underline; }
+.chip.flag-chip { color: var(--amber); border-color: rgba(255,182,72,0.4); }
+.chip.s-open { color: var(--green); border-color: #2f4a2f; }
+.src-dot.warn i { background: var(--amber); }
+.crowd-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; padding: 7px 2px; border-bottom: 1px solid var(--border); }
+.crowd-vel { color: var(--accent2); font-size: 12px; font-weight: 600; }
+.crowd-why { color: var(--muted); font-size: 12.5px; flex: 1; min-width: 220px; }
+/* Events & Macro Calendar (Milestone 4) */
+.ev-day { margin: 16px 0; }
+.ev-day-head { display: flex; align-items: center; gap: 8px; color: var(--text); font-weight: 650; font-size: 13.5px; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.ev-count { font-size: 11px; color: var(--faint); border: 1px solid var(--border); border-radius: 999px; padding: 0 7px; }
+.ev-row { display: flex; gap: 12px; padding: 9px 2px; border-bottom: 1px solid var(--border); }
+.ev-kind { flex: 0 0 74px; text-align: center; height: fit-content; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; border-radius: 6px; padding: 3px 6px; border: 1px solid var(--border-2); color: var(--muted); }
+.ev-kind.imp-high { background: rgba(255,107,129,0.12); color: #ff9db0; border-color: rgba(255,107,129,0.4); }
+.ev-kind.imp-medium { background: rgba(255,182,72,0.10); color: #ffcd80; border-color: rgba(255,182,72,0.35); }
+.ev-body { flex: 1; min-width: 0; }
+.ev-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-weight: 600; font-size: 13.5px; }
+.ev-name { color: var(--muted); font-weight: 500; }
+.ev-time { font-size: 11px; color: var(--faint); border: 1px solid var(--border); border-radius: 5px; padding: 0 6px; }
+.ev-why { color: var(--muted); font-size: 12.5px; line-height: 1.5; margin-top: 3px; }
+.ev-why b { color: var(--text); font-weight: 600; }
+.ev-more { color: var(--faint); font-size: 12px; padding: 6px 2px; }
+.xp { font-size: 10.5px; border-radius: 5px; padding: 1px 7px; }
+.xp-smart_money { background: rgba(51,209,122,0.14); color: #6fe6a2; }
+.xp-attention { background: rgba(255,182,72,0.16); color: #ffcd80; }
+/* AI chart analysis (Milestone 6) */
+.chart-analysis { border-left: 2px solid var(--accent2); }
+.ca-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.ca-row { font-size: 13px; margin: 4px 0; }
+.ca-l { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; margin-right: 8px; }
+.auto-upd { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+.live-dot { width: 7px; height: 7px; border-radius: 999px; background: var(--green); box-shadow: 0 0 0 0 rgba(47,227,160,0.6); animation: livepulse 2.4s infinite; }
+@keyframes livepulse { 0% { box-shadow: 0 0 0 0 rgba(47,227,160,0.5); } 70% { box-shadow: 0 0 0 6px rgba(47,227,160,0); } 100% { box-shadow: 0 0 0 0 rgba(47,227,160,0); } }

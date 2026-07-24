@@ -24,7 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from psycopg.types.json import Json
 from pydantic import BaseModel
 
-from . import admin, apikeys, assistant, authn, billing, community, crypto, db, flags, insights, portfolio, presentation, search, sentiment, trades
+from . import admin, apikeys, assistant, authn, billing, brief as brief_mod, community, crypto, db, events as events_mod, flags, insights, news as news_mod, portfolio, presentation, scheduler as scheduler_mod, search, sentiment, social as social_mod, trades
 
 SESSION_COOKIE = "tos_session"
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").lower() == "true"  # true behind TLS in prod
@@ -715,70 +715,63 @@ def leaderboards(tos_session: str | None = Cookie(None)) -> dict:
 
 
 @app.get("/api/brief")
-def brief(tos_session: str | None = Cookie(None)) -> dict:
-    """The Daily Smart-Money Brief — an auto-composed digest of what smart money did, tier-delay
-    aware. Every figure is a fact from the filings; the intro is a deterministic template that
-    states counts, never a recommendation."""
-    with db.connect() as conn, conn.cursor() as cur:
-        tier = _tier_of(conn, tos_session)
-        aso = _effective_as_of(cur, "latest", tier)
-        top: list[dict] = []
-        if aso is not None:
-            cur.execute(
-                """SELECT c.issuer_entity, e.name, c.score, c.confidence_bucket, c.inputs,
-                          (SELECT symbol FROM security_map m WHERE m.entity_id=c.issuer_entity
-                             AND m.source='sec_company_tickers' ORDER BY confidence DESC LIMIT 1)
-                   FROM signal_clusters c JOIN entities e ON e.id=c.issuer_entity
-                   WHERE c.as_of=%s ORDER BY c.score DESC LIMIT 6""",
-                (aso,),
-            )
-            rows = cur.fetchall()
-            names = _voice_names(cur, [(r[4] or {}).get("contributions", []) for r in rows])
-            for ent, name, score, bucket, inputs, sym in rows:
-                story = presentation.cluster_story((inputs or {}).get("contributions", []), names)
-                top.append({"issuer_entity": ent, "symbol": sym, "name": name,
-                            "smart_money_score": presentation.smart_money_score(float(score)),
-                            "confidence_bucket": bucket, "headline": story["headline"]})
-        cur.execute(
-            """SELECT t.owner_name, t.issuer_entity, e.name,
-                      (SELECT symbol FROM security_map m WHERE m.entity_id=t.issuer_entity
-                         AND m.source='sec_company_tickers' ORDER BY confidence DESC LIMIT 1),
-                      round(sum(t.shares * t.price_per_share)) AS value_usd, t.knowable_time::date AS day
-               FROM insider_transactions t JOIN entities e ON e.id=t.issuer_entity
-               WHERE t.transaction_code='P' AND t.acquired_disposed='A'
-                 AND t.shares IS NOT NULL AND t.price_per_share IS NOT NULL AND t.issuer_entity IS NOT NULL
-                 AND t.knowable_time <= COALESCE(%s, now())
-                 AND t.knowable_time > (SELECT max(knowable_time) FROM insider_transactions) - interval '30 days'
-               GROUP BY t.owner_name, t.issuer_entity, e.name, t.knowable_time::date
-               ORDER BY value_usd DESC LIMIT 40""",
-            (aso,),
-        )
-        biggest_buys, seen_issuers = [], set()  # one row per company (the largest buy) for variety
-        for nm, ent, name, sym, v, d in cur.fetchall():
-            if ent in seen_issuers:
-                continue
-            seen_issuers.add(ent)
-            biggest_buys.append({"insider": nm, "issuer_entity": ent, "name": name, "symbol": sym,
-                                 "value_usd": float(v) if v is not None else None, "date": d.isoformat()})
-            if len(biggest_buys) >= 6:
-                break
-        cur.execute(
-            """SELECT s.filer_entity, f.name, s.issuer_entity, e.name,
-                      (SELECT symbol FROM security_map m WHERE m.entity_id=s.issuer_entity
-                         AND m.source='sec_company_tickers' ORDER BY confidence DESC LIMIT 1), s.knowable_time::date
-               FROM stake_events s JOIN entities f ON f.id=s.filer_entity JOIN entities e ON e.id=s.issuer_entity
-               WHERE s.form_type='SCHEDULE 13D' AND s.issuer_entity IS NOT NULL
-               ORDER BY s.knowable_time DESC LIMIT 6""",
-        )
-        new_activist = [{"filer_entity": fe, "filer": f, "issuer_entity": ie, "issuer": iss,
-                         "symbol": sym, "date": d.isoformat()} for fe, f, ie, iss, sym, d in cur.fetchall()]
-    lead = top[0] if top else None
-    intro = (f"{len(top)} name{'s' if len(top) != 1 else ''} show smart-money convergence right now"
-             + (f", led by {lead['symbol'] or lead['name']} (score {lead['smart_money_score']})." if lead else ".")
-             + " Below: the biggest recent insider buys and the newest activist stakes. Each name carries"
-             + " its backtested rate; nothing here is investment advice.")
-    return {"as_of": aso.isoformat() if aso else None, "tier": tier, "delayed_hours": authn.delay_hours(tier),
-            "intro": intro, "top_convergences": top, "biggest_buys": biggest_buys, "new_activist_stakes": new_activist}
+def morning_brief(tos_session: str | None = Cookie(None)) -> dict:
+    """The Morning Brief — the day's cross-plane intelligence in one place: an AI executive summary,
+    impact-ranked cited news ('what changed overnight'), the smart-money convergence digest, and — when
+    signed in — the names you follow. Tier-delay aware on the signal portion; degrades to deterministic
+    prose so it is never blocked on a model being up. Cached per (user, day) by an inputs-hash."""
+    provider = os.environ.get("EXPLAIN_PROVIDER", "template")
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        tier = (user or {}).get("tier", "free")
+        with conn.cursor() as cur:
+            as_of = _effective_as_of(cur, "latest", tier)
+        followed: list[str] = []
+        if user:
+            with conn.cursor() as cur:
+                cur.execute("SELECT ref FROM follows WHERE user_id=%s AND kind='symbol'", (user["id"],))
+                followed = [r[0] for r in cur.fetchall()]
+        return brief_mod.cached_compose(
+            conn, user_id=(user or {}).get("id"), as_of=as_of, tier=tier,
+            delayed_hours=authn.delay_hours(tier), followed_symbols=followed,
+            provider=provider, voice_name_fn=_voice_names)
+
+
+@app.get("/api/events")
+def events_calendar(days: int = 10) -> dict:
+    """Event & Macro Intelligence — the forward calendar (upcoming earnings + US macro releases), grouped
+    by day, with a deterministic 'why it matters / which sectors' read on macro events and cross-plane
+    flags (smart-money / attention) on company earnings. Public data, not tier-gated."""
+    from .ingestion import calendar_nasdaq
+    days = max(1, min(21, days))
+    with db.connect() as conn:
+        return {"days": days, "calendar": events_mod.by_day(conn, days),
+                "sources": calendar_nasdaq.sources_status()}
+
+
+@app.get("/api/jobs")
+def jobs_status() -> dict:
+    """Continuous-update health: the last run + status per scheduler job, so freshness is observable
+    (and a stalled worker is visible, not silently stale)."""
+    with db.connect() as conn:
+        return {"jobs": scheduler_mod.job_status(conn)}
+
+
+@app.get("/api/news")
+def news_feed(symbol: str | None = None, category: str | None = None, hours: int = 72, limit: int = 40) -> dict:
+    """Impact-ranked News Intelligence — SEC 8-K material events + market/macro headlines, each with the
+    analyst's cited 'why it matters' when analyzed. Public info, so not tier-delayed."""
+    limit = max(1, min(100, limit))
+    with db.connect() as conn:
+        items = news_mod.ranked_news(conn, symbol=symbol, category=category, hours=hours, limit=limit)
+        return {"items": items, "sources": news_mod.sources_status(conn)}
+
+
+@app.get("/api/news/{news_id}")
+def news_item(news_id: int) -> dict:
+    with db.connect() as conn:
+        it = news_mod.get_item(conn, news_id)
+        return {"found": True, **it} if it else {"found": False}
 
 
 @app.get("/api/asset/{symbol}")
@@ -1087,6 +1080,68 @@ def trade_analysis(tid: int, tos_session: str | None = Cookie(None)) -> dict:
     return {"found": True, "analysis": analysis}
 
 
+@app.get("/api/trades/{tid}/chart-analysis")
+def trade_chart_analysis(tid: int, refresh: int = 0, tos_session: str | None = Cookie(None)) -> dict:
+    """Educational AI read of the chart screenshot on the user's OWN trade (owner-only — the image is
+    private). Cached per trade and invalidated by the image hash; `refresh=1` re-runs it (e.g. after a
+    vision model is connected). Falls back to the deterministic level-based analysis with no model."""
+    import hashlib
+    from .intelligence import vision
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            return {"found": False, "error": "not authenticated"}
+        row = _load_trade(cur, tid)
+        if not row:
+            return {"found": False}
+        m = dict(zip(_TRADE_COLS, row))
+        if m["user_id"] != user["id"]:
+            return {"found": False}                       # owner-only; never reveal another's trade
+        if not m["image_path"]:
+            return {"found": True, "has_image": False,
+                    "note": "Upload a chart screenshot to this trade to get an AI read of it."}
+        p = _image_path(m["image_path"])
+        if not p or not p.exists():
+            return {"found": True, "has_image": False}
+        img = p.read_bytes()
+        h = hashlib.sha256(img).hexdigest()
+        cur.execute("SELECT image_hash, analysis FROM chart_analyses WHERE trade_id=%s", (tid,))
+        cached = cur.fetchone()
+        if cached and cached[0] == h and not refresh:
+            return {"found": True, "has_image": True, "analysis": {**cached[1], "from_cache": True}}
+        provider = flags.effective_provider(conn, "ai_trade_analysis")
+        analysis = vision.analyze_chart(img, "image/png", trade=m, provider=provider)
+        cur.execute(
+            """INSERT INTO chart_analyses (trade_id, image_hash, analysis, model_id, used_template)
+               VALUES (%s,%s,%s,%s,%s)
+               ON CONFLICT (trade_id) DO UPDATE SET image_hash=EXCLUDED.image_hash,
+                 analysis=EXCLUDED.analysis, model_id=EXCLUDED.model_id,
+                 used_template=EXCLUDED.used_template, created_at=now()""",
+            (tid, h, Json(analysis), analysis.get("model_id"), analysis.get("used_template")))
+        conn.commit()
+    return {"found": True, "has_image": True, "analysis": {**analysis, "from_cache": False}}
+
+
+@app.post("/api/analyze-chart")
+async def analyze_chart_standalone(request: Request, tos_session: str | None = Cookie(None)) -> dict:
+    """Standalone educational read of any chart image (logged-in; uses the vision quota). Processed
+    in-request and not stored. Same guards + honest fallback as the trade-attached analysis."""
+    from .intelligence import vision
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            return {"error": "log in to analyze a chart"}
+        provider = flags.effective_provider(conn, "ai_trade_analysis")
+    mime = request.headers.get("content-type", "").split(";")[0].strip()
+    if mime not in _ALLOWED_IMAGE:
+        return {"error": "unsupported content-type; use png, jpeg, or webp"}
+    body = await request.body()
+    if not body or len(body) > MAX_IMAGE_BYTES:
+        return {"error": "image missing or larger than 8MB"}
+    analysis = vision.analyze_chart(body, mime, trade=None, provider=provider)
+    return {"analysis": analysis, "note": "Image processed in-request and not stored."}
+
+
 @app.get("/api/performance")
 def performance(tos_session: str | None = Cookie(None)) -> dict:
     with db.connect() as conn, conn.cursor() as cur:
@@ -1228,22 +1283,23 @@ def assistant_endpoint(req: AssistantReq, response: Response, tos_session: str |
 
 
 @app.get("/api/trending")
-def trending_endpoint(hours: int = 48) -> dict:
-    """The trend scanner: symbols ranked by public-attention velocity, with an honest source-status
-    map (docs/threat-models/sentiment.md). Public attention data, not the proprietary signal, so it
-    is not tier-gated. Empty until a source is ingested — never fabricated."""
-    hours = max(6, min(168, hours))
+def trending_endpoint(hours: int = 72) -> dict:
+    """Social & Attention Intelligence: names ranked by public-attention velocity across connected
+    sources (Wikipedia + Hacker News now; Reddit when its free key is set), with the analyst's 'why it's
+    drawing attention' connecting each spike to its likely news catalyst. Honest source-status map;
+    public data, not tier-gated; never fabricated."""
+    hours = max(6, min(336, hours))
     with db.connect() as conn:
-        board = sentiment.trending_board(conn, hours=hours)
+        board = social_mod.board(conn, hours=hours)
     return {"sources": sentiment.sources_status(), "hours": hours, "board": board,
-            "note": None if board else ("No attention data yet — run `ingest-sentiment` (Hacker News "
-                                        "needs no key), or connect Reddit/YouTube for sentiment.")}
+            "note": None if board else ("No attention data yet — run `ingest-sentiment` (Wikipedia + "
+                                        "Hacker News need no key), or connect Reddit for discussion sentiment.")}
 
 
 @app.get("/api/sentiment/{symbol}")
 def sentiment_endpoint(symbol: str) -> dict:
     with db.connect() as conn:
-        d = sentiment.symbol_sentiment(conn, symbol)
+        d = social_mod.symbol_detail(conn, symbol)
     return {"found": d is not None, "symbol": symbol.upper(), "detail": d,
             "sources": sentiment.sources_status()}
 

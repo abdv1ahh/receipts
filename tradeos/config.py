@@ -34,6 +34,14 @@ def reddit_configured() -> bool:
     return bool(os.environ.get("REDDIT_CLIENT_ID") and os.environ.get("REDDIT_CLIENT_SECRET"))
 
 
+def reddit_client_id() -> str:
+    return os.environ.get("REDDIT_CLIENT_ID", "")
+
+
+def reddit_client_secret() -> str:
+    return os.environ.get("REDDIT_CLIENT_SECRET", "")
+
+
 def youtube_configured() -> bool:
     """YouTube sentiment (Slice H) runs only with the operator's own free Data API key."""
     return bool(os.environ.get("YOUTUBE_API_KEY"))

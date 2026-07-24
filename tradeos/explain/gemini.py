@@ -1,27 +1,20 @@
-"""Gemini explanation provider (Slice 5, Decision 10).
+"""Prose-generation prompts for the Signal plane + journal (Slice 5, Decision 10).
 
-The model rephrases the computed facts into fluent prose — it never measures. It is given
-ONLY the computed values and is instructed to introduce no new numbers and no directive
-language; whatever it returns is then validated by the numbers guard and the directive guard
-in base.py before it is ever shown. If the key is unset or the call fails, this returns None
-and the deterministic template is used — the product never depends on the model being up.
+The model rephrases the computed facts into fluent prose — it never measures. Each function builds the
+prompt from ONLY the computed values and delegates the call to llm.py (any configured provider: gemini,
+or a free OpenAI-compatible endpoint). Whatever comes back is re-validated by the numbers + directive
+guards in base.py before it is ever shown; None -> the deterministic template, so the product never
+depends on a model being up. (Module keeps the name its callers import; transport is provider-agnostic.)
 """
 from __future__ import annotations
 
-import base64
 import json
 import logging
-import os
-import time
 from collections import Counter
-from urllib.parse import urlparse
 
-import httpx
+from .. import llm
 
-log = logging.getLogger("tradeos.explain.gemini")
-
-GEMINI_HOST = "generativelanguage.googleapis.com"
-GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+log = logging.getLogger("tradeos.explain.prose")
 
 INSTRUCTION = (
     "You are writing a short, neutral explanation of a convergence signal for a financial-"
@@ -57,36 +50,7 @@ def _payload(detail: dict, cal: dict | None, horizon: int) -> dict:
 
 
 def generate(detail: dict, cal: dict | None, horizon: int) -> str | None:
-    key = os.environ.get("GEMINI_API_KEY")
-    if not key:
-        return None
-    model = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
-    url = GEMINI_URL.format(model=model)
-    if urlparse(url).hostname != GEMINI_HOST:
-        raise ValueError("Gemini host allowlist violation")
-    body = {
-        "contents": [{"parts": [{"text": INSTRUCTION + json.dumps(_payload(detail, cal, horizon))}]}],
-        # disable "thinking" (this is a rephrasing task, not a reasoning one) so the whole
-        # token budget goes to the answer; low temperature to curb editorializing.
-        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 512,
-                             "thinkingConfig": {"thinkingBudget": 0}},
-    }
-    with httpx.Client(timeout=45.0) as client:
-        for attempt in range(3):  # transient 429/503 (quota spikes, model overload) -> brief retry
-            resp = client.post(url, params={"key": key}, json=body)
-            if resp.status_code in (429, 503) and attempt < 2:
-                time.sleep(2 * (attempt + 1))
-                continue
-            resp.raise_for_status()
-            break
-        data = resp.json()
-    candidates = data.get("candidates") or []
-    if not candidates:  # safety block or empty -> let the template render
-        log.warning("Gemini returned no candidates; using template")
-        return None
-    parts = candidates[0].get("content", {}).get("parts") or []
-    text = "".join(p.get("text", "") for p in parts if not p.get("thought")).strip()
-    return text or None
+    return llm.text(INSTRUCTION + json.dumps(_payload(detail, cal, horizon)), max_tokens=512)
 
 
 TRADE_INSTRUCTION = (
@@ -104,12 +68,8 @@ TRADE_INSTRUCTION = (
 
 
 def generate_trade_prose(analysis: dict, trade: dict) -> str | None:
-    """Rephrase a computed trade analysis into fluent prose — it never measures. Given only the
-    computed values, instructed to add no number and no directive language; the caller re-checks
-    both guards. Returns None with no key or on failure, so the deterministic prose is used."""
-    key = os.environ.get("GEMINI_API_KEY")
-    if not key:
-        return None
+    """Rephrase a computed trade analysis into fluent prose — never measures. The caller re-checks
+    both guards; None with no provider / on failure so the deterministic prose is used."""
     payload = {
         "symbol": trade.get("symbol"), "direction": trade.get("direction"),
         "asset_class": trade.get("asset_class"), "status": trade.get("status"),
@@ -117,30 +77,7 @@ def generate_trade_prose(analysis: dict, trade: dict) -> str | None:
         "observations": analysis.get("observations"), "risk_flags": analysis.get("risk_flags"),
         "context": analysis.get("context"),
     }
-    model = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
-    url = GEMINI_URL.format(model=model)
-    if urlparse(url).hostname != GEMINI_HOST:
-        raise ValueError("Gemini host allowlist violation")
-    body = {
-        "contents": [{"parts": [{"text": TRADE_INSTRUCTION + json.dumps(payload)}]}],
-        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 512,
-                             "thinkingConfig": {"thinkingBudget": 0}},
-    }
-    with httpx.Client(timeout=45.0) as client:
-        for attempt in range(3):  # transient 429/503 -> brief retry, else template
-            resp = client.post(url, params={"key": key}, json=body)
-            if resp.status_code in (429, 503) and attempt < 2:
-                time.sleep(2 * (attempt + 1))
-                continue
-            resp.raise_for_status()
-            break
-        data = resp.json()
-    candidates = data.get("candidates") or []
-    if not candidates:
-        return None
-    parts = candidates[0].get("content", {}).get("parts") or []
-    text = "".join(p.get("text", "") for p in parts if not p.get("thought")).strip()
-    return text or None
+    return llm.text(TRADE_INSTRUCTION + json.dumps(payload), max_tokens=512)
 
 
 REPORT_INSTRUCTION = (
@@ -160,36 +97,7 @@ REPORT_INSTRUCTION = (
 
 
 def generate_journal_report(report: dict) -> str | None:
-    """Rephrase an aggregate journal report into fluent prose — it never measures. Given only the
-    computed aggregates, instructed to add no number and no directive language; the caller re-checks
-    both guards. Returns None with no key or on failure, so the deterministic report is used."""
-    key = os.environ.get("GEMINI_API_KEY")
-    if not key:
-        return None
-    model = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
-    url = GEMINI_URL.format(model=model)
-    if urlparse(url).hostname != GEMINI_HOST:
-        raise ValueError("Gemini host allowlist violation")
-    body = {
-        "contents": [{"parts": [{"text": REPORT_INSTRUCTION + json.dumps(report)}]}],
-        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 640,
-                             "thinkingConfig": {"thinkingBudget": 0}},
-    }
-    with httpx.Client(timeout=45.0) as client:
-        for attempt in range(3):  # transient 429/503 -> brief retry, else template
-            resp = client.post(url, params={"key": key}, json=body)
-            if resp.status_code in (429, 503) and attempt < 2:
-                time.sleep(2 * (attempt + 1))
-                continue
-            resp.raise_for_status()
-            break
-        data = resp.json()
-    candidates = data.get("candidates") or []
-    if not candidates:
-        return None
-    parts = candidates[0].get("content", {}).get("parts") or []
-    text = "".join(p.get("text", "") for p in parts if not p.get("thought")).strip()
-    return text or None
+    return llm.text(REPORT_INSTRUCTION + json.dumps(report), max_tokens=640)
 
 
 ASSISTANT_INSTRUCTION = (
@@ -207,36 +115,7 @@ ASSISTANT_INSTRUCTION = (
 
 
 def answer_question(question: str, ctx: dict) -> str | None:
-    """Grounded answer from the retrieved context only — it never measures or browses. The caller
-    re-checks both guards. Returns None with no key or on failure, so the deterministic answer is used."""
-    key = os.environ.get("GEMINI_API_KEY")
-    if not key:
-        return None
-    model = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
-    url = GEMINI_URL.format(model=model)
-    if urlparse(url).hostname != GEMINI_HOST:
-        raise ValueError("Gemini host allowlist violation")
-    prompt = ASSISTANT_INSTRUCTION + json.dumps(ctx) + "\n\nQUESTION: " + question[:500]
-    body = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 640,
-                             "thinkingConfig": {"thinkingBudget": 0}},
-    }
-    with httpx.Client(timeout=45.0) as client:
-        for attempt in range(3):  # transient 429/503 -> brief retry, else template
-            resp = client.post(url, params={"key": key}, json=body)
-            if resp.status_code in (429, 503) and attempt < 2:
-                time.sleep(2 * (attempt + 1))
-                continue
-            resp.raise_for_status()
-            break
-        data = resp.json()
-    candidates = data.get("candidates") or []
-    if not candidates:
-        return None
-    parts = candidates[0].get("content", {}).get("parts") or []
-    text = "".join(p.get("text", "") for p in parts if not p.get("thought")).strip()
-    return text or None
+    return llm.text(ASSISTANT_INSTRUCTION + json.dumps(ctx) + "\n\nQUESTION: " + question[:500], max_tokens=640)
 
 
 VISION_INSTRUCTION = (
@@ -248,33 +127,13 @@ VISION_INSTRUCTION = (
 
 
 def extract_tickers(image_bytes: bytes, mime: str) -> list[str]:
-    """Vision call: return candidate ticker strings from an image, or [] if no key / on failure.
-    The caller applies the ^[A-Z.]{1,6}$ output guard and validates against the universe."""
-    key = os.environ.get("GEMINI_API_KEY")
-    if not key:
+    """Vision call: candidate ticker strings from an image, or [] if no provider / on failure. The
+    caller applies the ^[A-Z.]{1,6}$ output guard and validates against the universe."""
+    raw = llm.vision(VISION_INSTRUCTION, image_bytes, mime, max_tokens=512, json_mode=True)
+    if not raw:
         return []
-    model = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
-    url = GEMINI_URL.format(model=model)
-    if urlparse(url).hostname != GEMINI_HOST:
-        raise ValueError("Gemini host allowlist violation")
-    body = {
-        "contents": [{"parts": [
-            {"text": VISION_INSTRUCTION},
-            {"inlineData": {"mimeType": mime, "data": base64.b64encode(image_bytes).decode()}},
-        ]}],
-        "generationConfig": {"temperature": 0.0, "maxOutputTokens": 512,
-                             "thinkingConfig": {"thinkingBudget": 0},
-                             "responseMimeType": "application/json"},
-    }
     try:
-        with httpx.Client(timeout=45.0) as client:
-            resp = client.post(url, params={"key": key}, json=body)
-            resp.raise_for_status()
-            data = resp.json()
-        parts = (data.get("candidates") or [{}])[0].get("content", {}).get("parts") or []
-        text = "".join(p.get("text", "") for p in parts if not p.get("thought")).strip()
-        parsed = json.loads(text)
+        parsed = json.loads(raw)
         return [str(x) for x in parsed] if isinstance(parsed, list) else []
-    except Exception as exc:  # any failure -> empty -> manual entry
-        log.warning("Gemini vision extract failed (%s)", type(exc).__name__)
+    except (ValueError, TypeError):
         return []

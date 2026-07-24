@@ -41,6 +41,19 @@ export const markNotificationsRead = () => fetch("/api/notifications/read", { me
 export const fetchAlertPrefs = () => get("/api/alert-prefs");
 export const saveAlertPrefs = (prefs) => fetch("/api/alert-prefs", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(prefs) }).then((r) => r.json());
 export const fetchBrief = () => get("/api/brief");
+// News Intelligence (Milestone 1): impact-ranked, cited market news + the analyst's "why it matters".
+export const fetchNews = ({ symbol, category, hours, limit } = {}) => {
+  const p = new URLSearchParams();
+  if (symbol) p.set("symbol", symbol);
+  if (category) p.set("category", category);
+  if (hours) p.set("hours", hours);
+  if (limit) p.set("limit", limit);
+  const q = p.toString();
+  return get(`/api/news${q ? `?${q}` : ""}`);
+};
+export const fetchNewsItem = (id) => get(`/api/news/${id}`);
+export const fetchJobs = () => get("/api/jobs");
+export const fetchEvents = (days = 10) => get(`/api/events?days=${days}`);
 export const fetchPortfolios = () => get("/api/portfolios");
 export const getPortfolio = (id) => get(`/api/portfolios/${id}`);
 export const createPortfolio = (name, kind, buckets) => post("/api/portfolios", { name, kind, buckets: buckets || null });
@@ -66,6 +79,9 @@ export const deleteTrade = (id) => fetch(`/api/trades/${id}`, { method: "DELETE"
 export const fetchTradeAnalysis = (id) => get(`/api/trades/${id}/analysis`);
 export const uploadTradeImage = (id, file) => fetch(`/api/trades/${id}/image`, { method: "POST", headers: { "Content-Type": file.type }, body: file }).then((r) => r.json());
 export const fetchPerformance = () => get("/api/performance");
+// AI chart analysis (Milestone 6): educational read of the trade's chart screenshot; refresh re-runs it.
+export const fetchChartAnalysis = (id, refresh = false) => get(`/api/trades/${id}/chart-analysis${refresh ? "?refresh=1" : ""}`);
+export const analyzeChartImage = (file) => fetch("/api/analyze-chart", { method: "POST", headers: { "Content-Type": file.type }, body: file }).then((r) => r.json());
 // Advanced AI (Slice L): similar-trade finder, scenario simulator, auto journal report.
 export const fetchSimilarTrades = (id) => get(`/api/trades/${id}/similar`);
 export const simulateTrade = (params) => post("/api/simulate", params);

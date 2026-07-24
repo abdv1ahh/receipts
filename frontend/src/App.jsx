@@ -1,28 +1,28 @@
 import { useEffect, useState } from "react";
 import { authLogout, authMe, fetchCalibration, fetchClusters, fetchClusterDetail, fetchDefinitions, fetchExplanation, fetchFeeds, fetchNotifications } from "./api";
-import { ClusterDetail, ClusterTable, Disclaimer, Methodology, StatusStrip } from "./components.jsx";
+import { ClusterDetail, Methodology, StatusStrip } from "./components.jsx";
 import { AssetView, AuthPanel, LibraryEntry, LibraryView, ProfileView, Screener, WatchlistView } from "./views.jsx";
 import { Home } from "./home.jsx";
 import { JournalView } from "./journal.jsx";
 import { AssistantView } from "./assistant.jsx";
 import { ScannerView } from "./scanner.jsx";
-import { CommunityView } from "./community.jsx";
-import { AlertsView, BriefView, NotificationsView } from "./alerts.jsx";
+import { AlertsView, NotificationsView } from "./alerts.jsx";
+import { BriefView } from "./brief.jsx";
+import { NewsView } from "./news.jsx";
+import { EventsView } from "./events.jsx";
 import { PortfoliosView } from "./portfolios.jsx";
 import { PricingView } from "./pricing.jsx";
-import { OptionsPreview } from "./previews.jsx";
 import { CryptoView } from "./crypto.jsx";
-import { LandingView, SearchView, ExploreView } from "./discover.jsx";
+import { LandingView, SearchView } from "./discover.jsx";
 import { AdminView } from "./admin.jsx";
 import { Icon } from "./icons.jsx";
 
-const NAV_LABELS = { home: "Home", explore: "Explore", dashboard: "Signals", assistant: "Assistant", trending: "Trending", crypto: "Crypto", screener: "Screener", journal: "Journal", portfolios: "Portfolios", watchlist: "Watchlist", alerts: "Alerts", community: "Community", brief: "Brief", library: "Library", methodology: "Methodology" };
-const NAV_ICONS = { home: "home", explore: "compass", dashboard: "signal", assistant: "sparkles", trending: "trending", crypto: "crypto", screener: "filter", journal: "journal", portfolios: "briefcase", watchlist: "star", alerts: "bell", community: "users", brief: "news", library: "book", methodology: "target" };
+const NAV_LABELS = { brief: "Morning Brief", news: "News", events: "Calendar", home: "Smart Money", trending: "Social", crypto: "Crypto", journal: "Journal", portfolios: "Portfolios", watchlist: "Watchlist", alerts: "Alerts", assistant: "Assistant", screener: "Screener", library: "Library", methodology: "Methodology" };
+const NAV_ICONS = { brief: "sparkles", news: "news", events: "calendar", home: "signal", trending: "trending", crypto: "crypto", journal: "journal", portfolios: "briefcase", watchlist: "star", alerts: "bell", assistant: "compass", screener: "filter", library: "book", methodology: "target" };
 const SIDEBAR = [
-  { label: "Overview", items: ["home", "explore"] },
-  { label: "Intelligence", items: ["dashboard", "assistant", "trending", "crypto", "screener"] },
-  { label: "Your desk", items: ["journal", "portfolios", "watchlist", "alerts", "community"] },
-  { label: "Learn", items: ["brief", "library", "methodology"] },
+  { label: "Intelligence", items: ["brief", "news", "events", "home", "trending", "crypto"] },
+  { label: "Your desk", items: ["journal", "portfolios", "watchlist", "alerts", "assistant"] },
+  { label: "Research", items: ["screener", "library", "methodology"] },
 ];
 
 export default function App() {
@@ -41,7 +41,6 @@ export default function App() {
   const [explanation, setExplanation] = useState(null);
   const [assetSymbol, setAssetSymbol] = useState(null);
   const [profile, setProfile] = useState(null); // {kind, id}
-  const [communityHandle, setCommunityHandle] = useState(null);
   const [librarySlug, setLibrarySlug] = useState(null);
   const [search, setSearch] = useState("");
   const [err, setErr] = useState(null);
@@ -57,7 +56,7 @@ export default function App() {
     fetchFeeds().then(setFeeds).catch((e) => setErr(String(e)));
     fetchCalibration().then(setCalibration).catch((e) => setErr(String(e)));
     fetchDefinitions().then(setDefinitions).catch((e) => setErr(String(e)));
-    authMe().then((d) => { setUser(d.user); if (d.user) setView((v) => (v === "landing" ? "home" : v)); }).catch(() => {});
+    authMe().then((d) => { setUser(d.user); if (d.user) setView((v) => (v === "landing" ? "brief" : v)); }).catch(() => {});
     const params = new URLSearchParams(window.location.search);
     if (params.get("symbol")) { setAssetSymbol(params.get("symbol").toUpperCase()); setView("asset"); }
     if (params.get("upgraded")) setView("pricing");   // returned from Stripe Checkout
@@ -89,8 +88,7 @@ export default function App() {
   const openSymbol = (sym) => { setAssetSymbol(sym.toUpperCase()); setDetail(null); setView("asset"); };
   const openProfile = (kind, id) => { setProfile({ kind, id }); setDetail(null); setView("profile"); };
   const openLibrary = (slug) => { setLibrarySlug(slug); setDetail(null); setView("library-entry"); };
-  const openTrader = (handle) => { setCommunityHandle(handle); setDetail(null); setView("community"); };
-  const onAuthed = (u) => { setUser(u); setView("home"); };
+  const onAuthed = (u) => { setUser(u); setView("brief"); };
   const doLogout = async () => { await authLogout(); setUser(null); setView("landing"); };
   const submitSearch = () => { if (search.trim()) { setView("search"); setDetail(null); setNavOpen(false); } };
 
@@ -103,7 +101,7 @@ export default function App() {
   return (
     <div className="shell">
       <aside className={`sidebar ${navOpen ? "open" : ""}`}>
-        <div className="brand" onClick={() => go(user ? "home" : "landing")}>
+        <div className="brand" onClick={() => go(user ? "brief" : "landing")}>
           <span className="brand-mark">◆</span><span className="brand-name">TradeOS</span>
         </div>
         <nav className="side-nav">
@@ -113,12 +111,6 @@ export default function App() {
               {section.items.map(navBtn)}
             </div>
           ))}
-          <div className="nav-section">
-            <div className="nav-section-label">Roadmap</div>
-            <button className={`nav-item preview ${view === "options" ? "on" : ""}`} onClick={() => go("options")}>
-              <Icon name="layers" /><span>Options</span><span className="soon">soon</span>
-            </button>
-          </div>
           {user?.tier === "admin" && (
             <div className="nav-section">
               <div className="nav-section-label">Admin</div>
@@ -165,20 +157,29 @@ export default function App() {
           {err && <div className="err">error: {err}</div>}
 
           {view === "landing" ? (
-            <LandingView onGetStarted={() => go("auth")} onExplore={() => go("explore")} />
-          ) : view === "explore" ? (
-            <ExploreView onOpenSymbol={openSymbol} onNav={go} onOpenTrader={openTrader} />
+            <LandingView onGetStarted={() => go("auth")} onExplore={() => go("news")} />
           ) : view === "search" ? (
-            <SearchView query={search} onOpenSymbol={openSymbol} onOpenProfile={openProfile} onOpenLibrary={openLibrary} onOpenTrader={openTrader} />
+            <SearchView query={search} onOpenSymbol={openSymbol} onOpenProfile={openProfile} onOpenLibrary={openLibrary} onOpenTrader={() => {}} />
           ) : view === "home" ? (
-            <Home calibration={calibration} horizon={horizon} minC={minC} user={user}
-                  onLogin={() => go("auth")}
-                  onNav={go}
-                  onOpenSymbol={openSymbol}
-                  onOpenDetail={(id) => { setView("dashboard"); openDetail(id); }}
-                  onOpenProfile={openProfile} />
+            detail ? (
+              detail === "loading" ? (
+                <div className="detail"><div className="skel" style={{ width: 220 }} /></div>
+              ) : detail.found === false ? (
+                <div className="detail"><button className="back" onClick={() => setDetail(null)}>← back</button><div>No cluster for that issuer at the latest as-of.</div></div>
+              ) : (
+                <ClusterDetail detail={detail} onBack={() => setDetail(null)} calibration={calibration} horizon={horizon} explanation={explanation} onOpenLibrary={openLibrary} />
+              )
+            ) : (
+              <Home calibration={calibration} horizon={horizon} minC={minC} user={user}
+                    onLogin={() => go("auth")} onNav={go} onOpenSymbol={openSymbol}
+                    onOpenDetail={openDetail} onOpenProfile={openProfile} />
+            )
           ) : view === "brief" ? (
-            <BriefView calibration={calibration} horizon={horizon} onOpenSymbol={openSymbol} onOpenProfile={openProfile} />
+            <BriefView user={user} onOpenSymbol={openSymbol} onOpenProfile={openProfile} onNav={go} />
+          ) : view === "news" ? (
+            <NewsView onOpenSymbol={openSymbol} />
+          ) : view === "events" ? (
+            <EventsView onOpenSymbol={openSymbol} />
           ) : view === "alerts" ? (
             <AlertsView onLogin={() => go("auth")} onOpenSymbol={openSymbol} />
           ) : view === "portfolios" ? (
@@ -189,8 +190,6 @@ export default function App() {
             <AssistantView user={user} />
           ) : view === "trending" ? (
             <ScannerView onOpenSymbol={openSymbol} />
-          ) : view === "community" ? (
-            <CommunityView user={user} onLogin={() => go("auth")} onOpenSymbol={openSymbol} refreshUser={refreshUser} initialHandle={communityHandle} onConsumeHandle={() => setCommunityHandle(null)} />
           ) : view === "pricing" ? (
             <PricingView user={user} onUpgraded={refreshUser} onLogin={() => go("auth")} />
           ) : view === "notifications" ? (
@@ -212,67 +211,14 @@ export default function App() {
             <LibraryView onOpenEntry={openLibrary} />
           ) : view === "library-entry" ? (
             <LibraryEntry slug={librarySlug} onBack={() => go("library")} onOpenLibrary={openLibrary} />
-          ) : view === "options" ? (
-            <OptionsPreview onBack={() => go("home")} />
           ) : view === "crypto" ? (
             <CryptoView />
           ) : view === "admin" ? (
             <AdminView user={user} />
-          ) : detail ? (
-            detail === "loading" ? (
-              <div className="detail"><div className="skel" style={{ width: 220 }} /></div>
-            ) : detail.found === false ? (
-              <div className="detail">
-                <button className="back" onClick={() => setDetail(null)}>← back to clusters</button>
-                <div>No cluster for that issuer at the latest as-of.</div>
-              </div>
-            ) : (
-              <ClusterDetail detail={detail} onBack={() => setDetail(null)} calibration={calibration} horizon={horizon} explanation={explanation} onOpenLibrary={openLibrary} />
-            )
           ) : (
-            <>
-              <div className="page-head">
-                <div>
-                  <h1 className="page-title">Convergence signals</h1>
-                  <div className="page-sub">Where insiders, activists and funds are quietly converging on one name — straight from the filings.</div>
-                </div>
-              </div>
-              <div className="controls">
-                <div className="seg">
-                  {["low", "medium", "high"].map((b) => (
-                    <button key={b} className={minC === b ? "on" : ""} onClick={() => setMinC(b)}>{b}+</button>
-                  ))}
-                </div>
-                <div className="seg">
-                  {[30, 90, 180].map((h) => (
-                    <button key={h} className={horizon === h ? "on" : ""} onClick={() => setHorizon(h)}>{h}d</button>
-                  ))}
-                </div>
-                <div className="asof">
-                  {feed.delayed_hours > 0
-                    ? <span className="fresh a" title="Free/unauthenticated: signals shown on a 48-hour delay">48h DELAYED · {feed.tier}</span>
-                    : <span className="fresh g" title="Live signals (paid tier)">LIVE · {feed.tier}</span>}
-                  {asOf ? `  as of ${asOf.slice(0, 19).replace("T", " ")} UTC` : ""}
-                </div>
-              </div>
-
-              {clusters === null ? (
-                <table className="clusters">
-                  <tbody>
-                    {[...Array(5)].map((_, i) => (
-                      <tr key={i}><td colSpan={7}><div className="skel" style={{ width: `${70 - i * 6}%` }} /></td></tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : clusters.length === 0 ? (
-                <div className="err" style={{ color: "var(--muted)" }}>
-                  No {minC}+ clusters at this as-of. Lower the threshold, or ingest a wider window and recompute.
-                </div>
-              ) : (
-                <ClusterTable clusters={clusters} onSelect={openDetail} pulseKey={pulseKey} calibration={calibration} horizon={horizon} />
-              )}
-              <Disclaimer />
-            </>
+            <Home calibration={calibration} horizon={horizon} minC={minC} user={user}
+                  onLogin={() => go("auth")} onNav={go} onOpenSymbol={openSymbol}
+                  onOpenDetail={openDetail} onOpenProfile={openProfile} />
           )}
         </main>
       </div>

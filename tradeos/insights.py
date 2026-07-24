@@ -219,7 +219,7 @@ def render_report(report: dict) -> str:
 def _report_prose(report: dict, provider: str):
     """Return (prose, model_id, used_template). Optional model rephrasing held to the SAME directive
     and numbers guards as every other model path, with deterministic fallback (mirrors trades._prose)."""
-    if provider == "gemini":
+    if provider in ("gemini", "openai"):
         try:
             from .explain import gemini
             llm = gemini.generate_journal_report(report)
@@ -229,7 +229,8 @@ def _report_prose(report: dict, provider: str):
         if llm:
             allowed = allowed_numbers(report, {"_const": [1, 2, 5, 100]})
             if directive_guard(llm) and numbers_guard(llm, allowed):
-                return llm, os.environ.get("GEMINI_MODEL", "gemini"), False
+                return llm, (os.environ.get("OPENAI_MODEL", "openai") if provider == "openai"
+                             else os.environ.get("GEMINI_MODEL", "gemini")), False
             log.warning("journal report guard tripped; using deterministic prose")
     return render_report(report), "template", True
 

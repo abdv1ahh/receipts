@@ -244,7 +244,7 @@ def answer(conn: psycopg.Connection, question: str, user, as_of, provider=None) 
                     or ctx.get("top_signals"))
 
     text, model_id, used_template = det, "template", True
-    if provider == "gemini":
+    if provider in ("gemini", "openai"):
         try:
             from .explain import gemini
             llm = gemini.answer_question(question, ctx)
@@ -254,7 +254,8 @@ def answer(conn: psycopg.Connection, question: str, user, as_of, provider=None) 
         if llm:
             allowed = allowed_numbers(ctx, {"_const": [1, 5, 10, 100]})
             if directive_guard(llm) and numbers_guard(llm, allowed):
-                text, model_id, used_template = llm, os.environ.get("GEMINI_MODEL", "gemini"), False
+                text, model_id, used_template = llm, (os.environ.get("OPENAI_MODEL", "openai")
+                    if provider == "openai" else os.environ.get("GEMINI_MODEL", "gemini")), False
             else:
                 log.warning("assistant guard tripped; using deterministic answer")
 
