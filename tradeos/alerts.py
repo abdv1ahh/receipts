@@ -173,8 +173,8 @@ def _insert_notifications(conn, user_id, notifs) -> list[dict]:
 def _queue_digest(conn, user_id, email, inserted) -> None:
     titles = "\n".join(f"- {n['title']}" for n in inserted[:10])
     n = len(inserted)
-    subject = f"TradeOS: {n} new smart-money alert{'s' if n != 1 else ''}"
-    body = f"You have {n} new alert(s):\n\n{titles}\n\nOpen TradeOS to see the details."
+    subject = f"TradeOSS: {n} new smart-money alert{'s' if n != 1 else ''}"
+    body = f"You have {n} new alert(s):\n\n{titles}\n\nOpen TradeOSS to see the details."
     with conn.cursor() as cur:
         cur.execute(
             "INSERT INTO email_outbox (user_id, to_email, subject, body, status) VALUES (%s,%s,%s,%s,'queued')",

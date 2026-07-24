@@ -37,6 +37,9 @@ _MOVE = ("why is", "why did", "why are", "why's", "moving", "dropping", "spiking
          "selling off", "pumping", "tanking", "gap up", "gap down")
 _CONCEPT = ("explain", "what is", "what are", "what's a", "how does", "how do", "teach", "definition",
             "mean", "strategy", "learn")
+_PERSONAL = ("my portfolio", "my watchlist", "my position", "my holding", "my risk", "risks am i",
+             "risk am i missing", "am i missing", "match my", "matches my", "my strategy",
+             "should i hold", "my desk", "on my radar", "names i follow", "i own", "i'm holding")
 
 
 def classify(question: str) -> dict:
@@ -45,7 +48,7 @@ def classify(question: str) -> dict:
     q = f" {question.lower()} "
     hit = lambda kws: any(k in q for k in kws)
     return {"performance": hit(_PERF), "sentiment": hit(_SENT), "why_moving": hit(_MOVE),
-            "concept": hit(_CONCEPT)}
+            "concept": hit(_CONCEPT), "personal": hit(_PERSONAL)}
 
 
 def candidate_symbols(question: str) -> list[str]:
@@ -115,10 +118,22 @@ def build_answer(question: str, ctx: dict) -> tuple[str, list[str]]:
             parts.append(f"Across your {perf['n_closed']} closed trades, your recorded win rate is "
                          f"{wr}%{rr_txt}. The performance tab breaks this down by strategy.")
         else:
-            parts.append(f"You've logged {perf['n_closed']} closed trade(s); TradeOS reports a win rate "
+            parts.append(f"You've logged {perf['n_closed']} closed trade(s); TradeOSS reports a win rate "
                          f"and habits once there are at least 10, so it never calls an edge from a small "
                          f"sample.")
         sources.append("your_performance")
+
+    wl = ctx.get("watchlist")
+    if wl:
+        parts.append(f"On your watchlist ({', '.join(wl[:8])}), ask me about any name for its "
+                     f"smart-money signal and the backtested base rate for its bucket.")
+        sources.append("your_watchlist")
+    op = ctx.get("open_positions")
+    if op:
+        listing = ", ".join(f"{o['direction']} {o['symbol']}" for o in op[:6])
+        parts.append(f"Your open positions on record: {listing}. I can pull the disclosed smart-money "
+                     f"positioning for any of them — the decision stays yours.")
+        sources.append("your_positions")
 
     tr = ctx.get("trending")
     if tr:
@@ -222,6 +237,17 @@ def retrieve(conn: psycopg.Connection, question: str, user, as_of) -> dict:
         if intents["performance"] and user:
             perf = _user_performance(cur, user["id"])   # clean keys only (no raw fractions to restate)
             ctx["performance"] = {k: perf[k] for k in ("n_closed", "sufficient", "win_rate", "avg_reward_risk")}
+        if user and (intents["personal"] or intents["performance"]):
+            # the user's own desk — object-scoped, non-numeric (so it never trips the numbers guard)
+            cur.execute("SELECT ref FROM follows WHERE user_id=%s AND kind='symbol' LIMIT 12", (user["id"],))
+            wl = [r[0] for r in cur.fetchall() if r[0]]
+            if wl:
+                ctx["watchlist"] = wl
+            cur.execute("SELECT symbol, direction FROM trades WHERE user_id=%s AND status='open' "
+                        "AND symbol IS NOT NULL LIMIT 8", (user["id"],))
+            op = [{"symbol": s, "direction": d} for s, d in cur.fetchall()]
+            if op:
+                ctx["open_positions"] = op
         if intents["sentiment"]:
             board = sentiment.trending_board(conn, limit=6)
             if board:

@@ -1,4 +1,4 @@
-# TradeOS — one-command demo build and common tasks.
+# TradeOSS — one-command demo build and common tasks.
 # Prereqs: Docker with Compose; a .env with SEC_USER_AGENT (and optional TIINGO_API_KEY,
 # GEMINI_API_KEY for prices + LLM explanations).
 
@@ -26,7 +26,7 @@ demo:
 	$(X) sync-library
 	$(X) create-invites --n 5
 	@echo ""
-	@echo "TradeOS demo ready at http://localhost:8000"
+	@echo "TradeOSS demo ready at http://localhost:8000"
 	@echo "Next: create the admin (prompts for a password):"
 	@echo "  docker compose exec api python -m tradeos.cli seed-admin --email you@example.com"
 

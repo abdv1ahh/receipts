@@ -35,10 +35,38 @@ INSTRUCTION = (
     "- NEVER give advice or say what to do. Never use buy, sell, hold, should, recommend, enter, exit, "
     "target price, take profit, add, trim. This is post-hoc education, not a call.\n"
     "- If the image is not a price chart, set is_chart false and leave the analysis fields brief.\n"
+    "- ALSO extract, to help pre-fill a trade log, ONLY what is CLEARLY readable on the chart: the "
+    "ticker `symbol` shown, the `timeframe` if a timeframe label is visible (e.g. 5m, 1h, 1D), the "
+    "`direction` (long or short) if obvious, and `entry`/`stop`/`target` numeric prices ONLY if a "
+    "labeled line or a clear axis value shows them. If a field is NOT clearly visible, use null — never "
+    "guess a ticker or invent a price.\n"
     "Return ONLY JSON with keys: pattern (string), structure (string), risk_reward (string), "
-    "observations (array of strings), psychology (string), is_chart (boolean).\n"
+    "observations (array of strings), psychology (string), is_chart (boolean), symbol (string|null), "
+    "timeframe (string|null), direction (\"long\"|\"short\"|null), entry (number|null), stop (number|null), "
+    "target (number|null).\n"
     "TRADE CONTEXT (JSON):\n"
 )
+
+
+def _num(x):
+    """A number the model read off the chart, or None — never coerce junk into a value."""
+    try:
+        return float(x) if x is not None and str(x).strip() != "" else None
+    except (ValueError, TypeError):
+        return None
+
+
+def _detected(out: dict) -> dict:
+    """The structured pre-fill fields, passed through honestly: only what the model reported as visible,
+    nulls left as nulls (the UI marks these 'detected — verify')."""
+    sym = out.get("symbol")
+    direction = out.get("direction")
+    return {
+        "symbol": (str(sym).upper().strip() or None) if sym else None,
+        "timeframe": (str(out.get("timeframe")).strip() or None) if out.get("timeframe") else None,
+        "direction": direction if direction in ("long", "short") else None,
+        "entry": _num(out.get("entry")), "stop": _num(out.get("stop")), "target": _num(out.get("target")),
+    }
 _TEXT_FIELDS = ("pattern", "structure", "risk_reward", "psychology")
 
 
@@ -73,7 +101,7 @@ def _fallback(trade: dict | None) -> dict:
     """Deterministic, honest fallback: for a logged trade, the level-based analysis; otherwise a plain
     'connect a vision model' note. Never fabricates a chart read."""
     base = {"source": "levels", "model_id": "template", "used_template": True,
-            "pattern": None, "risk_reward": None, "psychology": None, "is_chart": None}
+            "pattern": None, "risk_reward": None, "psychology": None, "is_chart": None, "detected": {}}
     if trade and trade.get("entry_price"):
         from .. import trades
         a = trades.analyze_trade(trade)
@@ -101,6 +129,7 @@ def analyze_chart(image_bytes: bytes, mime: str, trade: dict | None = None,
                 "pattern": out.get("pattern"), "structure": out.get("structure"),
                 "risk_reward": out.get("risk_reward"), "observations": out.get("observations") or [],
                 "psychology": out.get("psychology"), "is_chart": out.get("is_chart"),
+                "detected": _detected(out),
                 "disclaimer": "An educational read of your chart, not advice."}
     if out:
         log.warning("chart analysis guard tripped; using deterministic fallback")

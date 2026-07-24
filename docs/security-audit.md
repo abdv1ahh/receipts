@@ -18,7 +18,7 @@ All 65 tests pass and the app is functionally verified under the upgraded versio
 Remaining: **GHSA-67mh-4wv8-2f99** (esbuild ≤0.24.2, transitive via Vite 5).
 
 - Assessment: this advisory affects only the **esbuild/Vite dev server** ("any website can send
-  requests to the dev server and read the response"). TradeOS never runs the dev server in the
+  requests to the dev server and read the response"). TradeOSS never runs the dev server in the
   demo or in production — the multi-stage Docker build produces a static bundle that FastAPI
   serves. The vulnerable code path is not present at runtime.
 - Remediation (tracked, not urgent): clearing it requires Vite 6 (a major bump with a build

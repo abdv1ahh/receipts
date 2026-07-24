@@ -6,7 +6,7 @@ surface that sits directly on money, so PCI scope, entitlement bypass, and data 
 defining threats.
 
 ## Assets
-- **Payment credentials** — must never touch TradeOS (PCI scope = zero).
+- **Payment credentials** — must never touch TradeOSS (PCI scope = zero).
 - **Entitlements** — a free user must not reach a paid capability by editing a request.
 - **The paid dataset** — the commercial attack is scraping the signals and reselling them.
 - **Billing integrity** — every state change must be authentic and auditable.

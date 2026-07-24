@@ -1,4 +1,4 @@
-"""The Morning Brief composer (Milestone 1) — the reason a trader opens TradeOS before their charts.
+"""The Morning Brief composer (Milestone 1) — the reason a trader opens TradeOSS before their charts.
 
 One briefing that answers "what changed overnight and why does it matter", assembled across BOTH planes:
   * the Intelligence plane — impact-ranked, cited news with the analyst's "why it matters" (news.py +

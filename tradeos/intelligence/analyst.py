@@ -106,7 +106,7 @@ def _template_why(item: dict) -> str:
         sym = syms[0]
         parts = [f"{sym} {_SYMBOL_PROSE.get(cat, _SYMBOL_PROSE['general'])}."]
         if item.get("has_signal"):
-            parts.append(f"Smart money is already converging on {sym} in TradeOS signal data, so the reaction here is worth watching.")
+            parts.append(f"Smart money is already converging on {sym} in TradeOSS signal data, so the reaction here is worth watching.")
     else:
         parts = [_MARKET_PROSE.get(cat, _MARKET_PROSE["general"])]
     parts.append("This is context, not advice.")
@@ -210,7 +210,7 @@ def _template_exec(items: list[dict], smart_money_lead: dict | None) -> str:
     else:
         parts = [f"Overnight, {n} development{'s' if n != 1 else ''} stand out across macro and market headlines."]
     if smart_money_lead and smart_money_lead.get("symbol"):
-        parts.append(f"Smart money is also converging on {smart_money_lead['symbol']} in TradeOS signal data.")
+        parts.append(f"Smart money is also converging on {smart_money_lead['symbol']} in TradeOSS signal data.")
     parts.append("Details below — context, not advice.")
     return " ".join(parts)
 
@@ -242,7 +242,7 @@ def _template_attention(symbol: str, attention: dict, news_items: list) -> str:
     lead = f"{symbol}'s public attention is running about {vel}x its usual level" if vel else f"{symbol} is drawing unusual public attention"
     if news_items:
         return f"{lead}; a likely driver is coverage such as \"{news_items[0]['headline']}\". This is attention, not advice."
-    return f"{lead}, with no obvious news catalyst in TradeOS sources — a watch-it signal, not advice."
+    return f"{lead}, with no obvious news catalyst in TradeOSS sources — a watch-it signal, not advice."
 
 
 def attention_why(symbol: str, attention: dict, news_items: list[dict], provider: str | None = None) -> dict:

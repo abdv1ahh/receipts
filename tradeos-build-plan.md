@@ -1,4 +1,4 @@
-# TradeOS Build Plan: Slices 2 through 6
+# TradeOSS Build Plan: Slices 2 through 6
 
 This document is the complete execution brief for everything after Slice 1. It assumes
 the Slice 1 codebase is present and its tests pass: the point-in-time Postgres schema,
@@ -57,7 +57,7 @@ These are permanent, inherited from the founding brief, and non-negotiable.
 15. Invite-gated access, no payments, no public marketing pages with performance claims.
 16. Congressional and short-interest sources are modular inputs (Decision 11):
     convergence must compute correctly with either or both disabled via config flag.
-17. Persistent product-wide disclaimer component: "TradeOS is an analytics and education
+17. Persistent product-wide disclaimer component: "TradeOSS is an analytics and education
     platform. Nothing here is investment advice. Signals describe disclosed activity by
     third parties, with delays as labeled." Rendered on every signal surface.
 
@@ -69,7 +69,7 @@ already set, (c) any deployment credentials in Slice 6. Nothing else should bloc
 
 ## Part 1: Slice 2 — Institutional pipelines and entity resolution
 
-Goal: TradeOS recognizes that a 13D, a 13F position, and an insider buy all refer to the
+Goal: TradeOSS recognizes that a 13D, a 13F position, and an insider buy all refer to the
 same company, and the founder can browse real institutional activity.
 
 ### 1.1 Migration 002: entities and institutional tables

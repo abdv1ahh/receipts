@@ -1,4 +1,4 @@
-"""TradeOS command line.
+"""TradeOSS command line.
 
   python -m tradeos.cli migrate
   python -m tradeos.cli sync-tickers
@@ -331,7 +331,7 @@ def cmd_seed_admin(args) -> None:
             print(f"admin {email} already exists; not modified")
             return
         authn.audit(conn, "system", "seed_admin", email)
-    uri = pyotp.TOTP(secret).provisioning_uri(name=email, issuer_name="TradeOS")
+    uri = pyotp.TOTP(secret).provisioning_uri(name=email, issuer_name="TradeOSS")
     print(f"admin created: {email}")
     print("add this TOTP to your authenticator app (required for admin login):")
     print(f"  secret: {secret}")

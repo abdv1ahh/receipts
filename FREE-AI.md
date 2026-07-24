@@ -1,9 +1,9 @@
 # Turning on the live AI — for free
 
-TradeOS runs **fully without any AI** (every AI surface has a deterministic fallback). To light up the
+TradeOSS runs **fully without any AI** (every AI surface has a deterministic fallback). To light up the
 *live* AI — the Morning Brief summary, the "why it matters" on news, the "why it's trending" on social,
 the AI chart reads, and the assistant — point it at one **free** provider. Pick **one** below, set four
-lines of config, restart. If a provider is ever rate-limited, TradeOS quietly falls back to templates —
+lines of config, restart. If a provider is ever rate-limited, TradeOSS quietly falls back to templates —
 it never breaks and never fabricates.
 
 You set these in `.env` (local dev) or `.env.production` (server), then restart the stack.
@@ -23,7 +23,7 @@ You set these in `.env` (local dev) or `.env.production` (server), then restart 
    ```
 3. Restart: `docker compose up -d` (local) or the prod command in DEPLOY.md.
 
-Free-tier limits are modest (a few requests/minute) — plenty for a personal deploy, and TradeOS
+Free-tier limits are modest (a few requests/minute) — plenty for a personal deploy, and TradeOSS
 throttles + caches so it stays within them.
 
 ## Option B — Groq (free, very fast)
@@ -54,7 +54,7 @@ throttles + caches so it stays within them.
 
 ## Verify it's live
 
-Restart, then open TradeOS:
+Restart, then open TradeOSS:
 - **Morning Brief** — the opener's tag flips from `auto-generated` to **✦ AI summary**.
 - **News / Social** — cards show **✦ AI analysis** instead of `auto`.
 - **Journal → a trade with a chart** — the panel shows **✦ AI vision** with a real chart read (needs a

@@ -41,3 +41,25 @@ def test_analyze_chart_template_provider_falls_back():
                                       "direction": "long", "status": "open"}, provider="template")
     assert out["used_template"] is True and out["source"] == "levels"
     assert "3" in (out["risk_reward"] or "")                         # 15/5 = 3.0 reward:risk
+    assert out["detected"] == {}                                     # fallback pre-fills nothing
+
+
+# ------------------------------------------------------------------ detected pre-fill: honest, never guessed
+
+def test_detected_passes_through_visible_only():
+    out = vision._detected({"symbol": "nvda", "timeframe": "1h", "direction": "long",
+                            "entry": "165.5", "stop": 155, "target": None})
+    assert out == {"symbol": "NVDA", "timeframe": "1h", "direction": "long",
+                   "entry": 165.5, "stop": 155.0, "target": None}     # symbol upper, target stays null
+
+
+def test_detected_rejects_junk_and_bad_direction():
+    out = vision._detected({"symbol": "", "timeframe": "", "direction": "sideways",
+                            "entry": "n/a", "stop": "", "target": "abc"})
+    assert out == {"symbol": None, "timeframe": None, "direction": None,
+                   "entry": None, "stop": None, "target": None}       # nothing fabricated from junk
+
+
+def test_num_coerces_or_none():
+    assert vision._num("165.5") == 165.5 and vision._num(10) == 10.0
+    assert vision._num(None) is None and vision._num("") is None and vision._num("abc") is None

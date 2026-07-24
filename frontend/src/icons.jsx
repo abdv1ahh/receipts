@@ -21,12 +21,18 @@ const PATHS = {
   layers: <><path d="M10 3.5l6.5 3.2L10 9.9 3.5 6.7z" /><path d="M3.5 10.1 10 13.3l6.5-3.2" /></>,
   search: <><circle cx="8.8" cy="8.8" r="5.1" /><path d="m12.6 12.6 3.8 3.8" /></>,
   menu: <><path d="M3.5 6h13M3.5 10h13M3.5 14h13" /></>,
+  grid: <><rect x="3.6" y="3.6" width="5.4" height="5.4" rx="1.3" /><rect x="11" y="3.6" width="5.4" height="5.4" rx="1.3" /><rect x="3.6" y="11" width="5.4" height="5.4" rx="1.3" /><rect x="11" y="11" width="5.4" height="5.4" rx="1.3" /></>,
+  activity: <><path d="M3 10.4h3.1l2-5.2 3.6 10 2.1-4.8H17" /></>,
+  arrow: <><path d="M3.8 10h11.4" /><path d="m10.8 5.6 4.4 4.4-4.4 4.4" /></>,
+  chevron: <><path d="m8 5 5 5-5 5" /></>,
+  zap: <><path d="M11 2.8 5.4 11h4l-.6 6.2L14.6 9h-4z" /></>,
+  radar: <><circle cx="10" cy="10" r="6.7" /><path d="M10 10 14.6 6.1" /><path d="M10 3.3a6.7 6.7 0 1 1-4.7 2" /></>,
   logout: <><path d="M8 3.9H5.3A1.6 1.6 0 0 0 3.7 5.5v9A1.6 1.6 0 0 0 5.3 16.1H8" /><path d="m12 13 3-3-3-3M15 10H7.4" /></>,
 };
 
-export function Icon({ name, size = 18 }) {
+export function Icon({ name, size = 18, style }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" stroke="currentColor"
+    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" stroke="currentColor" style={style}
       strokeWidth="1.55" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       {PATHS[name] || PATHS.home}
     </svg>

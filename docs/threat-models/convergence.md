@@ -2,7 +2,7 @@
 
 Written before the signal code, per the security mandate. The convergence signal is where
 the platform is most dangerous to itself: a number here can move a user's money decision,
-so the defining attack is an adversary manufacturing a cluster to make TradeOS pump an
+so the defining attack is an adversary manufacturing a cluster to make TradeOSS pump an
 asset for them (the poisoning threat from the founding brief). Each attack names the design
 property that removes or bounds it.
 

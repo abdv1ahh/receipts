@@ -19,14 +19,14 @@ CG = "https://api.coingecko.com/api/v3"
 def _client() -> httpx.Client:
     if urlparse(CG).hostname != CG_HOST:
         raise ValueError("CoinGecko host allowlist violation")
-    return httpx.Client(timeout=20.0, headers={"User-Agent": "TradeOS (contact via app)"})
+    return httpx.Client(timeout=20.0, headers={"User-Agent": "TradeOSS (contact via app)"})
 
 
 def top_markets(limit: int = 20) -> list[dict]:
     with _client() as c:
         r = c.get(f"{CG}/coins/markets", params={
             "vs_currency": "usd", "order": "market_cap_desc", "per_page": limit, "page": 1,
-            "price_change_percentage": "24h"})
+            "sparkline": "true", "price_change_percentage": "1h,24h,7d"})
         r.raise_for_status()
         return r.json()
 

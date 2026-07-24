@@ -1,7 +1,7 @@
 # Threat model: Screenshot ticker extraction
 
 Written before the code, per the security mandate. A user may paste a brokerage screenshot;
-TradeOS extracts the **ticker symbols only** and opens the disclosed picture on those names.
+TradeOSS extracts the **ticker symbols only** and opens the disclosed picture on those names.
 The one line this feature must never cross (Feature Spec 5.5): it reads symbols, and it does
 NOT read, store, infer, or react to position size, entry price, quantity, P&L, or any personal
 financial detail — even if those are visible in the image. The product is identical per user

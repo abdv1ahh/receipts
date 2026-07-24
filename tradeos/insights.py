@@ -95,7 +95,7 @@ def summarize_cohort(similar: list[dict]) -> dict:
         line = (f"Across {n} closed trades like this one in your journal, the recorded win rate is "
                 f"{wr}%. Descriptive history of your own trades, not a prediction about this one.")
     else:
-        line = (f"{n} closed trade(s) like this one so far — too few for TradeOS to state a win rate "
+        line = (f"{n} closed trade(s) like this one so far — too few for TradeOSS to state a win rate "
                 f"(it names a rate only at {trades.PERF_MIN_SAMPLE}). Context, not a prediction.")
     return {"n_similar": len(similar), "summary": summary, "line": line}
 
@@ -205,7 +205,7 @@ def render_report(report: dict) -> str:
             parts.append(ins)
     else:
         parts.append(f"That is below the {report.get('min_sample', trades.PERF_MIN_SAMPLE)}-trade floor "
-                     f"TradeOS needs before it reports a win rate, so this stays with counts and habits "
+                     f"TradeOSS needs before it reports a win rate, so this stays with counts and habits "
                      f"rather than an edge.")
     for h in report.get("habits", []):
         parts.append(f"{h['count']} of {h['of']} — {h['label']}.")

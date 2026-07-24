@@ -1,4 +1,4 @@
-# TradeOS — Slice 1: skeleton + Form 4 pipeline
+# TradeOSS — Slice 1: skeleton + Form 4 pipeline
 
 Real ingestion of real SEC Form 4 filings into a point-in-time Postgres store,
 with an API exposing feed freshness. No fabricated data anywhere; test fixtures
@@ -10,7 +10,7 @@ Prerequisites: Docker with Compose, or Python 3.12 + a local Postgres.
 
 ```bash
 cp .env.example .env
-# edit .env: set SEC_USER_AGENT to "TradeOS your@email.com" (SEC requires a contact)
+# edit .env: set SEC_USER_AGENT to "TradeOSS your@email.com" (SEC requires a contact)
 
 docker compose up -d          # starts Postgres + API on :8000
 ```
@@ -46,7 +46,7 @@ python -m pytest tests/ -q      # 13 tests, all offline, no network needed
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 export DATABASE_URL=postgresql://tradeos:${POSTGRES_PASSWORD}@localhost:5432/tradeos
-export SEC_USER_AGENT="TradeOS your@email.com"
+export SEC_USER_AGENT="TradeOSS your@email.com"
 python -m tradeos.cli migrate
 python -m tradeos.cli ingest-form4 --date 2026-07-10 --limit 25
 uvicorn tradeos.app:app --reload

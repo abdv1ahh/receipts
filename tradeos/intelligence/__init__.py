@@ -1,6 +1,6 @@
 """The Intelligence plane (Milestone 1).
 
-The second, NEW plane of TradeOS. Where the Signal plane (SEC convergence) forbids the model from
+The second, NEW plane of TradeOSS. Where the Signal plane (SEC convergence) forbids the model from
 interpreting at all — it may only rephrase computed math — this plane lets an AI *interpret* sourced
 information: it reads real news and explains why it may matter. It stays honest by construction:
 

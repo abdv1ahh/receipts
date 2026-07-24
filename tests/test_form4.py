@@ -140,7 +140,7 @@ def test_validation_rejects_bad_acquired_disposed():
 # ---------------------------------------------------------------- client safety
 
 def test_client_refuses_hosts_outside_allowlist():
-    client = EdgarClient("TradeOS test@example.com")
+    client = EdgarClient("TradeOSS test@example.com")
     with pytest.raises(ValueError):
         client.get("https://evil.example.com/edgar/data/1/1.txt")
     with pytest.raises(ValueError):

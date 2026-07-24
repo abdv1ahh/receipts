@@ -20,7 +20,7 @@ export function LandingView({ onGetStarted, onExplore }) {
         <div className="eyebrow">Trading intelligence, calibrated</div>
         <h1 className="landing-h1">See what the smartest money is quietly doing.</h1>
         <p className="landing-sub">
-          TradeOS reads the filings the pros move on — insiders, activists, and funds converging on one
+          TradeOSS reads the filings the pros move on — insiders, activists, and funds converging on one
           name — then adds an AI trade journal, a grounded assistant, a live attention scanner, and a
           community that ranks by real track record. Honest, backtested, probability-framed.
           <b> Never guaranteed alpha.</b>
@@ -42,7 +42,7 @@ export function LandingView({ onGetStarted, onExplore }) {
       </div>
       <div className="landing-foot">
         Built on the deepest legitimate map of what the world's best traders are doing — assembled only
-        from sources we have the right to use. TradeOS never custodies funds and is not a broker.
+        from sources we have the right to use. TradeOSS never custodies funds and is not a broker.
       </div>
     </div>
   );

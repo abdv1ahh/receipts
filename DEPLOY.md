@@ -1,6 +1,6 @@
-# Deploying TradeOS to production
+# Deploying TradeOSS to production
 
-This takes you from the repo to a live, HTTPS, self-refreshing TradeOS on your own server. The stack is
+This takes you from the repo to a live, HTTPS, self-refreshing TradeOSS on your own server. The stack is
 four containers: **Postgres**, the **API**, the **scheduler worker** (keeps news/signals/attention/events
 fresh), and **Caddy** (automatic Let's Encrypt HTTPS). The database is never exposed to the internet;
 Caddy is the only thing the outside world talks to.
@@ -40,7 +40,7 @@ nano .env.production
 Set at least:
 - `DOMAIN` — your domain (or `:80` for an HTTP-only test).
 - `POSTGRES_PASSWORD` — a long random string: `openssl rand -base64 30`.
-- `SEC_USER_AGENT` — `TradeOS you@yourdomain.com` (a real contact address; SEC policy).
+- `SEC_USER_AGENT` — `TradeOSS you@yourdomain.com` (a real contact address; SEC policy).
 - (recommended) `EXPLAIN_PROVIDER=gemini` + `GEMINI_API_KEY=...` to turn on live AI. Leave as
   `template` to run fully on the deterministic prose (no key needed).
 

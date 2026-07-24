@@ -1,4 +1,4 @@
-# TradeOS Feature Spec 5.5: Bring-Your-Names + Base-Rate Framing
+# TradeOSS Feature Spec 5.5: Bring-Your-Names + Base-Rate Framing
 
 This is an addition to `docs/build-plan.md`. It extends the Slice 5 deep-dive,
 watchlist, and explanation work already specified there. Build it after Slice 5's
@@ -16,7 +16,7 @@ pattern-language, never as advice to the user.
 
 ## The one line this feature must never cross
 
-TradeOS describes what disclosed sources have done and what patterns have historically
+TradeOSS describes what disclosed sources have done and what patterns have historically
 done. It never evaluates a specific user's position, entry, size, timing, or P&L, and
 never tells a user what to do. A user's own holdings are used only to look up the
 disclosed picture on those tickers. The platform passes no judgment on the user's
@@ -44,7 +44,7 @@ a portfolio to be graded.
 
 ## Part B: Screenshot ticker extraction
 
-A user pastes or uploads an image of a trading/brokerage page. TradeOS extracts the
+A user pastes or uploads an image of a trading/brokerage page. TradeOSS extracts the
 **ticker symbols only** and opens the disclosed picture on those names. It reads
 symbols. It does not read, store, infer, or react to position size, entry price,
 quantity, P&L, or any personal financial detail, even if those are visible in the image.
@@ -107,7 +107,7 @@ quantity, P&L, or any personal financial detail, even if those are visible in th
 ## Part C: The base-rate framing (the careful step further)
 
 On every deep-dive and cluster, alongside the backtested hit rate already built in
-Slice 4, TradeOS states the base rate in **pattern language**. This is the line
+Slice 4, TradeOSS states the base rate in **pattern language**. This is the line
 between a data viewer and something that feels alive, and it is legal precisely
 because it describes the history of a signal type, not a recommendation to a person.
 
@@ -165,7 +165,7 @@ Extend the Slice 5 explanation guards so they apply to this statement too:
   honesty qualifier and a base-rate integrity guard. Counterargument: strict framing
   is less punchy than a direct call; we accept that, because a caught overstatement
   kills trust and the framing is the legal line.
-- **22**: TradeOS states pattern base rates but never evaluates a user's specific
+- **22**: TradeOSS states pattern base rates but never evaluates a user's specific
   position; the product is identical per user for the same ticker. Counterargument:
   personalization would feel more premium; it would also convert the product into
   regulated advice, so it stays out until counsel and an entity exist.

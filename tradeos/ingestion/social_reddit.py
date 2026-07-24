@@ -27,7 +27,7 @@ log = logging.getLogger("tradeos.social.reddit")
 TOKEN_URL = "https://www.reddit.com/api/v1/access_token"
 API = "https://oauth.reddit.com"
 API_HOST = "oauth.reddit.com"
-UA = "TradeOS/1.0 (market-attention research)"
+UA = "TradeOSS/1.0 (market-attention research)"
 SUBREDDITS = ["wallstreetbets", "stocks", "investing", "options", "StockMarket"]
 
 _CASHTAG = re.compile(r"\$([A-Za-z]{1,5})\b")

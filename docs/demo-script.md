@@ -1,4 +1,4 @@
-# TradeOS — investor demo script
+# TradeOSS — investor demo script
 
 The whole growth engine is one moment: a skeptical trader checks a signal against a source
 they already trust, finds it accurate and honestly labeled, and comes back. This script builds

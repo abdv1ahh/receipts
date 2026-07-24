@@ -35,7 +35,7 @@ class FinraClient:
     def __init__(self, min_interval: float = 0.3):
         self._client = httpx.Client(
             headers={"Content-Type": "application/json", "Accept": "application/json",
-                     "User-Agent": "TradeOS contact@example.com"},
+                     "User-Agent": "TradeOSS contact@example.com"},
             timeout=60.0, follow_redirects=False)
         self._min_interval = min_interval
         self._last = 0.0

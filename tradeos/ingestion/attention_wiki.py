@@ -28,7 +28,7 @@ PV_URL = ("https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/"
           "en.wikipedia/all-access/all-agents/{title}/daily/{start}/{end}")
 PV_HOST = "wikimedia.org"
 # Wikimedia's UA policy rejects requests without an identifiable contact; a product URL satisfies it.
-UA = {"User-Agent": "TradeOS/1.0 (https://tradeos.app; market-attention research)"}
+UA = {"User-Agent": "TradeOSS/1.0 (https://tradeos.app; market-attention research)"}
 
 
 # ------------------------------------------------------------------ pure: velocity from a view series

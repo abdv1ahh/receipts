@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { authLogout, authMe, fetchCalibration, fetchClusters, fetchClusterDetail, fetchDefinitions, fetchExplanation, fetchFeeds, fetchNotifications } from "./api";
-import { ClusterDetail, Methodology, StatusStrip } from "./components.jsx";
+import { Methodology } from "./components.jsx";
 import { AssetView, AuthPanel, LibraryEntry, LibraryView, ProfileView, Screener, WatchlistView } from "./views.jsx";
-import { Home } from "./home.jsx";
+import { SmartMoneyView, IssuerDetail } from "./smartmoney.jsx";
 import { JournalView } from "./journal.jsx";
 import { AssistantView } from "./assistant.jsx";
-import { ScannerView } from "./scanner.jsx";
+import { SocialView } from "./social.jsx";
 import { AlertsView, NotificationsView } from "./alerts.jsx";
 import { BriefView } from "./brief.jsx";
 import { NewsView } from "./news.jsx";
@@ -15,15 +15,78 @@ import { PricingView } from "./pricing.jsx";
 import { CryptoView } from "./crypto.jsx";
 import { LandingView, SearchView } from "./discover.jsx";
 import { AdminView } from "./admin.jsx";
+import { Dashboard } from "./dashboard.jsx";
 import { Icon } from "./icons.jsx";
 
-const NAV_LABELS = { brief: "Morning Brief", news: "News", events: "Calendar", home: "Smart Money", trending: "Social", crypto: "Crypto", journal: "Journal", portfolios: "Portfolios", watchlist: "Watchlist", alerts: "Alerts", assistant: "Assistant", screener: "Screener", library: "Library", methodology: "Methodology" };
-const NAV_ICONS = { brief: "sparkles", news: "news", events: "calendar", home: "signal", trending: "trending", crypto: "crypto", journal: "journal", portfolios: "briefcase", watchlist: "star", alerts: "bell", assistant: "compass", screener: "filter", library: "book", methodology: "target" };
+const NAV_LABELS = { dashboard: "Dashboard", brief: "Morning Brief", news: "News", events: "Calendar", home: "Smart Money", trending: "Social", crypto: "Crypto", journal: "Journal", portfolios: "Portfolio", watchlist: "Watchlist", alerts: "Alerts", assistant: "AI Assistant", screener: "Screener", library: "Library", methodology: "Methodology" };
+const NAV_ICONS = { dashboard: "grid", brief: "sparkles", news: "news", events: "calendar", home: "signal", trending: "trending", crypto: "crypto", journal: "journal", portfolios: "briefcase", watchlist: "star", alerts: "bell", assistant: "compass", screener: "filter", library: "book", methodology: "target" };
+// A calmer rail: the essentials up front, utilities tucked into a collapsible "More".
 const SIDEBAR = [
-  { label: "Intelligence", items: ["brief", "news", "events", "home", "trending", "crypto"] },
-  { label: "Your desk", items: ["journal", "portfolios", "watchlist", "alerts", "assistant"] },
-  { label: "Research", items: ["screener", "library", "methodology"] },
+  { label: "Overview", items: ["dashboard", "brief"] },
+  { label: "Intelligence", items: ["home", "trending", "news", "crypto", "events"] },
+  { label: "Your desk", items: ["journal", "portfolios", "watchlist", "assistant", "alerts"] },
 ];
+const MORE = ["screener", "library", "methodology"];
+// Everything reachable from the ⌘K command palette.
+const CMD_ITEMS = [
+  ...["dashboard", "brief", "home", "trending", "news", "crypto", "events", "journal", "portfolios", "watchlist", "assistant", "alerts", "screener", "library", "methodology"]
+    .map((v) => ({ v, label: NAV_LABELS[v], icon: NAV_ICONS[v], group: "Go to" })),
+  { v: "pricing", label: "Upgrade plan", icon: "sparkles", group: "Actions" },
+  { v: "notifications", label: "Notifications", icon: "bell", group: "Actions" },
+];
+
+function CommandPalette({ onGo, onClose }) {
+  const [q, setQ] = useState("");
+  const [sel, setSel] = useState(0);
+  const items = CMD_ITEMS.filter((it) => it.label.toLowerCase().includes(q.trim().toLowerCase()));
+  useEffect(() => { setSel(0); }, [q]);
+  const choose = (it) => { if (it) { onGo(it.v); onClose(); } };
+  const onKey = (e) => {
+    if (e.key === "ArrowDown") { e.preventDefault(); setSel((x) => Math.min(items.length - 1, x + 1)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setSel((x) => Math.max(0, x - 1)); }
+    else if (e.key === "Enter") { e.preventDefault(); choose(items[sel]); }
+    else if (e.key === "Escape") { e.preventDefault(); onClose(); }
+  };
+  const groups = [];
+  items.forEach((it, idx) => {
+    let g = groups.find((x) => x.label === it.group);
+    if (!g) { g = { label: it.group, items: [] }; groups.push(g); }
+    g.items.push({ ...it, idx });
+  });
+  return (
+    <div className="cmdk-scrim" onMouseDown={onClose}>
+      <div className="cmdk" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="cmdk-input-wrap">
+          <Icon name="search" size={18} />
+          <input autoFocus className="cmdk-input" placeholder="Jump to…" value={q}
+                 onChange={(e) => setQ(e.target.value)} onKeyDown={onKey} />
+          <span className="kbd">esc</span>
+        </div>
+        <div className="cmdk-list">
+          {items.length === 0 ? (
+            <div className="cmdk-group-label">No matches</div>
+          ) : groups.map((g) => (
+            <div key={g.label}>
+              <div className="cmdk-group-label">{g.label}</div>
+              {g.items.map((it) => (
+                <button key={it.v} className={`cmdk-item ${it.idx === sel ? "on" : ""}`}
+                        onMouseEnter={() => setSel(it.idx)} onClick={() => choose(it)}>
+                  <Icon name={it.icon} size={16} /><span>{it.label}</span><span className="spacer" />
+                  <span className="go">↵</span>
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
+        <div className="cmdk-foot">
+          <span><span className="kbd">↑↓</span> navigate</span>
+          <span><span className="kbd">↵</span> open</span>
+          <span><span className="kbd">esc</span> close</span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function App() {
   const [minC, setMinC] = useState("medium");
@@ -47,6 +110,8 @@ export default function App() {
   const [pulseKey, setPulseKey] = useState(0);
   const [unread, setUnread] = useState(0);
   const [navOpen, setNavOpen] = useState(false);
+  const [cmdOpen, setCmdOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [refCode] = useState(() => new URLSearchParams(window.location.search).get("ref") || "");
 
   const refreshUnread = () => fetchNotifications().then((d) => setUnread(d.unread || 0)).catch(() => {});
@@ -56,7 +121,7 @@ export default function App() {
     fetchFeeds().then(setFeeds).catch((e) => setErr(String(e)));
     fetchCalibration().then(setCalibration).catch((e) => setErr(String(e)));
     fetchDefinitions().then(setDefinitions).catch((e) => setErr(String(e)));
-    authMe().then((d) => { setUser(d.user); if (d.user) setView((v) => (v === "landing" ? "brief" : v)); }).catch(() => {});
+    authMe().then((d) => { setUser(d.user); if (d.user) setView((v) => (v === "landing" ? "dashboard" : v)); }).catch(() => {});
     const params = new URLSearchParams(window.location.search);
     if (params.get("symbol")) { setAssetSymbol(params.get("symbol").toUpperCase()); setView("asset"); }
     if (params.get("upgraded")) setView("pricing");   // returned from Stripe Checkout
@@ -64,6 +129,15 @@ export default function App() {
   }, []);
 
   useEffect(() => { if (user) refreshUnread(); else setUnread(0); }, [user]);
+
+  // ⌘K / Ctrl-K opens the command palette from anywhere.
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setCmdOpen((o) => !o); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   useEffect(() => {
     setClusters(null);
@@ -88,7 +162,7 @@ export default function App() {
   const openSymbol = (sym) => { setAssetSymbol(sym.toUpperCase()); setDetail(null); setView("asset"); };
   const openProfile = (kind, id) => { setProfile({ kind, id }); setDetail(null); setView("profile"); };
   const openLibrary = (slug) => { setLibrarySlug(slug); setDetail(null); setView("library-entry"); };
-  const onAuthed = (u) => { setUser(u); setView("brief"); };
+  const onAuthed = (u) => { setUser(u); setView("dashboard"); };
   const doLogout = async () => { await authLogout(); setUser(null); setView("landing"); };
   const submitSearch = () => { if (search.trim()) { setView("search"); setDetail(null); setNavOpen(false); } };
 
@@ -101,8 +175,8 @@ export default function App() {
   return (
     <div className="shell">
       <aside className={`sidebar ${navOpen ? "open" : ""}`}>
-        <div className="brand" onClick={() => go(user ? "brief" : "landing")}>
-          <span className="brand-mark">◆</span><span className="brand-name">TradeOS</span>
+        <div className="brand" onClick={() => go(user ? "dashboard" : "landing")}>
+          <span className="brand-mark">◆</span><span className="brand-name">TradeOSS</span>
         </div>
         <nav className="side-nav">
           {SIDEBAR.map((section) => (
@@ -111,6 +185,12 @@ export default function App() {
               {section.items.map(navBtn)}
             </div>
           ))}
+          <div className="nav-section">
+            <button className={`nav-more-toggle ${moreOpen ? "open" : ""}`} onClick={() => setMoreOpen((o) => !o)}>
+              More <span className="chev"><Icon name="chevron" size={12} /></span>
+            </button>
+            {moreOpen && MORE.map(navBtn)}
+          </div>
           {user?.tier === "admin" && (
             <div className="nav-section">
               <div className="nav-section-label">Admin</div>
@@ -128,12 +208,14 @@ export default function App() {
       <div className="main">
         <header className="topbar">
           <button className="icon-btn menu-btn" onClick={() => setNavOpen((o) => !o)} title="menu"><Icon name="menu" /></button>
-          <div className="search-wrap">
+          <div className="search-wrap" onClick={() => document.getElementById("topsearch")?.focus()}>
             <Icon name="search" size={16} />
-            <input className="topsearch" placeholder="Search issuers, institutions, traders…" value={search}
+            <input id="topsearch" className="topsearch" placeholder="Search tickers, institutions, insiders…" value={search}
               onChange={(e) => setSearch(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") submitSearch(); }} />
+            <span className="kbd">⌘K</span>
           </div>
           <div className="topbar-right">
+            <button className="ask-ai" onClick={() => go("assistant")} title="Ask the AI mentor"><Icon name="compass" size={16} /><span>Ask AI</span></button>
             <button className="upgrade-btn" onClick={() => go("pricing")}>⚡ {user && user.tier !== "free" ? user.tier : "Upgrade"}</button>
             <button className="icon-btn" onClick={() => go("notifications")} title="notifications">
               <Icon name="bell" />{unread > 0 && <span className="bell-badge">{unread > 9 ? "9+" : unread}</span>}
@@ -153,24 +235,26 @@ export default function App() {
         </header>
 
         <main className="content">
-          {view !== "landing" && view !== "auth" && <StatusStrip feeds={feeds} />}
           {err && <div className="err">error: {err}</div>}
 
           {view === "landing" ? (
             <LandingView onGetStarted={() => go("auth")} onExplore={() => go("news")} />
+          ) : view === "dashboard" ? (
+            <Dashboard user={user} onOpenSymbol={openSymbol} onNav={go} />
           ) : view === "search" ? (
             <SearchView query={search} onOpenSymbol={openSymbol} onOpenProfile={openProfile} onOpenLibrary={openLibrary} onOpenTrader={() => {}} />
           ) : view === "home" ? (
             detail ? (
               detail === "loading" ? (
-                <div className="detail"><div className="skel" style={{ width: 220 }} /></div>
+                <div className="issuer"><div className="issuer-hero"><div className="skel" style={{ width: 220, height: 60 }} /></div></div>
               ) : detail.found === false ? (
-                <div className="detail"><button className="back" onClick={() => setDetail(null)}>← back</button><div>No cluster for that issuer at the latest as-of.</div></div>
+                <div className="issuer"><button className="issuer-back" onClick={() => setDetail(null)}>← back</button><div>No cluster for that issuer at the latest as-of.</div></div>
               ) : (
-                <ClusterDetail detail={detail} onBack={() => setDetail(null)} calibration={calibration} horizon={horizon} explanation={explanation} onOpenLibrary={openLibrary} />
+                <IssuerDetail detail={detail} onBack={() => setDetail(null)} calibration={calibration} horizon={horizon}
+                              explanation={explanation} onOpenLibrary={openLibrary} onOpenSymbol={openSymbol} onOpenProfile={openProfile} />
               )
             ) : (
-              <Home calibration={calibration} horizon={horizon} minC={minC} user={user}
+              <SmartMoneyView calibration={calibration} horizon={horizon} minC={minC} user={user}
                     onLogin={() => go("auth")} onNav={go} onOpenSymbol={openSymbol}
                     onOpenDetail={openDetail} onOpenProfile={openProfile} />
             )
@@ -187,9 +271,9 @@ export default function App() {
           ) : view === "journal" ? (
             <JournalView user={user} onLogin={() => go("auth")} onOpenSymbol={openSymbol} onOpenLibrary={openLibrary} />
           ) : view === "assistant" ? (
-            <AssistantView user={user} />
+            <AssistantView user={user} onLogin={() => go("auth")} />
           ) : view === "trending" ? (
-            <ScannerView onOpenSymbol={openSymbol} />
+            <SocialView onOpenSymbol={openSymbol} />
           ) : view === "pricing" ? (
             <PricingView user={user} onUpgraded={refreshUser} onLogin={() => go("auth")} />
           ) : view === "notifications" ? (
@@ -216,14 +300,13 @@ export default function App() {
           ) : view === "admin" ? (
             <AdminView user={user} />
           ) : (
-            <Home calibration={calibration} horizon={horizon} minC={minC} user={user}
-                  onLogin={() => go("auth")} onNav={go} onOpenSymbol={openSymbol}
-                  onOpenDetail={openDetail} onOpenProfile={openProfile} />
+            <Dashboard user={user} onOpenSymbol={openSymbol} onNav={go} />
           )}
         </main>
       </div>
 
       {navOpen && <div className="scrim" onClick={() => setNavOpen(false)} />}
+      {cmdOpen && <CommandPalette onGo={go} onClose={() => setCmdOpen(false)} />}
     </div>
   );
 }

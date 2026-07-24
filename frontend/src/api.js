@@ -41,6 +41,7 @@ export const markNotificationsRead = () => fetch("/api/notifications/read", { me
 export const fetchAlertPrefs = () => get("/api/alert-prefs");
 export const saveAlertPrefs = (prefs) => fetch("/api/alert-prefs", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(prefs) }).then((r) => r.json());
 export const fetchBrief = () => get("/api/brief");
+export const fetchDashboard = () => get("/api/dashboard");
 // News Intelligence (Milestone 1): impact-ranked, cited market news + the analyst's "why it matters".
 export const fetchNews = ({ symbol, category, hours, limit } = {}) => {
   const p = new URLSearchParams();

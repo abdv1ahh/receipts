@@ -12,6 +12,8 @@ def test_classify_intents():
     assert A.classify("how are my trades doing")["performance"]
     assert A.classify("what are traders discussing on reddit")["sentiment"]
     assert not A.classify("show me NVDA")["sentiment"]
+    assert A.classify("what risks am I missing across my watchlist")["personal"]
+    assert A.classify("find setups that match my strategy")["personal"]
 
 
 def test_candidate_symbols_cashtags_and_caps_minus_stoplist():
@@ -57,6 +59,16 @@ def test_answer_performance_sufficient_and_insufficient():
     assert _guarded(good) and _guarded(low)
 
 
+def test_answer_personal_context_is_advice_free():
+    ctx = {"watchlist": ["NVDA", "TSLA", "AAPL"],
+           "open_positions": [{"symbol": "AAPL", "direction": "long"}, {"symbol": "TSLA", "direction": "short"}]}
+    ans, src = A.build_answer("what risks am I missing", ctx)
+    assert "your watchlist" in ans.lower() and "NVDA" in ans
+    assert "long AAPL" in ans and "short TSLA" in ans
+    assert "your_watchlist" in src and "your_positions" in src
+    assert directive_guard(ans)                                  # no buy/sell/hold/should leaks through
+
+
 def test_answer_trending_when_sentiment_data_present():
     ctx = {"trending": [{"symbol": "NVDA", "attention": 88, "sentiment": None},
                         {"symbol": "TSLA", "attention": 61, "sentiment": 0.3}]}
@@ -91,6 +103,7 @@ def test_every_build_answer_output_clears_the_directive_guard():
         {"library": [{"slug": "breakout", "title": "The breakout"}]},
         {"performance": {"sufficient": True, "win_rate": 0.55, "avg_reward_risk": 1.8, "n_closed": 20}},
         {"sentiment": True, "unrecognized": ["MEME"]},
+        {"watchlist": ["NVDA", "TSLA"], "open_positions": [{"symbol": "AAPL", "direction": "long"}]},
         {},
     ]
     for c in cases:

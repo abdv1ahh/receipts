@@ -1,8 +1,9 @@
 // Deep-dive, screener, and profile surfaces. Every figure carries its freshness; a filer is
 // a link into its profile; nothing evaluates a user's position (the advice line).
 import { useEffect, useState } from "react";
-import { addFollow, addWatchlist, authLogin, authRegister, extractTickers, fetchActivity, fetchAsset, fetchExplanation, fetchInsider, fetchInstitution, fetchLibrary, fetchLibraryEntry, fetchScreener, fetchWatchlist, removeWatchlist } from "./api";
+import { addFollow, addWatchlist, analyzeChartImage, authLogin, authRegister, extractTickers, fetchActivity, fetchAsset, fetchExplanation, fetchInsider, fetchInstitution, fetchLibrary, fetchLibraryEntry, fetchScreener, fetchWatchlist, removeWatchlist } from "./api";
 import { Backtested, Disclaimer, Freshness } from "./components.jsx";
+import { Icon } from "./icons.jsx";
 
 function fmtDetail(o) {
   return Object.entries(o)
@@ -226,6 +227,62 @@ function ScreenshotImport({ onAdd }) {
   );
 }
 
+const wBand = (n) => (n >= 70 ? "high" : n >= 45 ? "med" : "low");
+const SENT = (v) => (v == null ? null : v > 0.2 ? ["bull", "bullish"] : v < -0.2 ? ["bear", "bearish"] : ["neutral", "mixed"]);
+
+function WatchChartAnalyzer() {
+  const [read, setRead] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const analyze = async (file) => { if (!file) return; setBusy(true); const d = await analyzeChartImage(file).catch(() => null); setRead(d?.analysis || { error: true }); setBusy(false); };
+  return (
+    <div className="watch-analyzer">
+      <label className="watch-analyzer-btn">
+        <Icon name="sparkles" size={15} /> {busy ? "reading chart…" : "Analyze a chart screenshot"}
+        <input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={busy} onChange={(e) => analyze(e.target.files[0])} />
+      </label>
+      {read && !read.error && (read.pattern || read.structure) && (
+        <div className="chart-read" style={{ marginTop: 10 }}>
+          <div className="chart-read-head"><Icon name="sparkles" size={14} /> What the AI saw <span className={`ai-tag ${read.source === "ai" ? "ai-on" : ""}`}>{read.source === "ai" ? "✦ AI vision" : "levels only"}</span></div>
+          {read.pattern && <div className="ca-row"><span className="ca-l">Pattern</span> {read.pattern}</div>}
+          {read.structure && <p className="an-prose" style={{ margin: "6px 0" }}>{read.structure}</p>}
+          {(read.observations || []).length > 0 && <ul className="an-list" style={{ marginTop: 4 }}>{read.observations.slice(0, 3).map((o, i) => <li key={i}>{o}</li>)}</ul>}
+          <div className="disc" style={{ marginTop: 6 }}>Educational read of the chart, not advice.</div>
+        </div>
+      )}
+      {read?.error && <div className="name" style={{ marginTop: 8 }}>Couldn't read that image right now.</div>}
+    </div>
+  );
+}
+
+function WatchCard({ w, onOpenSymbol, onRemove }) {
+  const conv = w.conviction;
+  const sm = w.smart_money, att = w.attention;
+  const sent = att ? SENT(att.sentiment) : null;
+  return (
+    <div className="watch-card">
+      <button className={`opp-score band-${conv ? wBand(conv.score) : "low"}`} onClick={() => onOpenSymbol(w.symbol)}>
+        <b>{conv ? conv.score : "—"}</b><span>CONVICTN</span>
+      </button>
+      <div className="watch-body">
+        <div className="watch-head">
+          <button className="opp-sym linkish" onClick={() => onOpenSymbol(w.symbol)}>{w.symbol}</button>
+          <span className="opp-name">{w.name || (w.resolved ? "" : "unresolved ticker")}</span>
+          <span className="spacer" style={{ flex: 1 }} />
+          <button className="linkish" style={{ color: "var(--muted)", fontSize: 12 }} onClick={() => onRemove(w.symbol)}>remove</button>
+        </div>
+        <div className="watch-scores">
+          <span className="wscore"><i>Smart money</i>{sm ? <b className={`band-${wBand(sm.score)}`}>{sm.score}</b> : <b className="wna">—</b>}</span>
+          <span className="wscore"><i>Social</i>{att ? <b className={`band-${wBand(att.score)}`}>{att.score}</b> : <b className="wna">—</b>}{att?.velocity ? <em>{att.velocity}×</em> : null}</span>
+          {sent && <span className={`sent sent-${sent[0]}`}>{sent[1]}</span>}
+          {w.cluster && <span className={`bucket ${w.cluster.bucket}`}>{w.cluster.bucket.toUpperCase()}</span>}
+        </div>
+        {w.news && <a className="watch-news" href={w.news.url} target="_blank" rel="noreferrer"><span className={`related-impact band-${w.news.impact >= 60 ? "high" : w.news.impact >= 35 ? "medium" : "low"}`}>{w.news.impact}</span> {w.news.headline}</a>}
+        {w.next_event && <div className="watch-event"><Icon name="calendar" size={12} /> next: {(w.next_event.title || "earnings").replace(/ earnings$/i, " earnings")} · {new Date(w.next_event.date + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" })}</div>}
+      </div>
+    </div>
+  );
+}
+
 export function WatchlistView({ onOpenSymbol }) {
   const [data, setData] = useState(null);
   const [sym, setSym] = useState("");
@@ -235,38 +292,22 @@ export function WatchlistView({ onOpenSymbol }) {
   const addMany = async (arr) => { for (const s of arr) await addWatchlist(s); load(); };
   const remove = async (s) => { await removeWatchlist(s); load(); };
   return (
-    <div className="detail">
-      <h2>Watchlist</h2>
-      <div className="meta">A set of names to watch — not a portfolio, and never graded. Bring names by typing a ticker, or import from a screenshot.</div>
-      <div className="controls" style={{ marginTop: 8 }}>
-        <input className="search" style={{ width: 140 }} placeholder="add ticker…" value={sym}
+    <div>
+      <div className="page-head">
+        <div><h1 className="page-title">Watchlist</h1><p className="page-sub">Names to watch, each scored on what's real — smart-money conviction, public attention, fresh news and the next catalyst. Add by ticker or from a screenshot.</p></div>
+      </div>
+      <div className="controls" style={{ marginTop: 4 }}>
+        <input className="search" style={{ width: 150 }} placeholder="add ticker…" value={sym}
                onChange={(e) => setSym(e.target.value)}
                onKeyDown={(e) => { if (e.key === "Enter") { add(sym.trim().toUpperCase()); setSym(""); } }} />
-        <button className="shot-btn" onClick={() => { add(sym.trim().toUpperCase()); setSym(""); }}>add</button>
+        <button className="act act-on" onClick={() => { add(sym.trim().toUpperCase()); setSym(""); }}>add</button>
       </div>
       <ScreenshotImport onAdd={addMany} />
-      {!data ? <div className="skel" style={{ width: "50%", marginTop: 12 }} />
-        : data.watchlist.length === 0 ? <div className="name" style={{ marginTop: 12 }}>Your watchlist is empty.</div>
-        : (
-          <table className="clusters" style={{ marginTop: 10 }}>
-            <thead><tr><th>Ticker</th><th>Current cluster</th><th></th></tr></thead>
-            <tbody>
-              {data.watchlist.map((w) => (
-                <tr className="row" key={w.symbol}>
-                  <td onClick={() => onOpenSymbol(w.symbol)}>
-                    <div className="sym">{w.symbol}</div><div className="name">{w.name || (w.resolved ? "" : "not a resolved issuer")}</div>
-                  </td>
-                  <td onClick={() => onOpenSymbol(w.symbol)}>
-                    {w.cluster ? <><b className="num">{w.cluster.score.toFixed(2)}</b> <span className={`bucket ${w.cluster.bucket}`}>{w.cluster.bucket.toUpperCase()}</span></>
-                      : <span className="name">no active cluster</span>}
-                  </td>
-                  <td><button className="linkish" onClick={() => remove(w.symbol)}>remove</button></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      <Disclaimer />
+      <WatchChartAnalyzer />
+      {!data ? <div className="skel" style={{ width: "50%", marginTop: 14 }} />
+        : data.watchlist.length === 0 ? <div className="empty" style={{ marginTop: 12 }}>Your watchlist is empty. Add a ticker above, or import from a screenshot.</div>
+        : <div className="watch-grid">{data.watchlist.map((w) => <WatchCard key={w.symbol} w={w} onOpenSymbol={onOpenSymbol} onRemove={remove} />)}</div>}
+      <div className="disc" style={{ marginTop: 16 }}>Conviction blends the two real per-name scores we have — smart-money and public attention. We don't compute technical, fundamental or momentum ratings and never fake them. Not investment advice.</div>
     </div>
   );
 }

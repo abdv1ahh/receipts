@@ -68,14 +68,18 @@ def detail(conn: psycopg.Connection, portfolio_id: int, user_id: int) -> dict:
         cur.execute("SELECT id, symbol, entity_id, opened_on, note FROM portfolio_positions "
                     "WHERE portfolio_id=%s ORDER BY opened_on DESC", (portfolio_id,))
         rows = cur.fetchall()
+    from . import news   # local import avoids any module-load cycle
+    sig = news.signal_symbols(conn)   # cross-plane: which positions still show a smart-money signal
     spy = _series(conn, BENCHMARK)
     positions = []
     for pid, sym, ent, opened, note in rows:
         pnl = position_pnl(_series(conn, sym), spy, opened)
-        positions.append({"id": pid, "symbol": sym, "entity_id": ent,
+        positions.append({"id": pid, "symbol": sym, "entity_id": ent, "has_signal": sym in sig,
                           "opened_on": opened.isoformat(), "note": note, **pnl})
+    summary = summarize(positions)
+    summary["signal_count"] = sum(1 for p in positions if p["has_signal"])
     return {"found": True, "id": p[0], "name": p[1], "kind": p[2], "created_at": p[3].isoformat(),
-            "summary": summarize(positions), "positions": positions}
+            "summary": summary, "positions": positions}
 
 
 def list_for_user(conn: psycopg.Connection, user_id: int) -> list[dict]:

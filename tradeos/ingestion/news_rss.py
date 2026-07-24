@@ -83,7 +83,7 @@ def _normalize_name(name: str) -> str:
 class RssClient:
     """Throttle-light allowlisted fetcher for the feed hosts only."""
 
-    def __init__(self, user_agent: str = "TradeOS-news/1.0"):
+    def __init__(self, user_agent: str = "TradeOSS-news/1.0"):
         self._client = httpx.Client(headers={"User-Agent": user_agent}, timeout=30.0, follow_redirects=True)
 
     def get(self, url: str) -> bytes:

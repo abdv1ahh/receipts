@@ -95,7 +95,7 @@ export function StatusStrip({ feeds }) {
 export function Disclaimer() {
   return (
     <div className="disclaimer">
-      TradeOS is an analytics and education platform. Nothing here is investment advice.
+      TradeOSS is an analytics and education platform. Nothing here is investment advice.
       Signals describe disclosed activity by third parties, with delays as labeled.
       Confidence buckets show a backtested hit rate wherever the resolved-episode sample is
       sufficient, and read “insufficient sample” otherwise. Higher-conviction buckets remain

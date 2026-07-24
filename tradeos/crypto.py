@@ -33,11 +33,17 @@ def risk_flags(coin: dict) -> list[str]:
 
 
 def format_market(coin: dict) -> dict:
+    # Thin the ~168 hourly sparkline points to a compact ~42 for a light client payload.
+    spark = ((coin.get("sparkline_in_7d") or {}).get("price")) or []
+    spark = spark[::4] if len(spark) > 48 else spark
     return {"id": coin.get("id"), "symbol": (coin.get("symbol") or "").upper(),
             "name": coin.get("name"), "price": coin.get("current_price"),
+            "change_1h": coin.get("price_change_percentage_1h_in_currency"),
             "change_24h": coin.get("price_change_percentage_24h"),
+            "change_7d": coin.get("price_change_percentage_7d_in_currency"),
             "market_cap": coin.get("market_cap"), "volume": coin.get("total_volume"),
-            "rank": coin.get("market_cap_rank"), "risk": risk_flags(coin)}
+            "rank": coin.get("market_cap_rank"), "risk": risk_flags(coin),
+            "sparkline": [round(float(x), 6) for x in spark if x is not None]}
 
 
 def _cache_get(key):

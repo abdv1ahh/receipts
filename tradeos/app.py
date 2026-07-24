@@ -1,4 +1,4 @@
-"""TradeOS API.
+"""TradeOSS API.
 
 Slice 1 seeded the honesty surface (/api/feeds). Slice 2 added /api/activity (merged,
 knowable_time-ordered disclosure per issuer). Slice 3 adds the signal surface:
@@ -24,7 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from psycopg.types.json import Json
 from pydantic import BaseModel
 
-from . import admin, apikeys, assistant, authn, billing, brief as brief_mod, community, crypto, db, events as events_mod, flags, insights, news as news_mod, portfolio, presentation, scheduler as scheduler_mod, search, sentiment, social as social_mod, trades
+from . import admin, apikeys, assistant, authn, billing, brief as brief_mod, community, crypto, dashboard as dashboard_mod, db, events as events_mod, flags, insights, news as news_mod, portfolio, presentation, scheduler as scheduler_mod, search, sentiment, social as social_mod, trades
 
 SESSION_COOKIE = "tos_session"
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").lower() == "true"  # true behind TLS in prod
@@ -168,7 +168,7 @@ if os.environ.get("SENTRY_DSN"):
     except Exception:
         log.warning("SENTRY_DSN set but sentry_sdk is not installed; error tracking disabled")
 
-app = FastAPI(title="TradeOS", docs_url=None, redoc_url=None, openapi_url=None)
+app = FastAPI(title="TradeOSS", docs_url=None, redoc_url=None, openapi_url=None)
 
 CALIBRATION_PENDING = "Backtested calibration pending"  # until Slice 4 (rule: no premature certainty)
 _BUCKET_RANK = {"low": 0, "medium": 1, "high": 2}
@@ -737,6 +737,28 @@ def morning_brief(tos_session: str | None = Cookie(None)) -> dict:
             provider=provider, voice_name_fn=_voice_names)
 
 
+@app.get("/api/dashboard")
+def dashboard(tos_session: str | None = Cookie(None)) -> dict:
+    """The Dashboard — the calm command center. One call returns the Market Pulse (a transparent
+    flow-and-positioning read with its own drivers), today's biggest smart-money opportunities, the
+    impact-ranked news that matters now, the smart-money digest, and what's on the radar. Tier-delay
+    aware on the signal plane; assembled from real records only and safe on empty data."""
+    provider = os.environ.get("EXPLAIN_PROVIDER", "template")
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        tier = (user or {}).get("tier", "free")
+        with conn.cursor() as cur:
+            as_of = _effective_as_of(cur, "latest", tier)
+        followed: list[str] = []
+        if user:
+            with conn.cursor() as cur:
+                cur.execute("SELECT ref FROM follows WHERE user_id=%s AND kind='symbol'", (user["id"],))
+                followed = [r[0] for r in cur.fetchall()]
+        return dashboard_mod.compose(
+            conn, as_of=as_of, tier=tier, delayed_hours=authn.delay_hours(tier),
+            followed_symbols=followed, provider=provider, voice_name_fn=_voice_names)
+
+
 @app.get("/api/events")
 def events_calendar(days: int = 10) -> dict:
     """Event & Macro Intelligence — the forward calendar (upcoming earnings + US macro releases), grouped
@@ -1291,6 +1313,9 @@ def trending_endpoint(hours: int = 72) -> dict:
     hours = max(6, min(336, hours))
     with db.connect() as conn:
         board = social_mod.board(conn, hours=hours)
+        sig = news_mod.signal_symbols(conn)   # cross-plane: which trending names ALSO show a smart-money signal
+    for r in board:
+        r["has_signal"] = r.get("symbol") in sig
     return {"sources": sentiment.sources_status(), "hours": hours, "board": board,
             "note": None if board else ("No attention data yet — run `ingest-sentiment` (Wikipedia + "
                                         "Hacker News need no key), or connect Reddit for discussion sentiment.")}
@@ -1629,15 +1654,37 @@ def crypto_trending() -> dict:
         return {"trending": [], "source": "CoinGecko", "error": "unavailable"}
 
 
+def _watch_conviction(sm, att):
+    """A transparent 0-100 conviction blend of the two REAL per-name scores we have — smart-money
+    conviction and public attention. It is NOT a technical/fundamental/momentum rating: we don't
+    compute those and never fake them, so the watchlist shows only what's real."""
+    if sm and sm.get("score") is not None:
+        score = sm["score"]
+        if att and att.get("score"):
+            score = round(0.75 * score + 0.25 * att["score"])
+        return {"score": int(score), "basis": "smart-money" + (" + attention" if att and att.get("score") else "")}
+    if att and att.get("score"):
+        return {"score": int(round(att["score"] * 0.55)), "basis": "attention only"}
+    return None
+
+
 @app.get("/api/watchlist")
 def watchlist_get(user: str = "demo") -> dict:
+    """Each watched name enriched with the REAL per-ticker scores: smart-money conviction (from the
+    convergence cluster), public attention (social), the latest impactful news, the next earnings date,
+    and a transparent conviction blend of the two. No fabricated technical/fundamental scores."""
     with db.connect() as conn, conn.cursor() as cur:
         cur.execute("SELECT symbol FROM watchlists WHERE user_key=%s ORDER BY created_at", (user,))
         symbols = [r[0] for r in cur.fetchall()]
+        nextev: dict = {}   # soonest upcoming earnings per symbol, one pass over the calendar
+        for e in events_mod.upcoming(conn, days=30):
+            if e.get("scope") == "company" and e.get("symbol") and e["symbol"] not in nextev:
+                nextev[e["symbol"]] = {"date": e["date"], "kind": e.get("kind"), "title": e.get("title")}
         rows = []
         for sym in symbols:
             ent = _resolve_symbol(cur, sym)
             item = {"symbol": sym, "resolved": ent is not None}
+            sm = att = None
             if ent:
                 eid = ent[0]
                 item["name"] = ent[2]
@@ -1648,6 +1695,17 @@ def watchlist_get(user: str = "demo") -> dict:
                 )
                 cl = cur.fetchone()
                 item["cluster"] = {"score": float(cl[0]), "bucket": cl[1]} if cl else None
+                if cl:
+                    sm = {"score": presentation.smart_money_score(float(cl[0])), "bucket": cl[1]}
+            sdata = sentiment.symbol_sentiment(conn, sym)
+            if sdata:
+                att = {"score": sdata["attention"], "velocity": sdata["velocity"], "sentiment": sdata["sentiment"]}
+            nz = news_mod.ranked_news(conn, symbol=sym, hours=240, limit=1)
+            item["smart_money"] = sm
+            item["attention"] = att
+            item["news"] = {"headline": nz[0]["headline"], "impact": nz[0]["impact"], "url": nz[0]["url"]} if nz else None
+            item["next_event"] = nextev.get(sym)
+            item["conviction"] = _watch_conviction(sm, att)
             rows.append(item)
     return {"user": user, "watchlist": rows}
 
@@ -2130,7 +2188,7 @@ def share_page(symbol: str) -> str:
     with db.connect() as conn, conn.cursor() as cur:
         d = _card_data(cur, sym) or {"symbol": sym, "name": "", "score": None, "headline": "Not a resolved issuer"}
     e = presentation._xml_escape
-    title = f"{sym} · Smart Money Score {d['score']}" if d.get("score") is not None else f"{sym} · TradeOS"
+    title = f"{sym} · Smart Money Score {d['score']}" if d.get("score") is not None else f"{sym} · TradeOSS"
     card = f"/api/card/{sym}.svg"
     return f'''<!doctype html><html lang="en"><head><meta charset="utf-8">
 <title>{e(title)}</title>
@@ -2142,8 +2200,8 @@ def share_page(symbol: str) -> str:
 <style>body{{background:#090b11;color:#d7e0ee;font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:flex;flex-direction:column;align-items:center;gap:22px;padding:44px 16px}}img{{max-width:100%;width:640px;border-radius:16px;border:1px solid #222b3a}}a{{color:#5b8cff;text-decoration:none;font-weight:600;font-size:18px}}p{{color:#7a8699;font-size:13px;max-width:560px;text-align:center;line-height:1.5}}</style>
 </head><body>
 <img src="{card}" alt="{e(title)}">
-<a href="/?symbol={e(sym)}">Open {e(sym)} on TradeOS &#8594;</a>
-<p>TradeOS shows what the smartest money is quietly doing, with backtested, probability-framed context. Not investment advice.</p>
+<a href="/?symbol={e(sym)}">Open {e(sym)} on TradeOSS &#8594;</a>
+<p>TradeOSS shows what the smartest money is quietly doing, with backtested, probability-framed context. Not investment advice.</p>
 </body></html>'''
 
 
@@ -2155,7 +2213,7 @@ if (_STATIC_DIR / "index.html").exists():
 else:
     @app.get("/", response_class=HTMLResponse)
     def _no_build() -> str:
-        return ("<h1>TradeOS API</h1><p>The dashboard bundle is not built. Run the multi-stage "
+        return ("<h1>TradeOSS API</h1><p>The dashboard bundle is not built. Run the multi-stage "
                 "Docker build, or <code>cd frontend && npm install && npm run build</code>. "
                 "API is live at <code>/api/clusters</code>, <code>/api/feeds</code>, "
                 "<code>/api/definitions</code>.</p>")

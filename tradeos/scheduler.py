@@ -1,4 +1,4 @@
-"""Continuous update scheduler (Milestone 3) — the piece that makes TradeOS fresh when you open it.
+"""Continuous update scheduler (Milestone 3) — the piece that makes TradeOSS fresh when you open it.
 
 A dependency-free worker: a registry of (name, interval, fn) jobs that reuse the existing ingestion
 functions, a due-check driven by the last successful run in job_runs (so it survives restarts), and

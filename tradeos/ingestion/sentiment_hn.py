@@ -40,7 +40,7 @@ def ingest_hn(conn, universe, window_hours: int = 48, baseline_days: int = 14) -
     base_start = int((now - timedelta(days=baseline_days)).timestamp())
     windows = max(1.0, (baseline_days * 24 - window_hours) / window_hours)
     written = 0
-    with httpx.Client(timeout=20.0, headers={"User-Agent": "TradeOS/sentiment (contact via app)"}) as client:
+    with httpx.Client(timeout=20.0, headers={"User-Agent": "TradeOSS/sentiment (contact via app)"}) as client:
         for entity_id, name, symbol in universe:
             query = (name or symbol or "").strip()
             if not query:

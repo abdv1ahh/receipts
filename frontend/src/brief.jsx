@@ -1,4 +1,4 @@
-// The Morning Brief — the reason to open TradeOS before your charts. One cross-plane briefing: an AI
+// The Morning Brief — the reason to open TradeOSS before your charts. One cross-plane briefing: an AI
 // executive summary, the names you follow, impact-ranked "what changed overnight" news (Intelligence
 // plane), and the smart-money convergence digest (Signal plane). Degrades to deterministic prose.
 import { useEffect, useState } from "react";

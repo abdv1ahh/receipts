@@ -8,7 +8,7 @@ the platform already logs the access it describes.
 ## Policy
 
 1. **No trading on pre-publication signals.** No member of staff (including founders) may trade
-   any security based on a TradeOS signal before that signal is public to the free tier. The
+   any security based on a TradeOSS signal before that signal is public to the free tier. The
    free tier sees signals on a 48-hour delay; staff are bound by at least that delay, and by a
    blackout until a specific cluster is public to the free tier.
 

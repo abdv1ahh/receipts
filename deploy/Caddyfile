@@ -1,4 +1,4 @@
-# TradeOS reverse proxy. Caddy provisions + renews a Let's Encrypt TLS cert for $DOMAIN
+# TradeOSS reverse proxy. Caddy provisions + renews a Let's Encrypt TLS cert for $DOMAIN
 # automatically (ports 80/443 must be reachable from the internet and DNS must point here).
 # For a quick IP-only test with no domain, set DOMAIN=":80" in .env.production (no HTTPS).
 {$DOMAIN} {

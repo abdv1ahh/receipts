@@ -19,6 +19,6 @@ def test_jobs_registry_is_sane():
     assert len(names) == len(set(names))                       # names unique (job_runs keys on them)
     assert all(interval > 0 for _, interval, _ in scheduler.JOBS)
     assert all(callable(fn) for _, _, fn in scheduler.JOBS)
-    # the jobs that make TradeOS feel fresh every morning are all present
+    # the jobs that make TradeOSS feel fresh every morning are all present
     for required in ("news_rss", "news_sec", "analyze_news", "attention_wiki", "sentiment_hn"):
         assert required in names

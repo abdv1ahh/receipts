@@ -180,7 +180,7 @@ def score_card_svg(symbol: str, name: str, score: int | None, bucket: str | None
   <defs><radialGradient id="g" cx="20%" cy="0%" r="80%">
     <stop offset="0%" stop-color="{color}" stop-opacity="0.12"/><stop offset="60%" stop-color="#090b11" stop-opacity="0"/>
   </radialGradient></defs>
-  <text x="80" y="90" font-family="Arial, sans-serif" font-size="30" font-weight="800" fill="#5b8cff" letter-spacing="1">TRADE<tspan fill="#b98cff">OS</tspan></text>
+  <text x="80" y="90" font-family="Arial, sans-serif" font-size="30" font-weight="800" fill="#5b8cff" letter-spacing="1">TRADE<tspan fill="#b98cff">OSS</tspan></text>
   <text x="80" y="128" font-family="Arial, sans-serif" font-size="20" fill="#7a8699">See what smart money is quietly doing</text>
   <rect x="80" y="200" width="330" height="330" rx="34" fill="{fill}" stroke="{color}" stroke-opacity="0.5"/>
   <text x="245" y="400" font-family="Arial, sans-serif" font-size="170" font-weight="800" fill="{color}" text-anchor="middle">{score_txt}</text>

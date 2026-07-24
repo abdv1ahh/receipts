@@ -115,7 +115,7 @@ export function PricingView({ user, onUpgraded, onLogin }) {
       {user && <ReferralCard />}
       {user && <ApiKeys />}
       <div className="disclaimer" style={{ marginTop: 20 }}>
-        Payments are handled by Stripe; card data never touches TradeOS servers. TradeOS is analytics and
+        Payments are handled by Stripe; card data never touches TradeOSS servers. TradeOSS is analytics and
         education, not investment advice.
       </div>
     </div>

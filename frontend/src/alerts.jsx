@@ -1,5 +1,5 @@
 // Slice B surfaces: the in-app notifications feed, alert settings (+ your follows), and the
-// Daily Smart-Money Brief. These make TradeOS reach out instead of waiting to be visited.
+// Daily Smart-Money Brief. These make TradeOSS reach out instead of waiting to be visited.
 import { useEffect, useState } from "react";
 import {
   fetchAlertPrefs, fetchFollows, fetchNotifications, markNotificationsRead,

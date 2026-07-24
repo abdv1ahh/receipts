@@ -1,4 +1,4 @@
-# TradeOS — Go-Live Guide
+# TradeOSS — Go-Live Guide
 
 Everything is built and on **PR #1** (branch `game-changer`). This is the copy-paste path from
 "code on a branch" to "live product people can use, free." No Stripe needed yet — billing runs in a
@@ -35,7 +35,7 @@ docker compose exec -T api python -m tradeos.cli migrate   # apply DB migrations
 ```
 App is served at `http://<host>:8000`. Behind TLS, set `COOKIE_SECURE=true` in the api environment.
 
-`.env` must have `SEC_USER_AGENT="TradeOS you@yourdomain.com"` (SEC fair-access requires a contact).
+`.env` must have `SEC_USER_AGENT="TradeOSS you@yourdomain.com"` (SEC fair-access requires a contact).
 `TIINGO_API_KEY` (free tier) enables backtest prices; `GEMINI_API_KEY` + `EXPLAIN_PROVIDER=gemini`
 enable the AI prose (guarded, with a deterministic fallback if unset).
 

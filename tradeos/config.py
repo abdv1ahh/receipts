@@ -1,4 +1,4 @@
-"""TradeOS configuration. Everything comes from the environment; nothing secret lives in code."""
+"""TradeOSS configuration. Everything comes from the environment; nothing secret lives in code."""
 import os
 
 
@@ -53,7 +53,7 @@ def sec_user_agent() -> str:
     ua = os.environ.get("SEC_USER_AGENT", "").strip()
     if "@" not in ua:
         raise ConfigError(
-            "SEC_USER_AGENT must be set to something like 'TradeOS admin@yourdomain.com' "
+            "SEC_USER_AGENT must be set to something like 'TradeOSS admin@yourdomain.com' "
             "(SEC fair access policy requires a contact address)."
         )
     return ua
