@@ -1,16 +1,18 @@
 # docs/state.md — where the work stands
 
-Updated: 2026-07-25, end of Phase 2.
+Updated: 2026-07-25, end of Phase 4 (core).
 Read this after `CLAUDE.md` and before `docs/plan.md` at the start of every session.
 
 ---
 
 ## Current phase
 
-**Phase 2 (the ingestion spine) — core complete.** Branch `phase/2-ingestion`, 3 commits.
-**Phase 3 (impact engine + Ledger) is unblocked and is next.**
+**Phases 0–3 complete. Phase 4 core complete.** Branch `phase/3-claims`.
+**Phase 5 (the globe) is next.** Reports for every phase are in `docs/progress/`.
 
-Phase 0 and Phase 1 are complete; their reports are in `docs/progress/`.
+Outstanding inside Phase 4: saved filter sets, in-place threading of developing stories, and
+subscribable alerts. The Radar surface itself, its relevance ranking, its filters and the
+dashboard tile are done.
 
 ---
 
@@ -45,18 +47,27 @@ unpaced probing throttled this IP for the rest of the phase, so no article has l
 `events` yet. The hourly scheduler job will confirm it once the limit clears; check
 `/api/integrations` or `SELECT count(*) FROM events WHERE source='gdelt'`.
 
+**Phase 3 + 4 core.** Full report in `docs/progress/phase_3_4.md`. Headlines:
+
+- Migration 025: `claims`, `claim_outcomes`, `country_exposure`, `user_profiles`.
+- `claims.py` — the impact engine. Rejects any "mechanism" that names a direction without a
+  channel, and writes NOTHING rather than falling back to a template.
+- `ledger.py` — outcome measurement vs SPY with a noise floor; `unscoreable` counted, not dropped.
+- `relevance.py` — personal ranking, no model involved.
+- Radar and Ledger surfaces; Radar is now where a signed-in reader lands.
+
 ## Next three tasks
 
-1. Open `phase/3-claims`, plan mode first.
-2. Migration `025`: `claims`, `claim_outcomes`, `country_exposure`. Claim generation with a
-   STRICT output schema validated on return — that validation is also the prompt-injection
-   boundary, since Phase 2 now ingests arbitrary text from GDELT.
-3. Outcome measurement on the existing scheduler, reusing `prices_eod` and `backtest/engine.py`
-   — the price-series machinery is already built and point-in-time correct.
+1. Open `phase/5-globe`, plan mode first. `react-globe.gl`, lazy-loaded, country selection
+   setting the app-wide geographic frame (the `user_profiles.country` written by
+   `PUT /api/profile/frame` already IS that frame — the globe replaces the control, not the
+   concept).
+2. Finish Phase 4's remainder: saved filter sets, in-place threading, subscribable alerts.
+3. Run `/security-review` on the Phase 2–4 diff. It found a real vulnerability on Phase 1 and has
+   not been run since.
 
-Carried over, not blocking: confirm GDELT ingests once its rate limit clears (the adapter is
-built and covered, but a live ingest is unverified — see `docs/progress/phase_2.md`), and add
-Bluesky as a real `SocialSource`.
+Carried over, not blocking: confirm GDELT ingests once its rate limit clears, and add Bluesky as
+a real `SocialSource`.
 
 ## Open questions waiting on the owner
 
@@ -67,7 +78,7 @@ Bluesky as a real `SocialSource`.
 | 3 | OpenRouter free key (<https://openrouter.ai/keys>), optional | Second link in the provider chain |
 | 4 | The six ASK rulings in `docs/dead_code.md` | Cleanup only |
 
-Nothing on this list blocks Phase 3.
+Nothing on this list blocks Phase 5.
 
 ## Decisions already taken
 
@@ -137,3 +148,21 @@ Nothing on this list blocks Phase 3.
 
 16. **Clusters re-derive their category from members.** Without that, improving the classifier
     and reprocessing creates duplicate clusters instead of correcting existing ones.
+
+17. **Azure's content filter classifies text that QUOTES prompt-injection examples as a jailbreak**
+    and 400s the whole request. Our own defence made the provider unusable. Describe the rule in
+    the abstract; `tests/test_claims.py` asserts no attack strings return.
+
+18. **The impact engine has NO template fallback, on purpose.** Every other AI path in this
+    codebase degrades to deterministic output. This one writes nothing, because a fabricated claim
+    inside a ledger built to measure honesty would poison the only thing that makes it defensible.
+
+19. **`= ANY(%s::record[])` fails** — psycopg cannot bind an anonymous composite type. Use two
+    parallel arrays with `unnest(%s::text[], %s::text[])`.
+
+20. **Every migration file must INSERT its own version row** into `schema_migrations`; the runner
+    does not. A file that forgets re-runs and fails with "relation already exists".
+    `tests/test_slice2.py` guards this.
+
+21. **Gemini's free tier has a real daily ceiling.** Claim generation is the heaviest consumer.
+    A second provider in the chain is the fix, not more retries.
