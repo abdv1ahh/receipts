@@ -17,22 +17,24 @@ import { LandingView, SearchView } from "./discover.jsx";
 import { AdminView } from "./admin.jsx";
 import { Dashboard } from "./dashboard.jsx";
 import { IntegrationsView } from "./integrations.jsx";
+import { RadarView } from "./radar.jsx";
+import { LedgerView } from "./ledger.jsx";
 import { ErrorBoundary, useRoute } from "./shell.jsx";
 import { Icon } from "./icons.jsx";
 
 const BRAND = "Rhumb";
-const NAV_LABELS = { dashboard: "Dashboard", brief: "Morning Brief", news: "News", events: "Calendar", home: "Smart Money", trending: "Social", crypto: "Crypto", journal: "Journal", portfolios: "Portfolio", watchlist: "Watchlist", alerts: "Alerts", assistant: "AI Assistant", screener: "Screener", library: "Library", methodology: "Methodology", integrations: "Integrations" };
-const NAV_ICONS = { dashboard: "grid", brief: "sparkles", news: "news", events: "calendar", home: "signal", trending: "trending", crypto: "crypto", journal: "journal", portfolios: "briefcase", watchlist: "star", alerts: "bell", assistant: "compass", screener: "filter", library: "book", methodology: "target", integrations: "plug" };
+const NAV_LABELS = { radar: "Radar", ledger: "Ledger", dashboard: "Dashboard", brief: "Morning Brief", news: "News", events: "Calendar", home: "Smart Money", trending: "Social", crypto: "Crypto", journal: "Journal", portfolios: "Portfolio", watchlist: "Watchlist", alerts: "Alerts", assistant: "AI Assistant", screener: "Screener", library: "Library", methodology: "Methodology", integrations: "Integrations" };
+const NAV_ICONS = { radar: "radar", ledger: "target", dashboard: "grid", brief: "sparkles", news: "news", events: "calendar", home: "signal", trending: "trending", crypto: "crypto", journal: "journal", portfolios: "briefcase", watchlist: "star", alerts: "bell", assistant: "compass", screener: "filter", library: "book", methodology: "target", integrations: "plug" };
 // A calmer rail: the essentials up front, utilities tucked into a collapsible "More".
 const SIDEBAR = [
-  { label: "Overview", items: ["dashboard", "brief"] },
-  { label: "Intelligence", items: ["home", "trending", "news", "crypto", "events"] },
+  { label: "Overview", items: ["radar", "dashboard", "brief"] },
+  { label: "Intelligence", items: ["ledger", "home", "trending", "news", "crypto", "events"] },
   { label: "Your desk", items: ["journal", "portfolios", "watchlist", "assistant", "alerts"] },
 ];
 const MORE = ["screener", "library", "integrations", "methodology"];
 // Everything reachable from the ⌘K command palette.
 const CMD_ITEMS = [
-  ...["dashboard", "brief", "home", "trending", "news", "crypto", "events", "journal", "portfolios", "watchlist", "assistant", "alerts", "screener", "library", "integrations", "methodology"]
+  ...["radar", "ledger", "dashboard", "brief", "home", "trending", "news", "crypto", "events", "journal", "portfolios", "watchlist", "assistant", "alerts", "screener", "library", "integrations", "methodology"]
     .map((v) => ({ v, label: NAV_LABELS[v], icon: NAV_ICONS[v], group: "Go to" })),
   { v: "pricing", label: "Upgrade plan", icon: "sparkles", group: "Actions" },
   { v: "notifications", label: "Notifications", icon: "bell", group: "Actions" },
@@ -131,7 +133,7 @@ export default function App() {
     fetchFeeds().then(setFeeds).catch(() => setFeeds(null));
     fetchCalibration().then(setCalibration).catch(() => setCalibration(null));
     fetchDefinitions().then(setDefinitions).catch(() => setDefinitions(null));
-    authMe().then((d) => { setUser(d.user); if (d.user) setViewState((v) => (v === "landing" ? "dashboard" : v)); }).catch(() => {});
+    authMe().then((d) => { setUser(d.user); if (d.user) setViewState((v) => (v === "landing" ? "radar" : v)); }).catch(() => {});
     const params = route.query;
     if (params.get("symbol")) { setAssetSymbol(params.get("symbol").toUpperCase()); setViewState("asset"); }
     if (params.get("upgraded")) setViewState("pricing");   // returned from Stripe Checkout
@@ -185,7 +187,7 @@ export default function App() {
   const openSymbol = (sym) => { setAssetSymbol(sym.toUpperCase()); setDetail(null); setView("asset", { symbol: sym.toUpperCase() }); };
   const openProfile = (kind, id) => { setProfile({ kind, id }); setDetail(null); setView("profile", { kind, id }); };
   const openLibrary = (slug) => { setLibrarySlug(slug); setDetail(null); setView("library-entry", { slug }); };
-  const onAuthed = (u) => { setUser(u); setView("dashboard"); };
+  const onAuthed = (u) => { setUser(u); setView("radar"); };
   const doLogout = async () => { await authLogout(); setUser(null); setView("landing"); };
   const submitSearch = () => { if (search.trim()) { setView("search", { q: search.trim() }); setDetail(null); setNavOpen(false); } };
 
@@ -321,6 +323,10 @@ export default function App() {
             <LibraryEntry slug={librarySlug} onBack={() => go("library")} onOpenLibrary={openLibrary} />
           ) : view === "crypto" ? (
             <CryptoView />
+          ) : view === "radar" ? (
+            <RadarView user={user} onLogin={() => go("auth")} />
+          ) : view === "ledger" ? (
+            <LedgerView />
           ) : view === "integrations" ? (
             <IntegrationsView onLogin={() => go("auth")} />
           ) : view === "admin" ? (

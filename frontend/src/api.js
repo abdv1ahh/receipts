@@ -17,6 +17,12 @@ export const fetchExplanation = (issuerId, horizon) =>
 export const fetchFeeds = () => get("/api/feeds");
 // Integration status (brief §4): every external source, its state, what it powers, and its health.
 export const fetchIntegrations = () => get("/api/integrations");
+// Radar + Ledger (Phases 3-4): interpretations ranked by personal relevance, and the accuracy record.
+export const fetchClaims = ({ hours = 336, limit = 60 } = {}) => get(`/api/claims?hours=${hours}&limit=${limit}`);
+export const fetchLedger = () => get("/api/ledger");
+export const fetchCountries = () => get("/api/countries");
+export const saveProfileFrame = (frame) =>
+  fetch("/api/profile/frame", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(frame) }).then((r) => r.json());
 export const fetchDefinitions = () => get("/api/definitions");
 export const fetchCalibration = () => get("/api/calibration");
 export const fetchAsset = (symbol) => get(`/api/asset/${encodeURIComponent(symbol)}`);

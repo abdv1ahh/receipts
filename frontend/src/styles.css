@@ -1282,3 +1282,81 @@ div.intg-warn { margin-top: 8px; border: 0; border-radius: 8px; padding: 7px 10p
 /* Data age: "live" is a claim, so it only shows when it is true (see dashboard.jsx). */
 .dash-live.stale { color: #ffc25c; }
 .dash-live.stale .live-dot { background: #ffc25c; animation: none; }
+
+/* ---- Radar: consequence first ---------------------------------------------------------------- */
+.rd-frame { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 14px 0 4px;
+  padding: 11px 14px; border: 1px solid var(--border-2); border-radius: 12px; font-size: 13px; }
+.rd-frame.unset { border-color: rgba(108,148,255,0.35); background: rgba(108,148,255,0.05); }
+.rd-frame select { background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text); padding: 5px 9px; font: inherit; font-size: 13px; }
+.rd-frame-why { color: var(--muted); font-size: 12.5px; }
+.rd-cat-filter { margin-left: auto; background: var(--bg); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--muted); padding: 5px 9px; font: inherit; font-size: 12.5px; }
+
+.rd-card { border: 1px solid var(--border-2); border-radius: 14px; padding: 16px 18px; margin-top: 12px; }
+.rd-top { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; font-size: 11px;
+  text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+.rd-conf { font-family: var(--mono); font-weight: 700; padding: 2px 7px; border-radius: 6px;
+  border: 1px solid var(--border-2); letter-spacing: 0; }
+.rd-conf.band-high { color: #4cd9a0; border-color: rgba(76,217,160,0.4); }
+.rd-conf.band-medium { color: #ffcd80; border-color: rgba(255,194,92,0.4); }
+.rd-conf.band-low { color: var(--faint); }
+.rd-cat { color: var(--accent-2, #6c94ff); }
+.rd-geo { font-family: var(--mono); border: 1px solid var(--border-2); border-radius: 5px; padding: 1px 5px; }
+.rd-when { font-family: var(--mono); text-transform: none; letter-spacing: 0; }
+
+/* The consequence is the headline of the card. Deliberately the largest text here. */
+.rd-mechanism { margin: 11px 0 0; font-size: 15.5px; line-height: 1.62; color: var(--text); }
+
+.rd-affected { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 12px; }
+.rd-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 600;
+  border: 1px solid var(--border-2); border-radius: 8px; padding: 3px 9px; }
+.rd-chip em { font-style: normal; font-size: 10.5px; color: var(--faint); font-weight: 400; }
+.rd-chip.dir-up { border-color: rgba(76,217,160,0.35); color: #6fe0b4; }
+.rd-chip.dir-down { border-color: rgba(255,107,129,0.35); color: #ff9db0; }
+
+.rd-contra { display: flex; align-items: center; gap: 7px; margin-top: 11px; font-size: 12.5px;
+  color: #ffcd80; background: rgba(255,194,92,0.08); border-radius: 8px; padding: 7px 10px; }
+
+.rd-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 12px;
+  padding-top: 11px; border-top: 1px solid var(--hairline); font-size: 12px; color: var(--muted); }
+.rd-src { font-family: var(--mono); font-size: 11.5px; color: var(--muted); text-decoration: none; }
+.rd-src:hover { color: var(--text); }
+.rd-why { font-style: italic; }
+
+.rd-reasoning { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--hairline); }
+.rd-headline { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+.rd-chain { margin: 0 0 12px; padding-left: 20px; font-size: 13.5px; line-height: 1.75; color: var(--text); }
+.rd-analogs { margin-bottom: 12px; }
+.rd-analog { font-size: 13px; line-height: 1.6; color: var(--muted); padding: 4px 0; }
+.rd-analog b { color: var(--text); font-family: var(--mono); margin-right: 6px; }
+.rd-followed { color: #6fe0b4; }
+.rd-parts { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.rd-part { font-family: var(--mono); font-size: 10.5px; color: var(--faint);
+  border: 1px solid var(--hairline); border-radius: 5px; padding: 1px 6px; }
+
+/* ---- The Ledger: misses first ---------------------------------------------------------------- */
+.lg-head { display: flex; gap: 22px; flex-wrap: wrap; align-items: center; margin: 14px 0 6px;
+  padding: 20px 22px; border: 1px solid var(--border-2); border-radius: 16px; }
+.lg-head-l { min-width: 210px; }
+.lg-rate { font-size: 46px; font-weight: 700; font-family: var(--mono); line-height: 1.05; margin-top: 6px; }
+.lg-rate.thin { color: var(--muted); }
+.lg-rate-sub { color: var(--muted); font-size: 13px; margin-top: 4px; max-width: 230px; line-height: 1.5; }
+.lg-counts { display: flex; gap: 12px; flex-wrap: wrap; margin-left: auto; }
+.lg-count { border: 1px solid var(--border-2); border-radius: 12px; padding: 11px 15px; min-width: 92px; }
+.lg-count b { display: block; font-size: 23px; font-family: var(--mono); }
+.lg-count span { font-size: 11.5px; color: var(--muted); }
+.lg-count.ok b { color: #4cd9a0; }
+.lg-count.bad b { color: #ff6b81; }
+
+.lg-misses { border-color: rgba(255,107,129,0.3); }
+.lg-misses-why { font-size: 11.5px; color: var(--muted); font-style: italic; margin-left: auto; }
+.lg-miss { padding: 12px 0; border-top: 1px solid var(--hairline); }
+.lg-miss:first-of-type { border-top: 0; }
+.lg-miss-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 12.5px;
+  color: var(--muted); }
+.lg-miss-sym { font-family: var(--mono); font-weight: 700; font-size: 14px; color: var(--text); }
+.lg-miss-head { display: block; margin-top: 6px; font-size: 13.5px; color: var(--text); text-decoration: none; }
+.lg-miss-head:hover { color: var(--accent-2, #6c94ff); }
+.lg-miss-mech { margin: 6px 0 0; font-size: 12.5px; line-height: 1.6; color: var(--muted); }
+.lg-thin { color: var(--faint); font-family: var(--mono); font-size: 11.5px; }
