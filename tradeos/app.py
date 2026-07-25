@@ -21,10 +21,14 @@ from pathlib import Path
 from fastapi import Cookie, FastAPI, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from psycopg.types.json import Json
 from pydantic import BaseModel
 
-from . import admin, apikeys, assistant, authn, billing, brief as brief_mod, community, crypto, dashboard as dashboard_mod, db, events as events_mod, flags, insights, news as news_mod, portfolio, presentation, scheduler as scheduler_mod, search, sentiment, social as social_mod, trades
+from . import (admin, apikeys, assistant, authn, billing, brief as brief_mod, community, config,
+               crypto, dashboard as dashboard_mod, db, events as events_mod, flags, insights,
+               news as news_mod, portfolio, presentation, scheduler as scheduler_mod, search,
+               sentiment, social as social_mod, sources, trades)
 
 SESSION_COOKIE = "tos_session"
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").lower() == "true"  # true behind TLS in prod
@@ -223,20 +227,34 @@ _CSP = ("default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inli
         "form-action 'self'")
 
 
+# Extra origins allowed to make state-changing requests. Only ever set in development, where the
+# Vite dev server lives on another port; empty in production, so the check stays strict.
+_DEV_ORIGINS = {o.strip() for o in os.environ.get("DEV_ORIGINS", "").split(",") if o.strip()}
+
+
+def _origin_ok(origin: str, host: str | None) -> bool:
+    from urllib.parse import urlparse
+    return urlparse(origin).netloc == host or origin in _DEV_ORIGINS
+
+
 @app.middleware("http")
 async def harden(request: Request, call_next):
     # CSRF: refuse a cross-origin state-changing request (belt-and-braces with SameSite=Lax)
     if request.method in ("POST", "PUT", "DELETE", "PATCH"):
         origin = request.headers.get("origin")
-        if origin:
-            from urllib.parse import urlparse
-            if urlparse(origin).netloc != request.headers.get("host"):
-                return JSONResponse({"error": "cross-origin request refused"}, status_code=403)
+        if origin and not _origin_ok(origin, request.headers.get("host")):
+            return JSONResponse({"error": "cross-origin request refused"}, status_code=403)
+    # One id per request, echoed to the client and stamped on every log line for it, so a failure
+    # the user reports can be traced end to end. Never derived from user input.
+    rid = secrets.token_hex(8)
+    request.state.request_id = rid
     try:
         response = await call_next(request)
     except Exception:  # uniform error shape, never a stack trace to the client
-        log.exception("unhandled error on %s %s", request.method, request.url.path)
-        return JSONResponse({"error": "internal error"}, status_code=500)
+        log.exception("unhandled error on %s %s [rid=%s]", request.method, request.url.path, rid)
+        return JSONResponse({"error": "internal error", "request_id": rid}, status_code=500,
+                            headers={"X-Request-Id": rid})
+    response.headers["X-Request-Id"] = rid
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
@@ -376,6 +394,18 @@ def feeds() -> dict:
         "counts": {"insider_transactions": insiders, "stake_events": stakes, "fund_holdings": holdings_total},
         "unresolved": {"fund_holdings": holdings_unresolved},
     }
+
+
+@app.get("/api/integrations")
+def integrations() -> dict:
+    """Every external source in one place: connected or not, what it powers, where its free key comes
+    from, when it last succeeded, and the last error if any. The owner should never again have to
+    guess why a panel is empty."""
+    with db.connect() as conn:
+        rows = sources.health(conn)
+    counts = {s: sum(1 for r in rows if r["state"] == s)
+              for s in (sources.CONNECTED, sources.NEEDS_KEY, sources.UNAVAILABLE)}
+    return {"sources": rows, "counts": counts, "brand": config.brand_name()}
 
 
 # ------------------------------------------------------------------- merged activity
@@ -2209,7 +2239,25 @@ def share_page(symbol: str) -> str:
 
 _STATIC_DIR = Path(__file__).parent / "static"
 if (_STATIC_DIR / "index.html").exists():
-    app.mount("/", StaticFiles(directory=str(_STATIC_DIR), html=True), name="spa")
+    class _SpaFiles(StaticFiles):
+        """Serve the built bundle, and hand any unmatched path back to index.html so client routes
+        survive a refresh, a bookmark, or a shared link. API routes are registered above this mount
+        and are matched first, so they are unaffected.
+
+        StaticFiles signals a miss by RAISING HTTPException(404), not by returning one, so the
+        fallback has to catch rather than inspect a status code."""
+
+        async def get_response(self, path: str, scope):
+            try:
+                return await super().get_response(path, scope)
+            except StarletteHTTPException as exc:
+                # Only a plain miss falls back; a bad method or a path with a real asset extension
+                # should still 404 rather than silently returning HTML.
+                if exc.status_code != 404 or path.startswith("api/") or "." in path.rsplit("/", 1)[-1]:
+                    raise
+                return await super().get_response("index.html", scope)
+
+    app.mount("/", _SpaFiles(directory=str(_STATIC_DIR), html=True), name="spa")
 else:
     @app.get("/", response_class=HTMLResponse)
     def _no_build() -> str:

@@ -28,6 +28,8 @@ const PATHS = {
   zap: <><path d="M11 2.8 5.4 11h4l-.6 6.2L14.6 9h-4z" /></>,
   radar: <><circle cx="10" cy="10" r="6.7" /><path d="M10 10 14.6 6.1" /><path d="M10 3.3a6.7 6.7 0 1 1-4.7 2" /></>,
   logout: <><path d="M8 3.9H5.3A1.6 1.6 0 0 0 3.7 5.5v9A1.6 1.6 0 0 0 5.3 16.1H8" /><path d="m12 13 3-3-3-3M15 10H7.4" /></>,
+  alert: <><path d="M10 3.6 17 15.4H3z" /><path d="M10 8.2v3.1M10 13.4v.1" /></>,
+  plug: <><path d="M7.2 3.6v3.6M12.8 3.6v3.6" /><path d="M5.2 7.2h9.6v2.6a4.8 4.8 0 0 1-9.6 0z" /><path d="M10 14.6v2.4" /></>,
 };
 
 export function Icon({ name, size = 18, style }) {

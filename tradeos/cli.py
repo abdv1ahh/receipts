@@ -248,13 +248,28 @@ def cmd_preflight(_args) -> None:
         warnings.append("DATABASE_URL uses the dev-default password 'tradeos' — set a strong POSTGRES_PASSWORD in production.")
     if "@" not in os.environ.get("SEC_USER_AGENT", ""):
         problems.append("SEC_USER_AGENT must be like 'YourName you@example.com' (SEC fair-access policy).")
-    prov = os.environ.get("EXPLAIN_PROVIDER", "template").lower()
-    if prov not in ("template", "gemini", "anthropic"):
-        problems.append(f"EXPLAIN_PROVIDER '{prov}' is invalid (template|gemini|anthropic).")
-    if prov == "gemini" and not os.environ.get("GEMINI_API_KEY"):
-        warnings.append("EXPLAIN_PROVIDER=gemini but GEMINI_API_KEY is empty — AI prose falls back to deterministic templates.")
-    if prov == "anthropic":
-        warnings.append("EXPLAIN_PROVIDER=anthropic but no Anthropic provider module ships yet — AI falls back to templates.")
+    # Validate the whole provider chain, not just its first entry. This check used to reject
+    # 'openai' (which ships) and offer 'anthropic' (which does not) — a confidently wrong check is
+    # worse than no check, because it tells an operator a working config is broken.
+    from . import llm
+    keyed = {"gemini": "GEMINI_API_KEY", "openai": "OPENAI_API_KEY"}
+    chain = llm.chain()
+    unknown = [p for p in chain if p not in keyed and p != "template"]
+    if unknown:
+        problems.append(f"EXPLAIN_PROVIDER names unknown provider(s) {unknown} "
+                        f"(valid: template, {', '.join(keyed)}; a comma list is a fallback chain).")
+    usable = [p for p in chain if p in keyed and os.environ.get(keyed[p])]
+    for p in chain:
+        if p in keyed and not os.environ.get(keyed[p]):
+            warnings.append(f"EXPLAIN_PROVIDER includes '{p}' but {keyed[p]} is empty — that link in "
+                            "the chain is skipped.")
+    if not usable and "template" not in chain:
+        warnings.append("no provider in EXPLAIN_PROVIDER has a key — all AI prose falls back to "
+                        "deterministic templates.")
+    elif len(usable) == 1:
+        warnings.append(f"only one usable AI provider ({usable[0]}). Add a second to "
+                        "EXPLAIN_PROVIDER (comma-separated) so one outage does not silence every "
+                        "AI surface.")
     if os.environ.get("COOKIE_SECURE", "false").lower() != "true":
         warnings.append("COOKIE_SECURE is not 'true' — set it in production so session cookies require HTTPS (also enables HSTS).")
     for w in warnings:

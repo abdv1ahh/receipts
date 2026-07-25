@@ -16,20 +16,23 @@ import { CryptoView } from "./crypto.jsx";
 import { LandingView, SearchView } from "./discover.jsx";
 import { AdminView } from "./admin.jsx";
 import { Dashboard } from "./dashboard.jsx";
+import { IntegrationsView } from "./integrations.jsx";
+import { ErrorBoundary, useRoute } from "./shell.jsx";
 import { Icon } from "./icons.jsx";
 
-const NAV_LABELS = { dashboard: "Dashboard", brief: "Morning Brief", news: "News", events: "Calendar", home: "Smart Money", trending: "Social", crypto: "Crypto", journal: "Journal", portfolios: "Portfolio", watchlist: "Watchlist", alerts: "Alerts", assistant: "AI Assistant", screener: "Screener", library: "Library", methodology: "Methodology" };
-const NAV_ICONS = { dashboard: "grid", brief: "sparkles", news: "news", events: "calendar", home: "signal", trending: "trending", crypto: "crypto", journal: "journal", portfolios: "briefcase", watchlist: "star", alerts: "bell", assistant: "compass", screener: "filter", library: "book", methodology: "target" };
+const BRAND = "Rhumb";
+const NAV_LABELS = { dashboard: "Dashboard", brief: "Morning Brief", news: "News", events: "Calendar", home: "Smart Money", trending: "Social", crypto: "Crypto", journal: "Journal", portfolios: "Portfolio", watchlist: "Watchlist", alerts: "Alerts", assistant: "AI Assistant", screener: "Screener", library: "Library", methodology: "Methodology", integrations: "Integrations" };
+const NAV_ICONS = { dashboard: "grid", brief: "sparkles", news: "news", events: "calendar", home: "signal", trending: "trending", crypto: "crypto", journal: "journal", portfolios: "briefcase", watchlist: "star", alerts: "bell", assistant: "compass", screener: "filter", library: "book", methodology: "target", integrations: "plug" };
 // A calmer rail: the essentials up front, utilities tucked into a collapsible "More".
 const SIDEBAR = [
   { label: "Overview", items: ["dashboard", "brief"] },
   { label: "Intelligence", items: ["home", "trending", "news", "crypto", "events"] },
   { label: "Your desk", items: ["journal", "portfolios", "watchlist", "assistant", "alerts"] },
 ];
-const MORE = ["screener", "library", "methodology"];
+const MORE = ["screener", "library", "integrations", "methodology"];
 // Everything reachable from the ⌘K command palette.
 const CMD_ITEMS = [
-  ...["dashboard", "brief", "home", "trending", "news", "crypto", "events", "journal", "portfolios", "watchlist", "assistant", "alerts", "screener", "library", "methodology"]
+  ...["dashboard", "brief", "home", "trending", "news", "crypto", "events", "journal", "portfolios", "watchlist", "assistant", "alerts", "screener", "library", "integrations", "methodology"]
     .map((v) => ({ v, label: NAV_LABELS[v], icon: NAV_ICONS[v], group: "Go to" })),
   { v: "pricing", label: "Upgrade plan", icon: "sparkles", group: "Actions" },
   { v: "notifications", label: "Notifications", icon: "bell", group: "Actions" },
@@ -88,10 +91,16 @@ function CommandPalette({ onGo, onClose }) {
   );
 }
 
+// Which surfaces are reachable by URL. Anything not listed falls back to the dashboard, so a
+// stale bookmark lands somewhere sensible instead of a blank page.
+const ROUTES = new Set([...Object.keys(NAV_LABELS), "landing", "auth", "pricing", "notifications",
+                        "search", "asset", "profile", "library-entry", "admin"]);
+
 export default function App() {
+  const route = useRoute();
   const [minC, setMinC] = useState("medium");
   const [horizon, setHorizon] = useState(90);
-  const [view, setView] = useState("landing"); // marketing landing for logged-out; flips to home when authed
+  const [view, setViewState] = useState(() => (ROUTES.has(route.path) ? route.path : "landing"));
   const [clusters, setClusters] = useState(null);
   const [asOf, setAsOf] = useState(null);
   const [defVer, setDefVer] = useState(null);
@@ -106,7 +115,6 @@ export default function App() {
   const [profile, setProfile] = useState(null); // {kind, id}
   const [librarySlug, setLibrarySlug] = useState(null);
   const [search, setSearch] = useState("");
-  const [err, setErr] = useState(null);
   const [pulseKey, setPulseKey] = useState(0);
   const [unread, setUnread] = useState(0);
   const [navOpen, setNavOpen] = useState(false);
@@ -117,16 +125,29 @@ export default function App() {
   const refreshUnread = () => fetchNotifications().then((d) => setUnread(d.unread || 0)).catch(() => {});
   const refreshUser = () => authMe().then((d) => setUser(d.user)).catch(() => {});
 
+  // These three feed the chrome (methodology, freshness, definitions). A failure degrades those
+  // panels; it must not paint an error over whatever surface the user is actually looking at.
   useEffect(() => {
-    fetchFeeds().then(setFeeds).catch((e) => setErr(String(e)));
-    fetchCalibration().then(setCalibration).catch((e) => setErr(String(e)));
-    fetchDefinitions().then(setDefinitions).catch((e) => setErr(String(e)));
-    authMe().then((d) => { setUser(d.user); if (d.user) setView((v) => (v === "landing" ? "dashboard" : v)); }).catch(() => {});
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("symbol")) { setAssetSymbol(params.get("symbol").toUpperCase()); setView("asset"); }
-    if (params.get("upgraded")) setView("pricing");   // returned from Stripe Checkout
-    if (params.get("ref")) setView("auth");           // arrived via a referral link
+    fetchFeeds().then(setFeeds).catch(() => setFeeds(null));
+    fetchCalibration().then(setCalibration).catch(() => setCalibration(null));
+    fetchDefinitions().then(setDefinitions).catch(() => setDefinitions(null));
+    authMe().then((d) => { setUser(d.user); if (d.user) setViewState((v) => (v === "landing" ? "dashboard" : v)); }).catch(() => {});
+    const params = route.query;
+    if (params.get("symbol")) { setAssetSymbol(params.get("symbol").toUpperCase()); setViewState("asset"); }
+    if (params.get("upgraded")) setViewState("pricing");   // returned from Stripe Checkout
+    if (params.get("ref")) setViewState("auth");           // arrived via a referral link
   }, []);
+
+  // Browser back/forward: the URL is the source of truth, so a popstate re-selects the surface.
+  useEffect(() => {
+    if (ROUTES.has(route.path) && route.path !== view) setViewState(route.path);
+    else if (!route.path && view !== "landing" && !user) setViewState("landing");
+  }, [route.path]);
+
+  useEffect(() => {
+    document.title = view === "landing" ? `${BRAND} — world events, and what they mean for you`
+                                        : `${NAV_LABELS[view] || BRAND} · ${BRAND}`;
+  }, [view]);
 
   useEffect(() => { if (user) refreshUnread(); else setUnread(0); }, [user]);
 
@@ -149,22 +170,24 @@ export default function App() {
         setFeed({ tier: d.tier, delayed_hours: d.delayed_hours });
         setPulseKey((k) => k + 1);
       })
-      .catch((e) => setErr(String(e)));
+      .catch(() => setClusters([]));      // the Smart Money surface renders its own empty state
   }, [minC, user]);
 
+  // One place that changes the surface, so the URL and the rendered view can never disagree.
+  const setView = (v, query) => { setViewState(v); route.go(v === "landing" ? "" : v, query); };
   const go = (v) => { setView(v); setDetail(null); setNavOpen(false); };
   const openDetail = (id) => {
     setDetail("loading");
     setExplanation(null);
-    fetchClusterDetail(id).then(setDetail).catch((e) => setErr(String(e)));
+    fetchClusterDetail(id).then(setDetail).catch(() => setDetail({ found: false }));
     fetchExplanation(id, horizon).then(setExplanation).catch(() => {});
   };
-  const openSymbol = (sym) => { setAssetSymbol(sym.toUpperCase()); setDetail(null); setView("asset"); };
-  const openProfile = (kind, id) => { setProfile({ kind, id }); setDetail(null); setView("profile"); };
-  const openLibrary = (slug) => { setLibrarySlug(slug); setDetail(null); setView("library-entry"); };
+  const openSymbol = (sym) => { setAssetSymbol(sym.toUpperCase()); setDetail(null); setView("asset", { symbol: sym.toUpperCase() }); };
+  const openProfile = (kind, id) => { setProfile({ kind, id }); setDetail(null); setView("profile", { kind, id }); };
+  const openLibrary = (slug) => { setLibrarySlug(slug); setDetail(null); setView("library-entry", { slug }); };
   const onAuthed = (u) => { setUser(u); setView("dashboard"); };
   const doLogout = async () => { await authLogout(); setUser(null); setView("landing"); };
-  const submitSearch = () => { if (search.trim()) { setView("search"); setDetail(null); setNavOpen(false); } };
+  const submitSearch = () => { if (search.trim()) { setView("search", { q: search.trim() }); setDetail(null); setNavOpen(false); } };
 
   const navBtn = (v) => (
     <button key={v} className={`nav-item ${view === v || (v === "library" && view === "library-entry") ? "on" : ""}`} onClick={() => go(v)}>
@@ -176,7 +199,7 @@ export default function App() {
     <div className="shell">
       <aside className={`sidebar ${navOpen ? "open" : ""}`}>
         <div className="brand" onClick={() => go(user ? "dashboard" : "landing")}>
-          <span className="brand-mark">◆</span><span className="brand-name">TradeOSS</span>
+          <span className="brand-mark">◆</span><span className="brand-name">{BRAND}</span>
         </div>
         <nav className="side-nav">
           {SIDEBAR.map((section) => (
@@ -234,9 +257,10 @@ export default function App() {
           </div>
         </header>
 
+        {/* One boundary per surface, keyed by view: a throw inside a surface shows a contained
+            failure panel with the chrome intact, and switching surfaces resets it. */}
         <main className="content">
-          {err && <div className="err">error: {err}</div>}
-
+          <ErrorBoundary key={view} surface={view}>
           {view === "landing" ? (
             <LandingView onGetStarted={() => go("auth")} onExplore={() => go("news")} />
           ) : view === "dashboard" ? (
@@ -297,11 +321,14 @@ export default function App() {
             <LibraryEntry slug={librarySlug} onBack={() => go("library")} onOpenLibrary={openLibrary} />
           ) : view === "crypto" ? (
             <CryptoView />
+          ) : view === "integrations" ? (
+            <IntegrationsView />
           ) : view === "admin" ? (
             <AdminView user={user} />
           ) : (
             <Dashboard user={user} onOpenSymbol={openSymbol} onNav={go} />
           )}
+          </ErrorBoundary>
         </main>
       </div>
 

@@ -50,3 +50,29 @@ def test_sources_status_is_honest():
     assert st["hn"]["state"] == "connected"            # keyless, wired by default
     assert st["x"]["state"] == "unavailable"           # no free tier -> never faked
     assert st["reddit"]["state"] in ("connected", "needs_key")
+
+
+# ------------------------------------------------------------------ regression: the inflated board (B-02)
+
+def test_velocity_is_not_inflated_by_a_source_with_no_baseline():
+    """The board used to divide total mentions (all sources) by total baseline (only sources that
+    HAVE one), which turned a flat 1.0x name into a multi-x 'spike' and pushed noise to the top."""
+    obs = [{"source": "wikipedia", "mentions": 312, "baseline": 310.0, "sentiment": None},
+           {"source": "hn", "mentions": 40, "baseline": None, "sentiment": None}]
+    out = S.score_symbol("BALL", "BALL Corp", obs)
+    assert out["velocity"] == 1.01                       # the Wikipedia ratio, not 352/310 = 1.14
+    assert out["mentions"] == 352                        # volume still counts every source
+    assert out["is_new"] is False
+
+
+def test_velocity_is_mention_weighted_across_sources():
+    obs = [{"source": "wikipedia", "mentions": 900, "baseline": 300.0, "sentiment": None},   # 3.0x
+           {"source": "reddit", "mentions": 100, "baseline": 100.0, "sentiment": 0.5}]       # 1.0x
+    out = S.score_symbol("X", "X", obs)
+    assert out["velocity"] == 2.8                        # (900*3 + 100*1) / 1000, not (3+1)/2
+
+
+def test_no_baseline_anywhere_means_no_velocity_claimed():
+    obs = [{"source": "hn", "mentions": 25, "baseline": None, "sentiment": None}]
+    out = S.score_symbol("NEW", "New Co", obs)
+    assert out["velocity"] is None and out["is_new"] is True

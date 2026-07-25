@@ -15,6 +15,8 @@ export const fetchClusterDetail = (issuerId) => get(`/api/clusters/${issuerId}?a
 export const fetchExplanation = (issuerId, horizon) =>
   get(`/api/clusters/${issuerId}/explanation?horizon=${horizon}`);
 export const fetchFeeds = () => get("/api/feeds");
+// Integration status (brief §4): every external source, its state, what it powers, and its health.
+export const fetchIntegrations = () => get("/api/integrations");
 export const fetchDefinitions = () => get("/api/definitions");
 export const fetchCalibration = () => get("/api/calibration");
 export const fetchAsset = (symbol) => get(`/api/asset/${encodeURIComponent(symbol)}`);

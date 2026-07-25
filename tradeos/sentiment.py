@@ -58,12 +58,28 @@ def manipulation_flag(obs) -> list[str]:
 
 
 def score_symbol(symbol, name, obs) -> dict:
+    """Score one symbol from at most one CURRENT observation per source (see trending_board).
+
+    Two things this must not do, both of which it used to. It must not sum repeated snapshots of
+    the same underlying measure — Wikipedia writes yesterday's pageview total every run, so adding
+    up a window of runs produced "7,547 mentions" for a name that gets 312 views a day. And it must
+    not divide a total that includes baseline-less sources by a total that excludes them: that
+    alone turned a 1.01x name into a 5.48x "spike" and put common-sounding tickers at the top of
+    the board. Velocity is now a mention-weighted mean of per-source ratios over exactly the
+    sources that have a baseline, and a source with no history contributes attention but never
+    velocity."""
     mentions = sum(o.get("mentions", 0) for o in obs)
-    baseline = sum((o.get("baseline") or 0) for o in obs) or None
+    with_base = [o for o in obs if (o.get("baseline") or 0) > 0]
+    base_mentions = sum(o.get("mentions", 0) for o in with_base)
+    baseline = sum(o["baseline"] for o in with_base) or None
+    velocity = None
+    if with_base and base_mentions:
+        weighted = sum(o["mentions"] * (o["mentions"] / o["baseline"]) for o in with_base)
+        velocity = round(weighted / base_mentions, 2)
     return {"symbol": symbol, "name": name or symbol, "mentions": mentions,
-            "attention": attention_score(mentions, baseline),
+            "attention": attention_score(base_mentions or mentions, baseline),
             "sentiment": blend_sentiment(obs),
-            "velocity": round(mentions / baseline, 2) if baseline else None,
+            "velocity": velocity,
             "sources": sorted({o["source"] for o in obs}),
             "is_new": baseline is None, "flags": manipulation_flag(obs)}
 
@@ -79,19 +95,31 @@ def trending(grouped, min_mentions=MIN_MENTIONS, limit=25) -> list[dict]:
 
 # ------------------------------------------------------------------ honest source status
 
+# Which of the catalogued sources feed the attention board, and whether each measures mood as well
+# as volume. `attention` = measures public attention; `sentiment` = measures mood.
+ATTENTION_SOURCES = {
+    "wikipedia": {"attention": True, "sentiment": False},
+    "hn": {"attention": True, "sentiment": False},
+    "reddit": {"attention": True, "sentiment": True},
+    "youtube": {"attention": True, "sentiment": True},
+    "stocktwits": {"attention": True, "sentiment": True},
+    "x": {"attention": True, "sentiment": True},
+}
+
+
 def sources_status() -> dict:
-    """Which sources are actually connected, derived from config — never fabricated. Wikipedia + HN are
-    keyless attention/discussion sources wired by default; Reddit/YouTube need the operator's free key
-    (Reddit via a ToS-compliant OAuth app); StockTwits and X have no reachable free tier and stay
-    unavailable rather than faked. `attention` = measures public attention; `sentiment` = measures mood."""
-    return {
-        "wikipedia": {"label": "Wikipedia attention", "state": "connected", "attention": True, "sentiment": False},
-        "hn": {"label": "Hacker News", "state": "connected", "attention": True, "sentiment": False},
-        "reddit": {"label": "Reddit", "state": "connected" if config.reddit_configured() else "needs_key", "attention": True, "sentiment": True},
-        "youtube": {"label": "YouTube", "state": "connected" if config.youtube_configured() else "needs_key", "attention": True, "sentiment": True},
-        "stocktwits": {"label": "StockTwits", "state": "unavailable", "attention": True, "sentiment": True},
-        "x": {"label": "X / Twitter", "state": "unavailable", "attention": True, "sentiment": True},
-    }
+    """The attention board's source strip, derived from the one source registry (sources.py) so
+    there is no second place to update when a source's state changes. Each entry carries what it
+    would add and where its free key comes from, so a disconnected source is an explained gap with
+    a next step rather than a bare 'N/A'."""
+    from . import sources
+    out = {}
+    for key, caps in ATTENTION_SOURCES.items():
+        g = sources.gate(key)
+        out[key] = {"label": g["label"], "state": g["state"], **caps,
+                    "powers": g["powers"], "note": g["note"], "signup_url": g.get("signup_url"),
+                    "env": g.get("env", [])}
+    return out
 
 
 def any_connected_with_data(conn) -> bool:
@@ -141,25 +169,33 @@ def _group(rows) -> dict:
     return grouped
 
 
-_BOARD_SQL = ("SELECT o.symbol, o.source, o.mentions, o.baseline, o.sentiment, o.bots_filtered, e.name "
-              "FROM sentiment_observations o LEFT JOIN entities e ON e.id=o.entity_id "
-              "WHERE o.window_end >= now() - make_interval(hours => %s)")
+# The CURRENT reading per (symbol, source), not every reading in the window. Each source writes a
+# snapshot of the same measure on every run, so taking more than the latest one double-counts.
+_BOARD_SQL = """
+    SELECT DISTINCT ON (o.symbol, o.source)
+           o.symbol, o.source, o.mentions, o.baseline, o.sentiment, o.bots_filtered, e.name
+      FROM sentiment_observations o
+      LEFT JOIN entities e ON e.id = o.entity_id
+     WHERE o.window_end >= now() - make_interval(hours => %s)
+       AND (%s::text IS NULL OR o.symbol = %s)
+     ORDER BY o.symbol, o.source, o.window_end DESC
+"""
+
+
+def _board_rows(conn: psycopg.Connection, hours: int, symbol: str | None = None):
+    with conn.cursor() as cur:
+        cur.execute(_BOARD_SQL, (hours, symbol, symbol))
+        return cur.fetchall()
 
 
 def trending_board(conn: psycopg.Connection, hours=DEFAULT_WINDOW_HOURS, min_mentions=MIN_MENTIONS,
                    limit=25) -> list[dict]:
-    with conn.cursor() as cur:
-        cur.execute(_BOARD_SQL, (hours,))
-        rows = cur.fetchall()
-    return trending(_group(rows), min_mentions=min_mentions, limit=limit)
+    return trending(_group(_board_rows(conn, hours)), min_mentions=min_mentions, limit=limit)
 
 
 def symbol_sentiment(conn: psycopg.Connection, symbol, hours=168) -> dict | None:
     symbol = symbol.upper()
-    with conn.cursor() as cur:
-        cur.execute(_BOARD_SQL.replace("WHERE", "WHERE o.symbol=%s AND") + " ORDER BY o.window_end DESC",
-                    (symbol, hours))
-        rows = cur.fetchall()
+    rows = _board_rows(conn, hours, symbol)
     if not rows:
         return None
     return score_symbol(symbol, rows[0][6], _group(rows)[symbol]["obs"])

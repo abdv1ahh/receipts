@@ -47,6 +47,23 @@ def youtube_configured() -> bool:
     return bool(os.environ.get("YOUTUBE_API_KEY"))
 
 
+def tiingo_configured() -> bool:
+    """End-of-day prices — how claim outcomes get scored. Free tier."""
+    return bool(os.environ.get("TIINGO_API_KEY"))
+
+
+def openfigi_configured() -> bool:
+    """CUSIP -> ticker mapping for 13F holdings. Works keyless at a low rate limit; a free key
+    raises it."""
+    return bool(os.environ.get("OPENFIGI_API_KEY"))
+
+
+def brand_name() -> str:
+    """The public product name. A single config value so the display name can change without a
+    refactor — nothing renames modules, tables or the package for branding."""
+    return os.environ.get("BRAND_NAME", "Rhumb").strip() or "Rhumb"
+
+
 def sec_user_agent() -> str:
     """SEC fair-access policy requires a declared User-Agent identifying the requester,
     conventionally 'Name contact@email'. We refuse to run without one."""

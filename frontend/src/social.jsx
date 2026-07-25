@@ -7,6 +7,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { fetchTrending } from "./api";
 import { Icon } from "./icons.jsx";
+import { LoadError, SourceGate } from "./shell.jsx";
 
 const FLAG_LABEL = { single_source: "single source", bot_heavy: "bot-heavy" };
 const SRC_LABEL = { wikipedia: "Wikipedia", hn: "Hacker News", reddit: "Reddit", youtube: "YouTube", stocktwits: "StockTwits", x: "X" };
@@ -21,18 +22,28 @@ function Sentiment({ v }) {
   return <span className={`sent sent-${s[0]}`}>{s[1]} {v.toFixed(2)}</span>;
 }
 
+/** The source strip. A connected source is a plain dot; anything else renders the shared gate, so
+ *  a disconnected source explains itself and links to its free key instead of reading "n/a". */
 function SourceStatus({ sources }) {
   if (!sources) return null;
   return (
     <div className="src-strip">
-      {Object.entries(sources).map(([k, s]) => (
-        <span key={k} className={`src-dot ${s.state === "connected" ? "on" : s.state === "needs_key" ? "warn" : "off"}`}
-              title={s.state === "needs_key" ? "add a free key to connect" : s.state === "unavailable" ? "no reachable free tier" : "connected"}>
-          <i /> {s.label}{s.state === "needs_key" ? " · add key" : s.state === "unavailable" ? " · n/a" : ""}
-        </span>
-      ))}
+      {Object.entries(sources).map(([k, s]) =>
+        s.state === "connected" ? (
+          <span key={k} className="src-dot on" title={s.note || "connected"}><i /> {s.label}</span>
+        ) : (
+          <SourceGate key={k} compact gate={{ ...s, key: k }} />
+        ))}
     </div>
   );
+}
+
+/** Shown once, above the board, when nothing connected measures mood. Explains the gap and how to
+ *  close it — the board itself keeps working on the attention sources that ARE live. */
+function MoodGate({ sources }) {
+  const reddit = sources?.reddit;
+  if (!reddit || reddit.state === "connected") return null;
+  return <SourceGate gate={{ ...reddit, key: "reddit" }} />;
 }
 
 function AttentionCard({ r, rank, onOpenSymbol }) {
@@ -73,9 +84,14 @@ function AttentionCard({ r, rank, onOpenSymbol }) {
 
 export function SocialView({ onOpenSymbol }) {
   const [data, setData] = useState(null);
+  const [failed, setFailed] = useState(false);
   const [hours, setHours] = useState(96);
   const [filter, setFilter] = useState("all");
-  useEffect(() => { setData(null); setFilter("all"); fetchTrending(hours).then(setData).catch(() => setData({ board: [], sources: null })); }, [hours]);
+  const load = () => {
+    setData(null); setFailed(false); setFilter("all");
+    fetchTrending(hours).then(setData).catch(() => setFailed(true));
+  };
+  useEffect(load, [hours]);
 
   const board = data?.board || [];
   const m = useMemo(() => {
@@ -135,6 +151,7 @@ export function SocialView({ onOpenSymbol }) {
       )}
 
       {data && <SourceStatus sources={data.sources} />}
+      {data && m.measured === 0 && <MoodGate sources={data.sources} />}
 
       {data && board.length > 0 && (
         <div className="j-tabs" style={{ marginTop: 14 }}>
@@ -146,7 +163,9 @@ export function SocialView({ onOpenSymbol }) {
         </div>
       )}
 
-      {data === null ? (
+      {failed ? (
+        <LoadError what="the attention board" onRetry={load} />
+      ) : data === null ? (
         [...Array(5)].map((_, i) => <div key={i} className="att-card news-skel"><div className="skel" style={{ width: `${65 - i * 7}%` }} /></div>)
       ) : board.length === 0 ? (
         <div className="empty" style={{ marginTop: 14 }}>{data.note || "No attention data yet."}</div>

@@ -1,0 +1,25 @@
+# Development override. Production (docker-compose.yml alone) is unchanged.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+#
+# What this buys: Python changes reload in place instead of costing a full image rebuild, and
+# tests/ is mounted so the suite can actually run (it is deliberately kept out of the production
+# image). Pair it with `cd frontend && npm run dev` on :5173 for the same loop on the UI.
+services:
+  api:
+    command: ["uvicorn", "tradeos.app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    volumes:
+      - ./tradeos:/app/tradeos          # live source; uvicorn --reload picks changes up
+      - ./tests:/app/tests              # not in the image on purpose — mounted only for dev/CI
+      # Mounting ./tradeos shadows the bundle the image baked into tradeos/static, so point that
+      # path at the locally built one. `cd frontend && npm run build` (~0.3s) is then enough to
+      # serve a UI change — no image rebuild.
+      - ./frontend/dist:/app/tradeos/static:ro
+      - uploads:/app/uploads
+    environment:
+      # Vite dev server runs on a different origin; allow it through the CSRF origin check.
+      DEV_ORIGINS: http://localhost:5173
+
+  worker:
+    volumes:
+      - ./tradeos:/app/tradeos
