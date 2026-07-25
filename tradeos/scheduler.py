@@ -85,6 +85,19 @@ def _job_economic(conn) -> dict:
     return calendar_nasdaq.ingest_economic(conn, days_ahead=12)
 
 
+def _job_gdelt(conn) -> dict:
+    """The global news backbone. Paced internally; a 429 ends the pass rather than hammering."""
+    from .ingestion import gdelt
+    return gdelt.ingest(conn, timespan="2h")
+
+
+def _job_spine_news(conn) -> dict:
+    """Project newly-arrived news_items into the event spine, so a story reported by both CNBC and
+    GDELT clusters as one happening. Small window — the bootstrap backfill is a CLI command."""
+    from .ingestion import news_adapter
+    return news_adapter.backfill(conn, since_hours=6)
+
+
 def _job_warm_brief(conn) -> dict:
     """Pre-compute + cache the shared market Morning Brief so it's instant to open. Runs after the news
     jobs so the LLM circuit is already warm and the brief reflects the latest data. Lazy app import
@@ -112,6 +125,10 @@ JOBS = [
     ("earnings_cal", 43200, _job_earnings),       # forward earnings -> twice a day
     ("economic_cal", 43200, _job_economic),       # macro calendar -> twice a day
     ("warm_brief", 3600, _job_warm_brief),        # keep the shared brief hot (runs after the news jobs)
+    # The spine. GDELT is paced at ~1 request per 5s internally, so a pass costs ~30s of wall time
+    # for 5 queries; hourly keeps well inside what the free API tolerates.
+    ("gdelt", 3600, _job_gdelt),
+    ("spine_news", 1800, _job_spine_news),        # follows news_rss, which runs on the same tick
 ]
 
 

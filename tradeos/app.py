@@ -43,6 +43,7 @@ from . import (
     sentiment,
     sources,
     trades,
+    watchlist_accounts,
 )
 from . import brief as brief_mod
 from . import dashboard as dashboard_mod
@@ -175,6 +176,21 @@ class AdminBanReq(BaseModel):
 
 class AdminFlagReq(BaseModel):
     enabled: bool
+
+
+class WatchlistAccountReq(BaseModel):
+    """One consequential account. `influence` is validated in watchlist_accounts.upsert so the
+    range rule lives with the data, not scattered across callers."""
+    platform: str
+    handle: str
+    display_name: str
+    role: str | None = None
+    domain: str | None = None
+    country: str | None = None
+    influence: float = 0.5
+    feed_url: str | None = None
+    active: bool = True
+    note: str | None = None
 
 
 def _set_session_cookie(response: Response, token: str) -> None:
@@ -1648,6 +1664,38 @@ def admin_set_flag(name: str, req: AdminFlagReq, response: Response,
             return res
         authn.audit(conn, user["email"], "admin_set_flag", name, {"enabled": req.enabled})
         return res
+
+
+@app.get("/api/admin/watchlist-accounts")
+def admin_watchlist_accounts(response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    """The consequential-accounts watchlist. The brief requires this be first-class editable data
+    with a management interface rather than a hardcoded array — this is that interface."""
+    with db.connect() as conn:
+        # _require_admin returns the USER on success and None on failure. Getting this backwards
+        # served the list to anonymous callers.
+        if not _require_admin(conn, tos_session, response):
+            return {"error": "admin only"}
+        return {"accounts": watchlist_accounts.listing(conn),
+                "note": "`influence` is a stated editorial weight, not a measurement. It records "
+                        "that this product treats a central bank's words as more consequential "
+                        "than an anonymous account; it does not claim to have measured anyone."}
+
+
+@app.post("/api/admin/watchlist-accounts")
+def admin_watchlist_account_save(req: WatchlistAccountReq, response: Response,
+                                 tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        me = _require_admin(conn, tos_session, response)
+        if not me:
+            return {"error": "admin only"}
+        out = watchlist_accounts.upsert(conn, req.model_dump())
+        if "error" in out:
+            response.status_code = 400
+            return out
+        conn.commit()
+        authn.audit(conn, (me or {}).get("email"), "watchlist_account.save",
+                    f"{req.platform}:{req.handle}", {"influence": req.influence})
+        return out
 
 
 @app.get("/api/admin/audit")

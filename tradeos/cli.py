@@ -282,6 +282,62 @@ def cmd_preflight(_args) -> None:
     print(f"preflight: OK ({len(warnings)} warning(s)).")
 
 
+def cmd_spine(args) -> None:
+    """Feed the event spine. `--backfill-news` is the one-time bootstrap that projects the whole
+    news_items table in; the scheduler keeps it current with a small window after that."""
+    from .ingestion import gdelt, news_adapter
+    with db.connect() as conn:
+        out = {}
+        if args.source in ("news", "all"):
+            out["news"] = news_adapter.backfill(conn, since_hours=None if args.backfill_news else 6)
+        if args.source in ("gdelt", "all"):
+            out["gdelt"] = gdelt.ingest(conn, timespan=args.timespan)
+    print(f"spine: {out}")
+
+
+def cmd_reprocess(args) -> None:
+    """Re-derive clustering and scores over stored raw payloads.
+
+    This is how a track record gets bootstrapped instead of waiting months for one: when the
+    engine improves, history is re-read rather than re-fetched. Expensive, so it is admin-only
+    and never runs on a schedule."""
+    from . import spine
+    with db.connect() as conn, conn.cursor() as cur:
+        cur.execute("SELECT id FROM events WHERE knowable_time >= now() - make_interval(days => %s) "
+                    "ORDER BY knowable_time", (args.days,))
+        ids = [r[0] for r in cur.fetchall()]
+        if args.reset:
+            cur.execute("UPDATE events SET cluster_id = NULL WHERE id = ANY(%s)", (ids,))
+            cur.execute("DELETE FROM event_clusters WHERE NOT EXISTS "
+                        "(SELECT 1 FROM events e WHERE e.cluster_id = event_clusters.id)")
+            conn.commit()
+        clusters = set()
+        for i, eid in enumerate(ids, 1):
+            if args.reclassify:
+                # Re-read the stored title/body through the current cue table. This is the point
+                # of keeping raw payloads: an improved classifier is applied to history, not only
+                # to what arrives next.
+                cur.execute("SELECT title, body FROM events WHERE id = %s", (eid,))
+                title, body = cur.fetchone()
+                cur.execute("UPDATE events SET category = %s WHERE id = %s",
+                            (spine.classify(title, body), eid))
+            clusters.add(spine.assign_cluster(conn, eid))
+            if i % 200 == 0:
+                conn.commit()
+                print(f"  {i}/{len(ids)}")
+        conn.commit()
+        for cid in clusters:
+            spine.score_cluster(conn, cid)
+        conn.commit()
+    print(f"reprocess: {len(ids)} events -> {len(clusters)} clusters")
+
+
+def cmd_seed_watchlist(_args) -> None:
+    from . import watchlist_accounts
+    with db.connect() as conn:
+        print(f"seed-watchlist: {watchlist_accounts.seed(conn)}")
+
+
 def cmd_scheduler(args) -> None:
     from . import scheduler
     if args.once:
@@ -510,6 +566,22 @@ def main() -> None:
     ical.add_argument("--source", default="all", choices=["earnings", "economic", "all"])
     ical.add_argument("--days", type=int, default=14, help="days ahead to fetch")
     ical.set_defaults(fn=cmd_ingest_calendar)
+
+    sp = sub.add_parser("spine", help="feed the event spine (Phase 2)")
+    sp.add_argument("--source", choices=["news", "gdelt", "all"], default="all")
+    sp.add_argument("--backfill-news", action="store_true",
+                    help="project the WHOLE news_items table, not just the recent window")
+    sp.add_argument("--timespan", default="2h", help="GDELT lookback, e.g. 2h / 24h")
+    sp.set_defaults(fn=cmd_spine)
+
+    rp = sub.add_parser("reprocess", help="re-derive clusters and scores over stored payloads (admin)")
+    rp.add_argument("--days", type=int, default=7)
+    rp.add_argument("--reset", action="store_true", help="drop existing cluster assignments first")
+    rp.add_argument("--reclassify", action="store_true", help="also re-run the category cue table")
+    rp.set_defaults(fn=cmd_reprocess)
+
+    sw = sub.add_parser("seed-watchlist", help="seed the consequential-accounts watchlist")
+    sw.set_defaults(fn=cmd_seed_watchlist)
 
     sch = sub.add_parser("scheduler")
     sch.add_argument("--once", action="store_true", help="run one pass of due jobs and exit")

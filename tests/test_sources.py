@@ -60,3 +60,35 @@ def test_redact_leaves_no_key_material_behind():
     out = scheduler.redact(msg)
     assert "AIzaLIVEKEY" not in out and "key=" not in out
     assert "generativelanguage.googleapis.com" in out    # the host is still useful for debugging
+
+
+# ------------------------------------------------------------------ authorization, adversarially
+
+def test_require_admin_contract_is_user_on_success_none_on_failure():
+    """The guard returns the USER on success and None on failure. Every admin route must therefore
+    branch on `not _require_admin(...)`.
+
+    This exists because getting it backwards is silent: the route keeps working for the developer
+    (who is an admin, and so is refused — obvious) OR keeps working for everyone (and the developer
+    never notices). It happened while building Phase 2, and served an admin-only list to anonymous
+    callers until an explicit check caught it."""
+    import inspect
+    import re
+
+    from tradeos import app as app_module
+
+    src = inspect.getsource(app_module)
+    # Every call site must be one of the two safe shapes: assigned then negated, or negated inline.
+    for line_no, line in enumerate(src.splitlines(), 1):
+        if "_require_admin(" not in line or "def _require_admin" in line:
+            continue
+        assigned = re.search(r"(\w+)\s*=\s*_require_admin\(", line)
+        negated_inline = "if not _require_admin(" in line
+        assert assigned or negated_inline, (
+            f"line {line_no}: _require_admin must be assigned-then-checked or negated inline, "
+            f"got: {line.strip()}")
+        if assigned:
+            var = assigned.group(1)
+            following = "\n".join(src.splitlines()[line_no:line_no + 3])
+            assert f"if not {var}" in following, (
+                f"line {line_no}: `{var} = _require_admin(...)` must be followed by `if not {var}`")
