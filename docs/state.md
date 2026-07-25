@@ -1,18 +1,23 @@
 # docs/state.md — where the work stands
 
-Updated: 2026-07-25, end of Phase 4 (core).
+Updated: 2026-07-25, Phase 6 partial.
 Read this after `CLAUDE.md` and before `docs/plan.md` at the start of every session.
 
 ---
 
 ## Current phase
 
-**Phases 0–3 complete. Phase 4 core complete.** Branch `phase/3-claims`.
-**Phase 5 (the globe) is next.** Reports for every phase are in `docs/progress/`.
+**Phases 0–5 complete. Phase 6 partial.** Branch `phase/6-sections`.
+Reports for every phase are in `docs/progress/`.
 
-Outstanding inside Phase 4: saved filter sets, in-place threading of developing stories, and
-subscribable alerts. The Radar surface itself, its relevance ranking, its filters and the
-dashboard tile are done.
+Done in Phase 6: Portfolio → **Exposure**, the **Calendar** (month/week/day, replacing a
+10,000-pixel scroll), and the **AI Assistant** with six read-only tools.
+
+Still to do in Phase 6: Morning Brief (fold in Ledger outcomes), Smart Money (feed signals into
+the claim/Ledger machinery), News (fold into the impact engine + source comparison), Crypto
+(still a data mirror), Journal (attach world context at trade time).
+
+Outstanding inside Phase 4: saved filter sets, in-place threading, subscribable alerts.
 
 ---
 
@@ -58,13 +63,13 @@ unpaced probing throttled this IP for the rest of the phase, so no article has l
 
 ## Next three tasks
 
-1. Open `phase/5-globe`, plan mode first. `react-globe.gl`, lazy-loaded, country selection
-   setting the app-wide geographic frame (the `user_profiles.country` written by
-   `PUT /api/profile/frame` already IS that frame — the globe replaces the control, not the
-   concept).
-2. Finish Phase 4's remainder: saved filter sets, in-place threading, subscribable alerts.
-3. Run `/security-review` on the Phase 2–4 diff. It found a real vulnerability on Phase 1 and has
-   not been run since.
+1. Finish Phase 6: Crypto is the weakest surface left and the owner named it directly — it needs
+   interpretation (on-chain flows tied to events, funding rates read against news flow, scenario
+   analysis with explicit invalidation conditions) rather than more numbers.
+2. Morning Brief: fold in yesterday's Ledger outcomes so the reader sees the system held to
+   account daily.
+3. Smart Money: route its convergence signals through `claims.py` so they are scored by the same
+   Ledger as everything else.
 
 Carried over, not blocking: confirm GDELT ingests once its rate limit clears, and add Bluesky as
 a real `SocialSource`.
@@ -165,4 +170,20 @@ Nothing on this list blocks Phase 5.
     `tests/test_slice2.py` guards this.
 
 21. **Gemini's free tier has a real daily ceiling.** Claim generation is the heaviest consumer.
-    A second provider in the chain is the fix, not more retries.
+    A second provider in the chain is the fix, not more retries. (It resets — the assistant is
+    running on Gemini again.)
+
+22. **GDELT's throttle is keyed on the User-Agent, not the IP.** Rotating it WOULD restore access;
+    we deliberately do not, and `tests/test_gdelt.py` asserts the module still explains why. A 429
+    parks the source for six hours, persisted so a restart cannot reset the clock.
+
+23. **`str.replace` cannot sanitise a delimiter.** It is a single pass and does not re-scan its
+    output, so a marker split around a nested copy of itself reassembles. The prompt fence uses a
+    per-request nonce instead — do not "simplify" it back to fixed markers.
+
+24. **Azure's content filter is not the only provider quirk to expect.** Assume any provider may
+    refuse a prompt for reasons unrelated to its content being wrong; `llm.py` reports a
+    content-filter rejection distinctly from a transport failure because retrying never helps.
+
+25. **`answer()` in assistant.py had a local named `llm`** shadowing the module. If you add a
+    module-level import to a long function, check for shadowing first.
