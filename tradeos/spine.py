@@ -27,10 +27,29 @@ from psycopg.types.json import Json
 
 log = logging.getLogger("tradeos.spine")
 
-# Two titles this similar, inside the window, are the same happening. Tuned against real wire copy:
-# below ~0.45 unrelated stories about the same company start merging; above ~0.75 the same story
-# rewritten by a second outlet no longer matches.
+# Two titles this similar, inside the window, are the same happening on title evidence alone.
 SIMILARITY = 0.55
+
+# Below that, a match needs corroboration. Measured across outlets on real data:
+#
+#   0.54  BBC "Four Palestinians and two Israelis killed"
+#         Al Jazeera "Funerals held for four Palestinians killed"        -> SAME event
+#   0.42  Al Jazeera "India's 'Cockroach' youth call off protest"
+#         BBC "Protesters celebrate resignation of India's..."           -> SAME event
+#   0.33  CNBC "Amazon cuts some jobs in its artificial general..."
+#         BBC "AI is 'not smart' so what's next in artificial..."        -> DIFFERENT events
+#
+# Different outlets genuinely word the same story differently, so a threshold low enough to catch
+# them also catches unrelated stories that share vocabulary. Title similarity alone cannot separate
+# those, which is what the brief was pointing at when it suggested embeddings.
+#
+# The corroborator is SHARED DISTINCTIVE WORDS. Geography was tried first and is provably the wrong
+# signal: `geo` holds where the OUTLET sits, so BBC (GB) and Al Jazeera (QA) covering one story
+# never overlap — the same outlet-versus-subject distinction already documented in the GDELT
+# adapter, made again here. Proper nouns are what two reports of one event actually share
+# ("Palestinians", "Israelis"), and what two unrelated ones do not.
+WEAK_SIMILARITY = 0.32
+MIN_SHARED_WORDS = 1            # one shared proper noun is meaningful; see distinctive_words
 CLUSTER_WINDOW_HOURS = 36        # how far back to look for an existing cluster to join
 NOVELTY_WINDOW_HOURS = 48        # the brief's "how new is this relative to the last 48 hours"
 
@@ -145,7 +164,58 @@ def _entity_values(entities) -> list[str]:
     return sorted({str(e.get("value")).upper() for e in (entities or []) if e.get("value")})
 
 
-def find_cluster(conn, event_id: int) -> int | None:
+# Words too common to mean anything when two headlines share them.
+_STOPWORDS = {
+    "the", "a", "an", "and", "or", "but", "of", "in", "on", "at", "to", "for", "with", "from",
+    "as", "by", "is", "are", "was", "were", "be", "been", "has", "have", "had", "will", "would",
+    "says", "said", "after", "before", "over", "into", "amid", "new", "more", "than", "that",
+    "this", "it", "its", "his", "her", "their", "they", "we", "you", "what", "why", "how", "who",
+    "not", "no", "up", "down", "out", "off", "about", "first", "last", "year", "years", "day",
+    "days", "week", "month", "one", "two", "three", "million", "billion", "percent",
+    # Common headline openers, which are capitalised for position rather than meaning.
+    "four", "five", "here", "these", "those", "when", "where", "which", "some", "many", "most",
+    "just", "now", "still", "again", "inside", "behind", "could", "should", "might", "may",
+}
+_WORD_RE = re.compile(r"[A-Za-z][A-Za-z'-]{3,}")
+
+
+def distinctive_words(title: str) -> set[str]:
+    """The words in a headline that identify WHICH event it is: proper nouns. Pure.
+
+    Trigram similarity compares character shape; this compares subject. Measured on the real pairs
+    that motivated it:
+
+      BBC "Four Palestinians and two Israelis killed" vs
+      Al Jazeera "Funerals held for four Palestinians killed"
+        -> shares {palestinians}                        SAME event
+
+      CNBC "Amazon cuts some jobs in its artificial general intelligence unit" vs
+      BBC "AI is 'not smart' so what's next in artificial intelligence"
+        -> shares nothing; "artificial intelligence" is lowercase common vocabulary,
+           and "Amazon" appears in only one                DIFFERENT events
+
+    A plain word count could not separate those — both pairs share two or three words. Requiring
+    the shared words to be CAPITALISED MID-HEADLINE keeps proper nouns (who and where) and drops
+    topic vocabulary, which is exactly the distinction that matters."""
+    proper = set()
+    for raw in (title.split() if title else []):
+        token = raw.strip("\u201c\u201d\"'.,:;!?()[]")
+        # Possessives: "India's" and "India" are the same subject. Stripping them was needed for a
+        # real pair — a headline leading "India's ... protest" and another ending "... of India's
+        # minister" are the same story.
+        token = re.sub(r"'s$", "", token)
+        if len(token) < 4 or not token[0].isupper() or not _WORD_RE.fullmatch(token):
+            continue
+        lowered = token.lower()
+        # The first word is capitalised by convention, so it is NOT skipped outright — headlines
+        # very often lead with the proper noun that identifies the story. The stopword list is what
+        # removes "The", "New", "Why" and friends.
+        if lowered not in _STOPWORDS:
+            proper.add(lowered)
+    return proper
+
+
+def find_cluster(conn, event_id: int, weak: bool = False) -> int | None:
     """The existing cluster this event belongs to, or None.
 
     A match needs a time window AND title similarity AND — when both sides name entities — at
@@ -166,13 +236,15 @@ def find_cluster(conn, event_id: int) -> int | None:
         title, knowable, category, entities = row
         mine = _entity_values(entities)
         cur.execute(
-            """SELECT c.id, similarity(c.title, %s) AS sim
+            """SELECT c.id, similarity(c.title, %s) AS sim, c.title
                  FROM event_clusters c
                 WHERE c.last_seen >= %s
                   -- Same category, or either side is uncategorised. The explicit ::text casts are
                   -- required: Postgres cannot infer a bare parameter's type inside IS NULL.
                   AND (c.category IS NOT DISTINCT FROM %s::text
                        OR c.category IS NULL OR %s::text IS NULL)
+                  -- Strong title match on its own, or a weaker one left to the caller to
+                  -- corroborate by shared distinctive words (see WEAK_SIMILARITY).
                   AND similarity(c.title, %s) >= %s
                   -- When this event names entities, the cluster must already contain one of them,
                   -- unless the cluster names none at all (an unattributed wire story).
@@ -185,18 +257,30 @@ def find_cluster(conn, event_id: int) -> int | None:
                                    WHERE m.cluster_id = c.id
                                      AND upper(je->>'value') = ANY(%s::text[])))
              ORDER BY sim DESC
-                LIMIT 1""",
+                LIMIT 8""",
             (normalise_title(title), knowable - timedelta(hours=CLUSTER_WINDOW_HOURS),
-             category, category, normalise_title(title), SIMILARITY, mine, mine))
-        hit = cur.fetchone()
-        return hit[0] if hit else None
+             category, category, normalise_title(title),
+             SIMILARITY if not weak else WEAK_SIMILARITY,
+             mine, mine))
+        candidates = cur.fetchall()
+    if not candidates:
+        return None
+    if not weak:
+        return candidates[0][0]
+    # In the weak band, require shared distinctive words before merging.
+    my_words = distinctive_words(title)
+    for cid, _sim, cand_title in candidates:
+        if len(my_words & distinctive_words(cand_title)) >= MIN_SHARED_WORDS:
+            return cid
+    return None
 
 
 def assign_cluster(conn, event_id: int) -> int:
+    """Strong title match first; if none, retry in the weak band with word corroboration."""
     """Put an event in a cluster — joining the one it matches, or forming a new one. Returns the
     cluster id. Recomputes the cluster's aggregates from its members rather than incrementing
     counters, so a reprocess produces the same answer as a live run."""
-    cluster_id = find_cluster(conn, event_id)
+    cluster_id = find_cluster(conn, event_id) or find_cluster(conn, event_id, weak=True)
     with conn.cursor() as cur:
         if cluster_id is None:
             cur.execute(

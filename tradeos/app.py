@@ -1095,6 +1095,59 @@ def news_feed(symbol: str | None = None, category: str | None = None, hours: int
         return {"items": items, "sources": news_mod.sources_status(conn)}
 
 
+@app.get("/api/news/coverage")
+def news_coverage(hours: int = 96, limit: int = 12) -> dict:
+    """How differently outlets frame the same event, and where coverage is thin.
+
+    Both halves come out of the spine's clustering for free. The comparison is only meaningful
+    because the feed list deliberately spans outlets in different countries — two CNBC feeds
+    agreeing is not two perspectives, which is what this view showed before those were added."""
+    hours, limit = max(6, min(720, hours)), max(1, min(40, limit))
+    with db.connect() as conn, conn.cursor() as cur:
+        cur.execute(
+            """SELECT c.id, c.title, c.category, c.source_count, c.event_count, c.novelty_score,
+                      json_agg(json_build_object('source', e.source, 'title', e.title,
+                                                 'url', e.source_url, 'geo', e.geo)
+                               ORDER BY e.knowable_time) AS reports
+                 FROM event_clusters c JOIN events e ON e.cluster_id = c.id
+                WHERE c.last_seen >= now() - make_interval(hours => %s)
+                  AND c.source_count > 1
+             GROUP BY c.id
+               HAVING count(DISTINCT regexp_replace(split_part(e.source, '/', 2), '-.*$', '')) > 1
+             ORDER BY count(DISTINCT regexp_replace(split_part(e.source, '/', 2), '-.*$', '')) DESC,
+                      c.novelty_score DESC NULLS LAST
+                LIMIT %s""", (hours, limit))
+        cols = ("id", "title", "category", "source_count", "event_count", "novelty", "reports")
+        compared = [dict(zip(cols, r, strict=True)) for r in cur.fetchall()]
+
+        # Thin coverage: high novelty, reported by one outlet only. The brief asks for "where
+        # coverage is unusually thin relative to an event's significance" — this is that, and it is
+        # the more interesting half, because a story only one outlet is carrying is either early or
+        # being ignored.
+        cur.execute(
+            """SELECT c.id, c.title, c.category, c.novelty_score,
+                      min(e.source) AS only_source, min(e.source_url) AS url
+                 FROM event_clusters c JOIN events e ON e.cluster_id = c.id
+                WHERE c.last_seen >= now() - make_interval(hours => %s)
+                  AND c.source_count = 1
+                  AND coalesce(c.novelty_score, 0) >= 0.45
+             GROUP BY c.id
+             ORDER BY c.novelty_score DESC LIMIT %s""", (hours, limit))
+        tcols = ("id", "title", "category", "novelty", "only_source", "url")
+        thin = [dict(zip(tcols, r, strict=True)) for r in cur.fetchall()]
+
+        cur.execute("""SELECT count(DISTINCT regexp_replace(split_part(source, '/', 2), '-.*$', ''))
+                         FROM events WHERE source LIKE 'rss/%%'""")
+        outlets = cur.fetchone()[0]
+
+    return {
+        "compared": compared, "thin_coverage": thin, "distinct_outlets": outlets, "hours": hours,
+        "note": ("A story carried by one outlet is not necessarily unimportant — it may be early, "
+                 "or outside what the connected feeds cover well. Coverage breadth measures this "
+                 "product's reach as much as an event's significance."),
+    }
+
+
 @app.get("/api/news/{news_id}")
 def news_item(news_id: int) -> dict:
     with db.connect() as conn:

@@ -29,8 +29,16 @@ _CATEGORY = {
     "general": None,
 }
 
-# Everything in news_items is US-registrant filings or US financial media.
-_DEFAULT_GEO = ["US"]
+# The outlet's country, per feed. news_items only stores `source`, so the mapping lives here and is
+# derived from the feed registry rather than duplicated by hand.
+def _feed_geo() -> dict[str, str]:
+    from .news_rss import FEEDS
+    return {f"rss/{f.key}": f.geo for f in FEEDS}
+
+
+# SEC filings are US registrants by definition; anything unmapped gets no geography rather than a
+# guessed one, because a wrong country is worse than a missing one.
+_SEC_GEO = ["US"]
 
 
 def to_event(row: dict) -> dict:
@@ -39,6 +47,12 @@ def to_event(row: dict) -> dict:
     category = _CATEGORY.get(row.get("category") or "")
     entities = [{"kind": "ticker", "value": s, "confidence": 1.0}
                 for s in (row.get("symbols") or []) if s]
+    source = row["source"]
+    if source.startswith("sec/"):
+        geo = _SEC_GEO
+    else:
+        outlet = _feed_geo().get(source)
+        geo = [outlet] if outlet and outlet != "EU" else (["DE", "FR", "IT"] if outlet == "EU" else [])
     return {
         "source": row["source"],
         "external_id": row["external_id"],
@@ -49,7 +63,7 @@ def to_event(row: dict) -> dict:
         "body": row.get("summary"),
         "language": "en",
         "entities": entities,
-        "geo": _DEFAULT_GEO,
+        "geo": geo,
         "category": category or spine.classify(row["headline"], row.get("summary")),
         "raw_payload": {"news_id": row["id"], "meta": row.get("meta") or {}},
     }

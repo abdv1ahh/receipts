@@ -148,3 +148,36 @@ def test_no_cue_carries_padding_whitespace():
     for _category, cues in spine._CATEGORY_CUES:
         for cue in cues:
             assert cue == cue.strip(), f"cue {cue!r} has padding whitespace"
+
+
+# ------------------------------------------------------------------ cross-outlet matching
+
+def test_distinctive_words_keeps_proper_nouns_and_drops_topic_vocabulary():
+    """The distinction that makes weak-band clustering safe. Measured on real pairs: two reports of
+    one event share WHO and WHERE; two unrelated stories share only subject vocabulary."""
+    same_a = spine.distinctive_words("Four Palestinians and two Israelis killed in West Bank")
+    same_b = spine.distinctive_words("Funerals held for four Palestinians killed in raid")
+    assert same_a & same_b                                    # shares "Palestinians"
+
+    diff_a = spine.distinctive_words("AI is 'not smart' so what's next in artificial intelligence")
+    diff_b = spine.distinctive_words("Amazon cuts jobs in its artificial general intelligence unit")
+    assert not (diff_a & diff_b)                              # "artificial intelligence" is lowercase
+
+
+def test_a_headline_leading_with_its_subject_still_yields_it():
+    """Skipping the first word outright lost the proper noun headlines most often lead with."""
+    assert "india" in spine.distinctive_words("India's youth call off protest")
+
+
+def test_possessives_are_normalised():
+    assert spine.distinctive_words("India's minister") == spine.distinctive_words("India minister")
+
+
+def test_common_headline_openers_are_not_treated_as_subjects():
+    for opener in ("Four killed in blast", "These are the winners", "Why markets fell"):
+        words = spine.distinctive_words(opener)
+        assert not (words & {"four", "these", "why"})
+
+
+def test_the_weak_band_sits_below_the_strong_one():
+    assert 0 < spine.WEAK_SIMILARITY < spine.SIMILARITY

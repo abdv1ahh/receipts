@@ -3,6 +3,7 @@
 // and is labelled "AI analysis" (model-written) or "auto" (deterministic template) — never fabricated.
 import { useEffect, useState } from "react";
 import { fetchNews } from "./api";
+import { CoverageView } from "./coverage.jsx";
 
 const IMPACT_BAND = (n) => (n >= 70 ? "high" : n >= 45 ? "medium" : "low");
 const CAT_LABEL = {
@@ -155,6 +156,7 @@ function StoryCard({ entry, onOpenSymbol }) {
 export function NewsView({ onOpenSymbol }) {
   const [data, setData] = useState(null);
   const [cat, setCat] = useState("all");
+  const [tab, setTab] = useState("stories");
   const [err, setErr] = useState(null);
   useEffect(() => {
     setData(null);
@@ -174,9 +176,15 @@ export function NewsView({ onOpenSymbol }) {
           <h1 className="page-title">News Intelligence</h1>
           <div className="page-sub">Every material event and market headline, deduped and ranked by expected impact, each explained by the analyst — sourced, never fabricated.</div>
         </div>
+        <div className="sm-filter">
+          <button className={tab === "stories" ? "on" : ""} onClick={() => setTab("stories")}>Stories</button>
+          <button className={tab === "coverage" ? "on" : ""} onClick={() => setTab("coverage")}>Coverage</button>
+        </div>
       </div>
 
-      {data && items.length > 0 && (
+      {tab === "coverage" && <CoverageView />}
+
+      {tab === "coverage" ? null : data && items.length > 0 && (
         <div className="news-pulse">
           <span className="dash-live"><span className="live-dot" /> updated {timeAgo(freshest)}</span>
           <span className="dot-sep">·</span>
@@ -188,14 +196,14 @@ export function NewsView({ onOpenSymbol }) {
         </div>
       )}
 
-      <div className="j-tabs" style={{ marginTop: 12 }}>
+      {tab === "coverage" ? null : <div className="j-tabs" style={{ marginTop: 12 }}>
         {CATS.map((c) => <button key={c} className={`j-tab ${cat === c ? "on" : ""}`} onClick={() => setCat(c)}>{CAT_TAB[c]}</button>)}
-      </div>
+      </div>}
 
-      {data && <SourceStrip sources={data.sources} />}
-      {err && <div className="err">error: {err}</div>}
+      {tab === "coverage" ? null : data && <SourceStrip sources={data.sources} />}
+      {tab === "coverage" ? null : err && <div className="err">error: {err}</div>}
 
-      {data === null ? (
+      {tab === "coverage" ? null : data === null ? (
         [...Array(5)].map((_, i) => <div key={i} className="news-card news-skel"><div className="skel" style={{ width: `${70 - i * 7}%` }} /></div>)
       ) : items.length === 0 ? (
         <div className="empty">No news at this filter in the last few days. The 8-K feed and market feeds fill in as filings and headlines cross the wire.</div>

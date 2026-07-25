@@ -37,18 +37,32 @@ class Feed:
     url: str
     label: str
     category: str     # default category for items from this feed
+    geo: str = "US"   # ISO code of where the OUTLET sits — not where the story is about
 
 
 # Curated allowlist. Weighted toward official / public-domain feeds (the safest, highest-signal macro
 # sources) plus a couple of broad market headline feeds. Extend here; the host allowlist derives from it.
 FEEDS: list[Feed] = [
-    Feed("fed", "https://www.federalreserve.gov/feeds/press_all.xml", "Federal Reserve", "macro"),
-    Feed("sec", "https://www.sec.gov/news/pressreleases.rss", "SEC Press", "regulatory"),
-    Feed("cnbc-markets", "https://www.cnbc.com/id/20910258/device/rss/rss.html", "CNBC Markets", "markets"),
-    Feed("cnbc-top", "https://www.cnbc.com/id/100003114/device/rss/rss.html", "CNBC Top News", "markets"),
+    # US official + markets
+    Feed("fed", "https://www.federalreserve.gov/feeds/press_all.xml", "Federal Reserve", "macro", "US"),
+    Feed("sec", "https://www.sec.gov/news/pressreleases.rss", "SEC Press", "regulatory", "US"),
+    Feed("cnbc-markets", "https://www.cnbc.com/id/20910258/device/rss/rss.html", "CNBC Markets", "markets", "US"),
+    Feed("cnbc-top", "https://www.cnbc.com/id/100003114/device/rss/rss.html", "CNBC Top News", "markets", "US"),
+    Feed("cnbc-intl", "https://www.cnbc.com/id/100727362/device/rss/rss.html", "CNBC International", "markets", "US"),
+    # Outside the US. This is not decoration: the product's premise is that the same event reads
+    # differently from different places, and with only US financial media the source-comparison
+    # view had nothing to compare — two CNBC feeds agreeing is not two perspectives.
+    Feed("bbc-business", "https://feeds.bbci.co.uk/news/business/rss.xml", "BBC Business", "markets", "GB"),
+    Feed("bbc-world", "https://feeds.bbci.co.uk/news/world/rss.xml", "BBC World", "general", "GB"),
+    Feed("guardian-business", "https://www.theguardian.com/uk/business/rss", "Guardian Business", "markets", "GB"),
+    Feed("aljazeera", "https://www.aljazeera.com/xml/rss/all.xml", "Al Jazeera", "general", "QA"),
+    Feed("scmp-business", "https://www.scmp.com/rss/92/feed", "South China Morning Post", "markets", "HK"),
+    Feed("ecb", "https://www.ecb.europa.eu/rss/press.html", "European Central Bank", "macro", "EU"),
 ]
 # NOTE: feed curation is deliberate — noisy personal-finance feeds were dropped so the brief leads
-# with market-moving news, not lifestyle columns. Extend with vetted, market-focused feeds only.
+# with market-moving news, not lifestyle columns. Every feed above was fetched and parsed before
+# being added; Reuters, DW, Nikkei and Arab News were tried and rejected (unreachable, empty, or
+# 403). Extend with vetted feeds only, and record the outlet's country so the spine can place it.
 _ALLOWED_HOSTS = {urlparse(f.url).hostname for f in FEEDS}
 
 # High-precision mega-cap name → ticker map for tagging plain-language headlines ("Nvidia", "Apple").

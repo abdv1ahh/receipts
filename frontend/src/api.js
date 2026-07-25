@@ -63,6 +63,8 @@ export const fetchNews = ({ symbol, category, hours, limit } = {}) => {
   return get(`/api/news${q ? `?${q}` : ""}`);
 };
 export const fetchNewsItem = (id) => get(`/api/news/${id}`);
+// Source comparison (Phase 6): how differently outlets frame one event, and where coverage is thin.
+export const fetchNewsCoverage = (hours = 96) => get(`/api/news/coverage?hours=${hours}`);
 export const fetchJobs = () => get("/api/jobs");
 export const fetchEvents = (days = 10) => get(`/api/events?days=${days}`);
 export const fetchPortfolios = () => get("/api/portfolios");
