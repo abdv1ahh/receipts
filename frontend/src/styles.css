@@ -1495,3 +1495,24 @@ div.intg-warn { margin-top: 8px; border: 0; border-radius: 8px; padding: 7px 10p
 .cal-row-meta { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11.5px; color: var(--faint);
   font-family: var(--mono); }
 .cal-row-meta b { color: var(--muted); }
+
+/* ---- Crypto: structure first ------------------------------------------------------------------ */
+.cx-summary { border: 1px solid var(--border-2); border-radius: 14px; padding: 17px 19px; margin-top: 14px; }
+.cx-line { font-size: 17px; line-height: 1.5; margin-top: 8px; }
+.cx-liq { margin-top: 11px; font-size: 13px; line-height: 1.6; color: var(--muted); }
+.cx-liq b { color: var(--text); }
+.cx-card { border: 1px solid var(--border-2); border-radius: 14px; padding: 15px 18px; margin-top: 11px; }
+.cx-top { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.cx-sym { font-family: var(--mono); font-weight: 700; font-size: 16px; }
+.cx-fund { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.cx-dir { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #ffcd80; }
+.cx-meme { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; color: #ff9db0;
+  border: 1px solid rgba(255,107,129,0.35); border-radius: 5px; padding: 1px 6px; }
+.cx-mech { margin: 11px 0 0; font-size: 14px; line-height: 1.62; }
+.cx-note { margin-top: 6px; font-size: 12.5px; color: var(--muted); line-height: 1.55; }
+.cx-invalid { display: flex; align-items: flex-start; gap: 7px; margin-top: 11px; padding: 8px 11px;
+  border-radius: 9px; background: rgba(108,148,255,0.07); color: #a9c2ff; font-size: 12.5px;
+  line-height: 1.55; }
+.cx-narr { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0;
+  border-top: 1px solid var(--hairline); font-size: 13px; line-height: 1.55; }
+.cx-src { margin-top: 8px; font-size: 11.5px; color: var(--faint); font-family: var(--mono); }

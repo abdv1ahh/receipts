@@ -34,6 +34,7 @@ from . import (
     community,
     config,
     crypto,
+    crypto_intel,
     db,
     exposure,
     flags,
@@ -1978,6 +1979,45 @@ def crypto_markets(limit: int = 25) -> dict:
     except Exception:
         log.warning("crypto markets fetch failed")
         return {"markets": [], "source": "CoinGecko", "error": "crypto data temporarily unavailable"}
+
+
+@app.get("/api/crypto/structure")
+def crypto_structure() -> dict:
+    """Crypto market STRUCTURE — who is positioned, how crowded, and whether money is entering.
+
+    The price table this replaces showed numbers anyone can get free in five seconds. Positioning
+    is free too but almost nobody surfaces it, and it is what explains a move rather than
+    restating it. Every reading carries the condition that would break it."""
+    from .ingestion import derivatives
+    try:
+        deriv = derivatives.fetch_cached()
+    except Exception as exc:
+        log.warning("derivatives unavailable (%s)", type(exc).__name__)
+        return {"available": False,
+                "note": "Positioning data is temporarily unavailable from the exchange."}
+    stables = []
+    try:
+        stables = [c for c in crypto.markets(limit=60) if c.get("symbol", "").upper()
+                   in ("USDT", "USDC", "DAI", "USDS", "PYUSD")]
+    except Exception as exc:
+        log.warning("stablecoin supply unavailable (%s)", type(exc).__name__)
+
+    with db.connect() as conn, conn.cursor() as cur:
+        # Narrative, from our own store: what has this product actually interpreted about crypto?
+        cur.execute("""SELECT c.id, c.mechanism, c.confidence, c.horizon, e.title, e.source_url
+                         FROM claims c LEFT JOIN events e ON e.id = c.event_id
+                        WHERE c.created_at >= now() - interval '14 days'
+                          AND (e.category = 'protocol_upgrade'
+                               OR EXISTS (SELECT 1 FROM jsonb_array_elements(c.affected) a
+                                           WHERE upper(a->>'value') IN
+                                             ('BTC','ETH','BITCOIN','ETHEREUM','CRYPTO','SOL')))
+                     ORDER BY c.confidence DESC LIMIT 5""")
+        ncols = ("id", "mechanism", "confidence", "horizon", "headline", "url")
+        narrative = [dict(zip(ncols, r, strict=True)) for r in cur.fetchall()]
+
+    out = crypto_intel.compose(deriv["positioning"], stables, narrative)
+    return {"available": True, **out, "failed_symbols": deriv["failed"],
+            "source": deriv["source"]}
 
 
 @app.get("/api/crypto/trending")

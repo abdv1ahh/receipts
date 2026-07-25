@@ -112,6 +112,14 @@ def _job_measure_claims(conn) -> dict:
     return ledger.measure_due(conn)
 
 
+def _job_crypto_structure(conn) -> dict:
+    """Keep the derivatives cache warm so the Crypto surface is instant. Five symbols x four
+    endpoints is ~7s of paced requests — fine here, unacceptable on a page load."""
+    from .ingestion import derivatives
+    out = derivatives.fetch_cached()
+    return {"symbols": len(out.get("positioning") or {}), "failed": out.get("failed")}
+
+
 def _job_warm_brief(conn) -> dict:
     """Pre-compute + cache the shared market Morning Brief so it's instant to open. Runs after the news
     jobs so the LLM circuit is already warm and the brief reflects the latest data. Lazy app import
@@ -145,6 +153,7 @@ JOBS = [
     ("spine_news", 1800, _job_spine_news),        # follows news_rss, which runs on the same tick
     ("interpret", 3600, _job_interpret),          # claims from new clusters, hourly and bounded
     ("measure_claims", 21600, _job_measure_claims),  # horizons close slowly; 4x a day is plenty
+    ("crypto_structure", 240, _job_crypto_structure),  # just inside the 300s cache TTL
 ]
 
 

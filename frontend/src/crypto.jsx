@@ -1,11 +1,80 @@
-// Crypto — real market data from CoinGecko (free, keyless): prices, 1h/24h/7d moves, market cap,
-// volume, 7-day sparklines, and what's trending in search — with a breadth-based market pulse and
-// unmissable risk labels. Honest by construction: on a fetch failure it says "temporarily unavailable"
-// rather than showing a stale/fabricated price, and it is explicit that on-chain flows / whales /
-// funding / OI / liquidations / ETF flows need specialized feeds that aren't wired. Never advice.
+// Crypto — market STRUCTURE first, prices second.
+//
+// This surface used to be a price table: price, 24h, market cap, sparkline. Every number real, and
+// every one available free elsewhere in five seconds. That is the definition of a mirror, and a
+// mirror adds nothing — which was the owner's criticism, and it was correct.
+//
+// What leads now is positioning: who is leveraged which way, what it costs them to stay there, and
+// whether that crowd is building or unwinding. It is equally free (Binance's public futures
+// endpoints, no key) and almost nobody surfaces it, because it takes a paragraph to explain rather
+// than a number to print.
+//
+// Every reading carries the condition that would BREAK it. A reading you cannot be wrong about is
+// worthless, and this product scores itself.
 import { useEffect, useMemo, useState } from "react";
-import { fetchCryptoMarkets, fetchCryptoTrending } from "./api";
+import { fetchCryptoMarkets, fetchCryptoStructure, fetchCryptoTrending } from "./api";
 import { Icon } from "./icons.jsx";
+import { LoadError } from "./shell.jsx";
+
+const BAND = (state) => (state.startsWith("extremely") ? "high"
+  : state.startsWith("crowded") ? "high"
+  : state.startsWith("leaning") ? "medium" : "low");
+
+function Positioning({ d }) {
+  if (!d) return <div className="skel" style={{ width: "60%", height: 70, marginTop: 14 }} />;
+  if (!d.available) {
+    return <div className="empty" style={{ marginTop: 14 }}>{d.note}</div>;
+  }
+  return (
+    <>
+      <div className="cx-summary">
+        <div className="pulse-kicker"><span className="live-dot" /> Market structure</div>
+        <div className="cx-line">{d.summary.line}</div>
+        {d.liquidity?.available && (
+          <div className="cx-liq">
+            <b>Liquidity: {d.liquidity.state}</b> — {d.liquidity.mechanism}
+          </div>
+        )}
+      </div>
+
+      {d.positioning.map((r) => (
+        <div key={r.symbol} className="cx-card">
+          <div className="cx-top">
+            <span className="cx-sym">{r.symbol}</span>
+            <span className={`rd-conf band-${BAND(r.state)}`}>{r.state}</span>
+            <span className="cx-fund">
+              {r.funding_annualised_pct >= 0 ? "+" : ""}{r.funding_annualised_pct}%/yr funding
+            </span>
+            {r.funding_direction !== "flat" && <span className="cx-dir">{r.funding_direction}</span>}
+            {r.attention_driven && <span className="cx-meme">attention-driven</span>}
+            <span className="spacer" />
+            <span className="name">{r.confidence} confidence</span>
+          </div>
+          <p className="cx-mech">{r.mechanism}</p>
+          {r.notes.map((n, i) => <div key={i} className="cx-note">· {n}</div>)}
+          <div className="cx-invalid">
+            <Icon name="alert" size={13} /> {r.invalidation}
+          </div>
+        </div>
+      ))}
+
+      {d.narrative?.length > 0 && (
+        <div className="sec" style={{ marginTop: 14 }}>
+          <div className="sec-head"><div className="sec-title">What this product has interpreted</div></div>
+          {d.narrative.map((n) => (
+            <div key={n.id} className="cx-narr">
+              <span className="rd-conf band-medium">{Math.round(n.confidence * 100)}%</span>
+              <span>{n.mechanism}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="disc" style={{ marginTop: 14 }}>{d.disclaimer}</div>
+      <div className="cx-src">Positioning: {d.source}. Prices: CoinGecko free tier.</div>
+    </>
+  );
+}
 
 const RISK = { high_volatility: "⚡ volatile", microcap: "microcap", thin_volume: "thin volume" };
 const usd = (v) => (v == null ? "—" : v >= 1 ? `$${v.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : `$${v.toPrecision(3)}`);
@@ -44,9 +113,13 @@ function MiniBoard({ icon, title, coins, kind }) {
 export function CryptoView() {
   const [markets, setMarkets] = useState(null);
   const [trending, setTrending] = useState(null);
+  const [structure, setStructure] = useState(null);
+  const [tab, setTab] = useState("structure");
   useEffect(() => {
     fetchCryptoMarkets(40).then(setMarkets).catch(() => setMarkets({ markets: [], error: "unavailable" }));
     fetchCryptoTrending().then((d) => setTrending(d.trending || [])).catch(() => setTrending([]));
+    fetchCryptoStructure().then(setStructure)
+      .catch(() => setStructure({ available: false, note: "Positioning data is temporarily unavailable." }));
   }, []);
 
   const rows = markets?.markets || [];
@@ -70,11 +143,21 @@ export function CryptoView() {
       <div className="page-head">
         <div>
           <h1 className="page-title">Crypto</h1>
-          <div className="page-sub">Live market data and search attention from CoinGecko. Crypto is highly volatile — this is market data, never advice.</div>
+          <div className="page-sub">
+            Who is positioned which way, what it costs them to stay there, and whether money is
+            entering the system. Prices are the second question, not the first.
+          </div>
+        </div>
+        <div className="sm-filter">
+          <button className={tab === "structure" ? "on" : ""} onClick={() => setTab("structure")}>Structure</button>
+          <button className={tab === "prices" ? "on" : ""} onClick={() => setTab("prices")}>Prices</button>
         </div>
       </div>
 
-      {markets === null ? <div className="skel" style={{ width: "50%", marginTop: 14, height: 90 }} />
+      {tab === "structure" && <Positioning d={structure} />}
+
+      {tab !== "prices" ? null
+        : markets === null ? <div className="skel" style={{ width: "50%", marginTop: 14, height: 90 }} />
         : markets.error || !rows.length ? (
           <div className="empty" style={{ marginTop: 14 }}>Crypto data is temporarily unavailable. It's live from CoinGecko and will return shortly — we never show a stale or fabricated price.</div>
         ) : (
@@ -126,9 +209,11 @@ export function CryptoView() {
         )}
 
       <div className="disc" style={{ marginTop: 16 }}>
-        Data: CoinGecko (prices, moves, market cap, volume, search-trending). On-chain flows, whale activity,
-        funding &amp; open interest, liquidations, and ETF flows need specialized data feeds that aren't connected yet —
-        we show what's real and never fabricate the rest. Crypto assets are highly volatile and can lose all value. Not investment advice.
+        Data: CoinGecko (prices, moves, market cap, volume, search-trending) and Binance's public
+        futures endpoints (funding, open interest, account positioning) — both free and keyless.
+        Still not connected: on-chain flows, whale activity, liquidation cascades and ETF flows,
+        which need paid feeds. We show what's real and never fabricate the rest. Crypto assets are
+        highly volatile and can lose all value. Not investment advice.
       </div>
     </div>
   );

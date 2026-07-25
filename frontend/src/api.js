@@ -115,6 +115,8 @@ export const reportContent = (target_type, target_id, reason) => post("/api/repo
 export const fetchTraderLeaderboard = () => get("/api/leaderboard/traders");
 export const fetchCryptoMarkets = (limit = 25) => get(`/api/crypto/markets?limit=${limit}`);
 export const fetchCryptoTrending = () => get("/api/crypto/trending");
+// Market structure (Phase 6): positioning and liquidity, not another price table.
+export const fetchCryptoStructure = () => get("/api/crypto/structure");
 export const fetchSearch = (q) => get(`/api/search?q=${encodeURIComponent(q)}`);
 // Admin dashboard (Slice K) — every route is admin-only server-side (tier=admin, TOTP at login).
 export const adminOverview = () => get("/api/admin/overview");
