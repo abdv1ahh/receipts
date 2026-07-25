@@ -34,11 +34,12 @@ Never rename Python modules, database tables, or the `tradeos` package for brand
 | XML | defusedxml | 0.7.1 |
 | Auth | argon2-cffi, pyotp (TOTP for admins) | 23.1.0 / 2.9.0 |
 | Tests | pytest | 9.0.3 |
-| Frontend | React + Vite, **no router, no state library, no CSS framework** | 18.3.1 / 5.4.21 |
+| Frontend | React + Vite. Routing is ~40 lines over the History API in `shell.jsx`; no state library, no CSS framework | 18.3.1 / 5.4.21 |
 | Node (build) | node / npm | 24.18 / 11.16 |
 
-There is **no ORM** (raw SQL through psycopg), **no migration framework** (ordered `.sql`
-files run by `tradeos/db.py`), and **no dependency injection / event bus / state machine**.
+Ruff is the linter (not the formatter — see the note in `pyproject.toml`). There is **no ORM**
+(raw SQL through psycopg), **no migration framework** (ordered `.sql` files run by
+`tradeos/db.py`), and **no dependency injection / event bus / state machine**.
 Keep it that way. `requirements.txt` is 10 lines. Adding to it is a decision, not a reflex.
 
 ---
@@ -62,13 +63,13 @@ The app is at <http://localhost:8000>. Demo login: `demo@tradeos.app` / `<genera
 ### Tests
 
 ```bash
-docker compose run --rm -T -v "$PWD/tests:/app/tests" api python -m pytest tests/ -q
+make test     # 222 tests, ~0.3s, fully offline (no network)
+make lint     # ruff; zero errors is the standard
+make dev      # reload-in-place stack; then `make web` for a UI change
 ```
 
-**189 tests, ~0.5s, fully offline (no network).** The `-v` mount is required: the Dockerfile
-deliberately does not copy `tests/` into the image, so `make test` and the README's
-`python -m pytest tests/ -q` both fail with "file or directory not found". Fixing that
-mismatch is a Phase 1 cleanup item.
+`tests/` is deliberately not copied into the production image, so the suite runs against a mount.
+`make test` does that for you.
 
 ### Frontend
 
@@ -115,7 +116,10 @@ tradeos/                  the Python package (all backend code)
   app.py                  FastAPI app: 98 routes, 2200 lines. The one big file.
   db.py                   psycopg connect() + ordered .sql migration runner
   config.py               env accessors; raises ConfigError rather than defaulting secrets
-  llm.py                  ONE transport for every model call (gemini | openai-compatible)
+  llm.py                  ONE transport for every model call: provider CHAIN + per-provider
+                          circuit breakers + FAST/DEEP model roles
+  sources.py              the source registry: every external source, its state, what it powers,
+                          where its free key comes from. Backs /api/integrations and every gate.
   authn.py  apikeys.py    sessions (argon2, TOTP for admin), API keys
   flags.py                DB-backed feature flags actually enforced on the request path
   scheduler.py            the background worker: JOBS registry + due-check + job_runs
@@ -130,6 +134,7 @@ tradeos/                  the Python package (all backend code)
                           trades, insights, portfolio, community, alerts, admin,
                           billing, search, library, presentation, assistant
 frontend/src/             React, one .jsx per surface, imported by App.jsx
+  shell.jsx               routing, ErrorBoundary, LoadError/EmptyState, SourceGate
 tests/                    pytest; offline, fixture-driven (tests/fixtures/)
 docs/                     audit, bugs, dead_code, plan, state, progress/, decision-log,
                           threat-models/, runbooks/
@@ -166,26 +171,30 @@ when a phase touches it, not as a standalone refactor.
 
 ## Gotchas that will cost you an hour
 
-1. **Frontend changes need a Docker rebuild.** (See above. This is the number one time sink.)
-2. **`make test` and the README test command are broken.** Use the mount form above.
-3. **GitHub Models is being retired 2026-07-30.** `EXPLAIN_PROVIDER=openai` currently points
-   at `https://models.github.ai/inference`, which returns `Sunset: Thu, 30 Jul 2026` headers.
-   All AI prose, the Morning Brief, news analysis and chart reads die that day unless the
-   provider moves. `gemini-flash-latest` is verified working on the existing key.
-4. **`gemini-2.5-flash` 404s** ("no longer available to new users") and `gemini-2.0-flash`
-   is over quota on this key. Use `gemini-flash-latest`.
-5. **`llm.py` has a process-global cooldown.** One 429 silences *every* model caller for 120
-   seconds. When debugging model output, a `None` may mean "cooling", not "no provider".
-6. **`directive_guard` bans the phrase `target price`** while the vision prompt asks the
-   model to discuss entry/stop/target levels. Any prose field tripping the guard discards
-   the *entire* analysis. This is the root cause of "the AI never sees my screenshot".
-7. **The app has no router.** Navigation is `useState` in `App.jsx`; there are no URLs, no
-   deep links, no browser back. Phase 4 and Phase 7 both need this fixed.
-8. **A single failed fetch sets a global `err`** in `App.jsx` and renders a red bar over
-   every page. There are no error boundaries.
-9. **Postgres, not SQLite.** The product brief suggests SQLite; the app already has 23
+1. **Frontend changes need a rebuild.** Under `make dev` that is `make web` (~0.3s). Without
+   it, a full `docker compose up -d --build`. The bundle is baked into the image.
+2. **Gemini's `maxOutputTokens` counts hidden reasoning.** Measured 769–1360 thinking tokens for
+   one chart image, so a caller asking for 800 gets truncated JSON that looks like a parse bug.
+   `THINKING_HEADROOM` in `llm.py` pays for it — do not remove it.
+3. **`thinkingConfig` returns 400 on every Gemini model newer than 2.5.** Sending it had pinned
+   the app to legacy models. Do not reintroduce it.
+4. **Gemini quota is per model.** `gemini-2.0-flash` has a zero free-tier allowance and
+   `gemini-2.5-*` are closed to new keys. Use `gemini-flash-latest` (DEEP) and
+   `gemini-flash-lite-latest` (FAST). The model id is load-bearing.
+5. **`EXPLAIN_PROVIDER` is a chain**, comma-separated, tried in order. Circuit breakers are per
+   provider. A `None` from `llm.text()` may mean "every provider is cooling" — use
+   `llm.complete()` when you need the reason to show a user.
+6. **httpx puts the full request URL, query string included, in exception messages.** Any API
+   authenticated with `?key=` leaks its credential through an unhandled error.
+   `scheduler.redact()` strips query strings before anything is stored or logged. Keep it.
+7. **Postgres, not SQLite.** The product brief suggests SQLite; the app already has 23
    migrations, 48 tables and 664k insider transactions in Postgres. Do not migrate.
-10. **Migrations are never edited once applied.** Add `024_*.sql` and move forward.
+8. **Migrations are never edited once applied.** Add `024_*.sql` and move forward.
+9. **Never call an external API from a route handler or a component** — it goes in
+   `tradeos/ingestion/` and gets an entry in `tradeos/sources.py`, or the integration status page
+   silently stops telling the truth.
+10. **A source that no-ops because it is unkeyed still records `status: ok`** in `job_runs`.
+    `sources.health()` deliberately does not count that as a successful fetch.
 
 ---
 
@@ -203,7 +212,7 @@ when a phase touches it, not as a standalone refactor.
 | Reddit | `REDDIT_CLIENT_ID` + `_SECRET` | Social sentiment | **not connected** |
 | YouTube | `YOUTUBE_API_KEY` | Social sentiment | not connected |
 | X / Twitter | — | — | **no free read tier; do not attempt** |
-| LLM | `OPENAI_*` or `GEMINI_API_KEY` | All AI prose | connected, **sunsetting** |
+| LLM | `GEMINI_API_KEY` (+ optional `OPENAI_*`) | All AI prose | connected (Gemini free tier) |
 
 Every external call goes through a module in `tradeos/ingestion/`. **Never call an external
 API from a route handler or a component.**
