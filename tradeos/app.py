@@ -418,15 +418,22 @@ def feeds() -> dict:
 
 
 @app.get("/api/integrations")
-def integrations() -> dict:
+def integrations(tos_session: str | None = Cookie(None)) -> dict:
     """Every external source in one place: connected or not, what it powers, where its free key comes
     from, when it last succeeded, and the last error if any. The owner should never again have to
-    guess why a panel is empty."""
+    guess why a panel is empty.
+
+    Authenticated. Raw operator detail — the last error text and per-feed row counts — goes only to
+    admins: `last_error` is `str(exc)` from an arbitrary ingestion failure, and an httpx error
+    embeds the full request URL. Everyone else sees that a run failed, without its text."""
     with db.connect() as conn:
-        rows = sources.health(conn)
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            return {"authenticated": False}
+        rows = sources.health(conn, detailed=user.get("tier") == "admin")
     counts = {s: sum(1 for r in rows if r["state"] == s)
               for s in (sources.CONNECTED, sources.NEEDS_KEY, sources.UNAVAILABLE)}
-    return {"sources": rows, "counts": counts, "brand": config.brand_name()}
+    return {"authenticated": True, "sources": rows, "counts": counts, "brand": config.brand_name()}
 
 
 # ------------------------------------------------------------------- merged activity

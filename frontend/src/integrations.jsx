@@ -55,7 +55,11 @@ function Source({ s }) {
           Connected, but nothing new in over three days. Check the worker logs for this source.
         </div>
       )}
-      {s.last_error && <div className="intg-err">Last error: {s.last_error}</div>}
+      {/* The error TEXT is admin-only server-side (it can carry a request URL). Everyone else
+          still learns the run failed, which is what explains an empty panel. */}
+      {s.last_error ? <div className="intg-err">Last error: {s.last_error}</div>
+        : s.failing ? <div className="intg-err">Its last scheduled run failed. Check the worker logs.</div>
+        : null}
 
       {s.state === "needs_key" && s.signup_url && (
         <div className="intg-connect">
@@ -88,12 +92,23 @@ function Source({ s }) {
   );
 }
 
-export function IntegrationsView() {
+export function IntegrationsView({ onLogin }) {
   const [d, setD] = useState(undefined);   // undefined loading · null failed
   const load = () => { setD(undefined); fetchIntegrations().then(setD).catch(() => setD(null)); };
   useEffect(load, []);
 
   if (d === null) return <LoadError what="the integration status" onRetry={load} />;
+  if (d && d.authenticated === false) {
+    return (
+      <div>
+        <div className="page-head"><h1 className="page-title">Integrations</h1></div>
+        <div className="empty" style={{ marginTop: 14 }}>
+          Log in to see which data sources are connected and how they are behaving.
+          <div style={{ marginTop: 10 }}><button className="act" onClick={onLogin}>log in</button></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>

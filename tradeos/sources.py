@@ -153,10 +153,15 @@ def gate(key: str) -> dict:
             "note": s["note"], "signup_url": s["signup_url"], "env": s["env"]}
 
 
-def health(conn) -> list[dict]:
+def health(conn, detailed: bool = False) -> list[dict]:
     """The catalog joined to what actually happened: last successful fetch per feed, freshest record,
-    row counts, rejects, and the last error the scheduler recorded for each job. This is the whole
-    point of the integration status page — no more guessing why a panel is empty."""
+    row counts, rejects, and whether the last job run failed. This is the whole point of the
+    integration status page — no more guessing why a panel is empty.
+
+    `detailed` (admins only) includes the raw error TEXT. That text is `str(exc)[:300]` of an
+    arbitrary ingestion exception, and an httpx error embeds the full request URL including its
+    query string — which is how a keyed API's credential would escape. Non-admins learn that a run
+    failed, which is all they need to interpret an empty panel."""
     iso = lambda t: t.isoformat() if t else None                      # noqa: E731 — trivial local
     with conn.cursor() as cur:
         cur.execute("SELECT source, last_success_at, last_record_knowable, records_total, "
@@ -183,10 +188,12 @@ def health(conn) -> list[dict]:
             **s,
             "feeds": [{**f, "last_success_at": iso(f["last_success_at"]), "freshest": iso(f["freshest"])}
                       for f in mine],
-            "jobs": [{**j, "last_run": iso(j["last_run"])} for j in myjobs],
+            "jobs": [{"job": j["job"], "last_run": iso(j["last_run"]), "status": j["status"],
+                      "duration_ms": j["duration_ms"]} for j in myjobs],
             "last_success_at": iso(max(last)) if last else None,
             "records": sum(x["records"] or 0 for x in mine) or None,
             "rejects": sum(x["rejects"] or 0 for x in mine) or None,
-            "last_error": errors[0] if errors else None,
+            "failing": bool(errors),
+            "last_error": (errors[0] if errors else None) if detailed else None,
         })
     return out

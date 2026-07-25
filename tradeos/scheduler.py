@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import time
 from datetime import UTC, date, datetime, timedelta
 
@@ -130,6 +131,19 @@ def _last_success(conn, job: str) -> datetime | None:
         return cur.fetchone()[0]
 
 
+# A URL's query string is where credentials travel (Gemini authenticates with ?key=..., and other
+# free APIs do the same). httpx puts the full request URL into its exception message, so an
+# unhandled 4xx would otherwise write a live key into job_runs and into any surface that reads it.
+# Strip every query string before the message is stored or logged.
+_QUERY = re.compile(r"(\?|&)[^\s'\"]+")
+
+
+def redact(text: str) -> str:
+    """An error message with query strings removed, so a credential passed as a URL parameter never
+    reaches the database or the logs. Pure and offline-testable."""
+    return _QUERY.sub(r"\1<redacted>", text or "")
+
+
 def run_job(conn, name: str, fn) -> dict:
     """Run one job, recording the attempt in job_runs whether it succeeds or fails (degrade loudly)."""
     started = datetime.now(UTC)
@@ -139,9 +153,9 @@ def run_job(conn, name: str, fn) -> dict:
         status = "ok"
     except Exception as exc:
         conn.rollback()
-        detail = {"error": type(exc).__name__, "message": str(exc)[:300]}
+        detail = {"error": type(exc).__name__, "message": redact(str(exc))[:300]}
         status = "error"
-        log.warning("job %s failed: %s", name, exc)
+        log.warning("job %s failed: %s: %s", name, type(exc).__name__, redact(str(exc))[:300])
     dur = int((time.monotonic() - t0) * 1000)
     with conn.cursor() as cur:
         cur.execute("INSERT INTO job_runs (job, started_at, finished_at, status, detail, duration_ms) "

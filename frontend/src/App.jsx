@@ -322,7 +322,7 @@ export default function App() {
           ) : view === "crypto" ? (
             <CryptoView />
           ) : view === "integrations" ? (
-            <IntegrationsView />
+            <IntegrationsView onLogin={() => go("auth")} />
           ) : view === "admin" ? (
             <AdminView user={user} />
           ) : (
