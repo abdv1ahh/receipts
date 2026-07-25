@@ -85,6 +85,29 @@ def _nearest_high_macro(radar: list[dict]) -> tuple[int | None, str | None]:
 
 # ------------------------------------------------------------------ the Market Pulse
 
+def _live_radar(conn, limit: int = 5) -> list[dict]:
+    """The top live interpretations, for the dashboard's compact Radar tile.
+
+    The tile used to show the next few CALENDAR entries, which is a schedule, not a radar —
+    nothing on it could ever be a surprise. This reads the same claims the Radar surface ranks,
+    leading with the consequence, so the tile is a genuine preview of that surface rather than a
+    different thing wearing its name."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """SELECT c.id, c.mechanism, c.confidence, c.horizon, c.affected,
+                      cardinality(c.contradicts) AS disputes,
+                      e.title, e.category, e.geo, cl.novelty_score
+                 FROM claims c
+                 LEFT JOIN events e ON e.id = c.event_id
+                 LEFT JOIN event_clusters cl ON cl.id = c.cluster_id
+                WHERE c.created_at >= now() - interval '7 days'
+             ORDER BY COALESCE(cl.novelty_score, 0) * c.confidence DESC
+                LIMIT %s""", (limit,))
+        cols = ("id", "mechanism", "confidence", "horizon", "affected", "disputes",
+                "headline", "category", "geo", "novelty")
+        return [dict(zip(cols, r, strict=True)) for r in cur.fetchall()]
+
+
 def _market_pulse(conn, as_of, sm: dict, news_items: list[dict], radar: list[dict],
                   attention: list[dict]) -> dict:
     """A transparent flow-and-positioning read. The score starts neutral (50) and each REAL signal
@@ -184,6 +207,7 @@ def compose(conn: psycopg.Connection, *, as_of, tier: str, delayed_hours: int,
     sm = brief.smart_money_digest(conn, as_of, voice_name_fn, limit=8)
     news_items = news.ranked_news(conn, hours=48, limit=8)
     radar = events.brief_events(conn, days=6, limit=6)
+    live_radar = _live_radar(conn, limit=5)
     attention = social.board(conn, hours=72, limit=8, enrich_top=4)
 
     pulse = _market_pulse(conn, as_of, sm, news_items, radar, attention)
@@ -199,7 +223,8 @@ def compose(conn: psycopg.Connection, *, as_of, tier: str, delayed_hours: int,
         "high_conviction_count": len(high_conviction),
         "news": news_items[:5],
         "smart_money": {k: v for k, v in sm.items() if k != "lead"},
-        "radar": radar,
+        "radar": radar,              # scheduled calendar entries — kept as "what's coming"
+        "live_radar": live_radar,    # live interpretations — what the Radar surface actually shows
         "attention": [a for a in attention if a.get("symbol")][:5],
         "sources_status": news.sources_status(conn),
         "generated_at": datetime.now(UTC).isoformat(),

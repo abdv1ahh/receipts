@@ -1360,3 +1360,23 @@ div.intg-warn { margin-top: 8px; border: 0; border-radius: 8px; padding: 7px 10p
 .lg-miss-head:hover { color: var(--accent-2, #6c94ff); }
 .lg-miss-mech { margin: 6px 0 0; font-size: 12.5px; line-height: 1.6; color: var(--muted); }
 .lg-thin { color: var(--faint); font-family: var(--mono); font-size: 11.5px; }
+
+/* Dashboard's compact live Radar tile — consequence first, same as the full surface. */
+.dradar { display: flex; gap: 12px; width: 100%; text-align: left; background: none; border: 0;
+  border-top: 1px solid var(--hairline); padding: 12px 4px; cursor: pointer; color: inherit; font: inherit; }
+.dradar:first-of-type { border-top: 0; }
+.dradar:hover { background: rgba(255,255,255,0.02); }
+.dradar-conf { flex: none; font-family: var(--mono); font-size: 12px; font-weight: 700;
+  border: 1px solid var(--border-2); border-radius: 6px; padding: 2px 7px; height: fit-content; }
+.dradar-conf.band-high { color: #4cd9a0; border-color: rgba(76,217,160,0.4); }
+.dradar-conf.band-medium { color: #ffcd80; border-color: rgba(255,194,92,0.4); }
+.dradar-conf.band-low { color: var(--faint); }
+.dradar-body { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.dradar-mech { font-size: 13.5px; line-height: 1.55; color: var(--text);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.dradar-meta { display: flex; gap: 7px; flex-wrap: wrap; align-items: center; font-size: 11.5px; color: var(--muted); }
+.dradar-chip { font-weight: 600; border: 1px solid var(--border-2); border-radius: 6px; padding: 1px 6px; }
+.dradar-chip.dir-up { color: #6fe0b4; border-color: rgba(76,217,160,0.3); }
+.dradar-chip.dir-down { color: #ff9db0; border-color: rgba(255,107,129,0.3); }
+.dradar-h { font-family: var(--mono); }
+.dradar-disp { color: #ffcd80; }

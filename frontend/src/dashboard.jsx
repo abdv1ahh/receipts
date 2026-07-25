@@ -204,7 +204,43 @@ function SmartMoney({ sm, onOpenSymbol, onNav, riseN }) {
   );
 }
 
-function Radar({ events, onOpenSymbol, onNav, riseN }) {
+/** The compact live Radar: the top interpretations, consequence first, with a route into the
+ *  full surface. Replaces a tile that showed the next few calendar entries — a schedule, not a
+ *  radar, since nothing on it could ever be a surprise. */
+function LiveRadar({ items, onNav, riseN }) {
+  return (
+    <Section icon="radar" title="On the radar" span riseN={riseN}
+             count={items.length ? `${items.length} live` : null}
+             linkLabel="Open Radar" onLink={() => onNav("radar")}>
+      {items.length === 0 ? (
+        <div className="sec-empty">
+          No live interpretations right now. The engine writes one only when it can identify a
+          specific causal mechanism — it stays quiet rather than guessing.
+        </div>
+      ) : items.map((c) => (
+        <button key={c.id} className="dradar" onClick={() => onNav("radar")}>
+          <span className={`dradar-conf band-${c.confidence >= 0.7 ? "high" : c.confidence >= 0.4 ? "medium" : "low"}`}>
+            {Math.round((c.confidence || 0) * 100)}%
+          </span>
+          <span className="dradar-body">
+            <span className="dradar-mech">{c.mechanism}</span>
+            <span className="dradar-meta">
+              {(c.affected || []).slice(0, 3).map((a, i) => (
+                <span key={i} className={`dradar-chip dir-${a.direction}`}>
+                  {a.direction === "up" ? "▲" : "▼"} {a.value}
+                </span>
+              ))}
+              <span className="dradar-h">over {c.horizon}</span>
+              {c.disputes > 0 && <span className="dradar-disp">⚠ {c.disputes} disagree</span>}
+            </span>
+          </span>
+        </button>
+      ))}
+    </Section>
+  );
+}
+
+function UpcomingRadar({ events, onOpenSymbol, onNav, riseN }) {
   const fmtDay = (iso) => {
     try {
       const d = new Date(iso + "T00:00:00");
@@ -213,7 +249,7 @@ function Radar({ events, onOpenSymbol, onNav, riseN }) {
     } catch { return { wd: "", dm: iso }; }
   };
   return (
-    <Section icon="radar" title="On the radar" span riseN={riseN}
+    <Section icon="calendar" title="What's coming" span riseN={riseN}
              linkLabel="Calendar" onLink={() => onNav("events")}>
       {(!events || events.length === 0) ? (
         <div className="sec-empty">Nothing major scheduled in the next several days.</div>
@@ -304,7 +340,11 @@ export function Dashboard({ user, onOpenSymbol, onNav }) {
       </div>
 
       <div style={{ marginTop: "var(--s4)" }}>
-        <Radar events={d.radar || []} onOpenSymbol={onOpenSymbol} onNav={onNav} riseN={4} />
+        <LiveRadar items={d.live_radar || []} onNav={onNav} riseN={4} />
+      </div>
+
+      <div style={{ marginTop: "var(--s4)" }}>
+        <UpcomingRadar events={d.radar || []} onOpenSymbol={onOpenSymbol} onNav={onNav} riseN={4} />
       </div>
     </div>
   );
