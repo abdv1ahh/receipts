@@ -8,7 +8,6 @@ import pytest
 
 from tradeos import scheduler, sources
 
-
 # ------------------------------------------------------------------ the registry
 
 def test_catalog_states_are_derived_from_config(monkeypatch):
