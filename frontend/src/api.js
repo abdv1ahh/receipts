@@ -21,6 +21,7 @@ export const fetchIntegrations = () => get("/api/integrations");
 export const fetchClaims = ({ hours = 336, limit = 60 } = {}) => get(`/api/claims?hours=${hours}&limit=${limit}`);
 export const fetchLedger = () => get("/api/ledger");
 export const fetchCountries = () => get("/api/countries");
+export const fetchGlobe = () => get("/api/globe");
 export const saveProfileFrame = (frame) =>
   fetch("/api/profile/frame", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(frame) }).then((r) => r.json());
 export const fetchDefinitions = () => get("/api/definitions");

@@ -36,6 +36,7 @@ from . import (
     crypto,
     db,
     flags,
+    geography,
     insights,
     ledger,
     portfolio,
@@ -541,6 +542,56 @@ def profile_frame_set(req: ProfileFrameReq, response: Response,
              req.sectors or [], req.risk_appetite))
         conn.commit()
     return {"saved": True}
+
+
+@app.get("/api/globe")
+def globe() -> dict:
+    """What the map draws: countries lit by the events actually placed there, and the trade
+    corridors between the countries we hold sourced exposure data for.
+
+    Geography comes from what claims say they AFFECT, not from who published them — GDELT reports
+    the country of the outlet, and a US wire filing about Asian exporters is not a US event."""
+    with db.connect() as conn, conn.cursor() as cur:
+        cur.execute("""SELECT c.id, c.affected, c.confidence, c.mechanism, c.horizon,
+                              e.geo, e.category, cl.novelty_score
+                         FROM claims c
+                         LEFT JOIN events e ON e.id = c.event_id
+                         LEFT JOIN event_clusters cl ON cl.id = c.cluster_id
+                        WHERE c.created_at >= now() - interval '14 days'""")
+        cols = ("id", "affected", "confidence", "mechanism", "horizon", "geo", "category", "novelty")
+        claims_rows = [dict(zip(cols, r, strict=True)) for r in cur.fetchall()]
+
+        cur.execute("""SELECT country, name, currency, currency_regime, pegged_to, main_index,
+                              export_partners, import_partners, key_exports, key_imports
+                         FROM country_exposure ORDER BY country""")
+        ecols = ("country", "name", "currency", "currency_regime", "pegged_to", "main_index",
+                 "export_partners", "import_partners", "key_exports", "key_imports")
+        exposure = [dict(zip(ecols, r, strict=True)) for r in cur.fetchall()]
+
+    # Place every claim, preferring what it AFFECTS over where it was filed.
+    counts: dict[str, int] = {}
+    per_country: dict[str, list[dict]] = {}
+    for c in claims_rows:
+        placed = geography.countries_for(c["affected"]) or list(c.get("geo") or [])
+        for iso in placed:
+            counts[iso] = counts.get(iso, 0) + 1
+            per_country.setdefault(iso, []).append(
+                {"claim_id": c["id"], "mechanism": c["mechanism"][:240],
+                 "confidence": c["confidence"], "horizon": c["horizon"], "category": c["category"]})
+
+    by_iso = {e["country"]: e for e in exposure}
+    countries = [{
+        "country": iso, "name": (by_iso.get(iso) or {}).get("name", iso),
+        "events": n, "has_exposure_data": iso in by_iso,
+        "claims": per_country.get(iso, [])[:5],
+    } for iso, n in sorted(counts.items(), key=lambda kv: -kv[1])]
+
+    return {
+        "countries": countries,
+        "corridors": geography.corridors(exposure),
+        "exposure": {e["country"]: e for e in exposure},
+        "coverage": geography.coverage(counts, len(exposure)),
+    }
 
 
 @app.get("/api/countries")
