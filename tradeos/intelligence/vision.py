@@ -12,10 +12,8 @@ trading mentor would offer. It stays on the right side of the line by constructi
 """
 from __future__ import annotations
 
-import base64
 import json
 import logging
-import os
 
 from .. import llm
 from ..explain.guards import directive_guard
@@ -70,10 +68,22 @@ def _detected(out: dict) -> dict:
 _TEXT_FIELDS = ("pattern", "structure", "risk_reward", "psychology")
 
 
-def _guarded(out: dict) -> bool:
-    """Every prose field (and each observation) must be advice-free, or the model output is discarded."""
-    fields = [out.get(k) or "" for k in _TEXT_FIELDS] + list(out.get("observations") or [])
-    return all(directive_guard(str(f)) for f in fields)
+def _guard_fields(out: dict) -> tuple[dict, list[str]]:
+    """Drop only the prose that fails the advice guard, and name what was dropped.
+
+    Discarding a whole chart read because one sentence tripped threw away four good fields and
+    left the user with a fallback that blamed a missing model. Withholding the one offending
+    field is both safer and honest: nothing unguarded reaches the user, and the UI can say which
+    part was held back."""
+    clean, dropped = dict(out), []
+    for k in _TEXT_FIELDS:
+        if out.get(k) and not directive_guard(str(out[k])):
+            clean[k], _ = None, dropped.append(k)
+    obs = [o for o in (out.get("observations") or []) if directive_guard(str(o))]
+    if len(obs) != len(out.get("observations") or []):
+        dropped.append("observations")
+    clean["observations"] = obs
+    return clean, dropped
 
 
 def _context(trade: dict | None) -> dict:
@@ -97,40 +107,48 @@ def _parse(raw: str | None) -> dict | None:
         return None
 
 
-def _fallback(trade: dict | None) -> dict:
-    """Deterministic, honest fallback: for a logged trade, the level-based analysis; otherwise a plain
-    'connect a vision model' note. Never fabricates a chart read."""
-    base = {"source": "levels", "model_id": "template", "used_template": True,
+def _fallback(trade: dict | None, reason: str) -> dict:
+    """Deterministic, honest fallback: for a logged trade, the level-based analysis; otherwise a note
+    saying what to do about it. `reason` is the transport's plain-language explanation — a quota trip
+    is reported as a quota trip, never as a missing integration. Never fabricates a chart read."""
+    why = reason or "the AI read could not be produced"
+    base = {"source": "levels", "model_id": "template", "used_template": True, "reason": why,
             "pattern": None, "risk_reward": None, "psychology": None, "is_chart": None, "detected": {}}
     if trade and trade.get("entry_price"):
         from .. import trades
         a = trades.analyze_trade(trade)
         rr = a.get("reward_risk")
         return {**base, "ok": True,
-                "structure": "AI chart reading isn't available (no vision model connected) — here is the "
-                             "analysis from your recorded levels instead.",
+                "structure": f"No AI chart read this time — {why}. Here is the analysis from your "
+                             "recorded levels instead.",
                 "risk_reward": f"Planned reward:risk is {rr}." if rr is not None else None,
                 "observations": a.get("observations", []), "risk_flags": a.get("risk_flags", [])}
     return {**base, "ok": False, "source": "none",
-            "structure": "Connect a vision model (set EXPLAIN_PROVIDER + a key) to get an AI read of the chart.",
+            "structure": f"No AI chart read this time — {why}.",
             "observations": [], "risk_flags": []}
 
 
 def analyze_chart(image_bytes: bytes, mime: str, trade: dict | None = None,
                   provider: str | None = None) -> dict:
-    """Educational analysis of a chart image, via any configured vision model (llm.vision). Model output
-    is guarded (no advice); anything that fails a guard, or any absence of a vision model, falls back to
-    the deterministic level-based analysis."""
-    provider = (provider or os.environ.get("EXPLAIN_PROVIDER", "template")).lower()
-    out = _parse(llm.vision(INSTRUCTION + json.dumps(_context(trade)), image_bytes, mime,
-                            max_tokens=800, json_mode=True, provider=provider))
-    if out and _guarded(out):
-        return {"ok": True, "source": "ai", "used_template": False, "model_id": llm.model_id(provider),
-                "pattern": out.get("pattern"), "structure": out.get("structure"),
-                "risk_reward": out.get("risk_reward"), "observations": out.get("observations") or [],
-                "psychology": out.get("psychology"), "is_chart": out.get("is_chart"),
-                "detected": _detected(out),
-                "disclaimer": "An educational read of your chart, not advice."}
+    """Educational analysis of a chart image, via any configured vision model. Prose that fails the
+    advice guard is withheld field by field; if nothing survives, or no provider answered, this falls
+    back to the deterministic level-based analysis and says why."""
+    raw, reason = llm.complete(INSTRUCTION + json.dumps(_context(trade)), (image_bytes, mime),
+                               max_tokens=800, json_mode=True, provider=provider)
+    out = _parse(raw)
+    if raw and not out:
+        reason = "the model's reply was not valid JSON"
     if out:
-        log.warning("chart analysis guard tripped; using deterministic fallback")
-    return _fallback(trade)
+        clean, dropped = _guard_fields(out)
+        if dropped:
+            log.info("chart analysis: withheld %s (advice guard)", ", ".join(dropped))
+        if any(clean.get(k) for k in _TEXT_FIELDS) or clean["observations"]:
+            return {"ok": True, "source": "ai", "used_template": False,
+                    "model_id": llm.model_id(provider),
+                    "pattern": clean.get("pattern"), "structure": clean.get("structure"),
+                    "risk_reward": clean.get("risk_reward"), "observations": clean["observations"],
+                    "psychology": clean.get("psychology"), "is_chart": clean.get("is_chart"),
+                    "detected": _detected(out), "withheld": dropped,
+                    "disclaimer": "An educational read of your chart, not advice."}
+        reason = "every part of the model's read was withheld by the advice guard"
+    return _fallback(trade, reason)

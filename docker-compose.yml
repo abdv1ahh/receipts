@@ -21,11 +21,13 @@ services:
       TIINGO_API_KEY: ${TIINGO_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-flash-latest}
+      GEMINI_MODEL_FAST: ${GEMINI_MODEL_FAST:-gemini-flash-lite-latest}
       EXPLAIN_PROVIDER: ${EXPLAIN_PROVIDER:-template}
       # Free live AI via any OpenAI-compatible endpoint (GitHub Models / Groq / OpenRouter). See FREE-AI.md.
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-}
+      OPENAI_MODEL_FAST: ${OPENAI_MODEL_FAST:-}
       # Sentiment sources (Slice H). HN needs no key; add these free keys to connect Reddit/YouTube.
       REDDIT_CLIENT_ID: ${REDDIT_CLIENT_ID:-}
       REDDIT_CLIENT_SECRET: ${REDDIT_CLIENT_SECRET:-}
@@ -52,10 +54,12 @@ services:
       TIINGO_API_KEY: ${TIINGO_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-flash-latest}
+      GEMINI_MODEL_FAST: ${GEMINI_MODEL_FAST:-gemini-flash-lite-latest}
       EXPLAIN_PROVIDER: ${EXPLAIN_PROVIDER:-template}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-}
+      OPENAI_MODEL_FAST: ${OPENAI_MODEL_FAST:-}
       REDDIT_CLIENT_ID: ${REDDIT_CLIENT_ID:-}
       REDDIT_CLIENT_SECRET: ${REDDIT_CLIENT_SECRET:-}
     depends_on:

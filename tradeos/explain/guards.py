@@ -12,12 +12,22 @@ from __future__ import annotations
 import re
 
 # recommendation / directive / second-person-position vocabulary (case-insensitive)
+#
+# On "price target": an analyst ISSUING one is a recommendation and stays banned. Merely naming
+# the target price a user recorded on their own trade is description, and banning that made the
+# chart coach discard correct readings and then report "no vision model connected" — a lie the
+# product must not tell. So the rule fires on issuance ("price target of $190", "raised its price
+# target"), not on reference ("the distance from entry to the target price"). numbers_guard
+# independently stops the model inventing a level, so nothing is lost by narrowing this.
 _DIRECTIVE = re.compile(
     r"\byou\s+(should|could|ought|might\s+want|need|must)\b"
     r"|\b(i|we|they|analysts?)\s+(recommend|suggest|advise)\b"
     r"|\brecommend(s|ed)?\s+(buying|selling|holding|adding|trimming|a\s+position|the\s+stock|shares)\b"
     r"|\b(should|must)\s+(buy|sell|hold|add|trim|exit|enter|own|avoid)\b"
-    r"|\b(strong\s+buy|strong\s+sell|price\s+target|target\s+price|over\s?weight|under\s?weight|outperform|underperform)\b"
+    r"|\b(strong\s+buy|strong\s+sell|over\s?weight|under\s?weight|outperform|underperform)\b"
+    r"|\b(price\s+target|target\s+price)\s+(of|is|at|to)\s+\$?\d"
+    r"|\b(set|sets|setting|raise|raises|raised|lower|lowers|lowered|cut|cuts|issue|issues|"
+    r"assign|assigns|reiterate|reiterates)\s+(a|an|the|its|their)?\s*(price\s+target|target\s+price)\b"
     r"|\b(buy|sell)\s+(now|the\s+dip|this|it|shares|the\s+stock)\b"
     r"|\bgo(ing)?\s+(long|short)\b"
     r"|\btake\s+a\s+position\b",
