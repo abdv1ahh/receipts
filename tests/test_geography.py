@@ -8,7 +8,6 @@ import pytest
 
 from tradeos import geography
 
-
 # ------------------------------------------------------------------ regions
 
 @pytest.mark.parametrize("region,expected", [
