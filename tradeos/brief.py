@@ -110,15 +110,72 @@ def _your_names(conn, followed_symbols: list[str], signal_syms: set[str]) -> dic
             "news": deduped[:YOUR_NEWS_LIMIT]}
 
 
-def _input_hash(as_of, what_changed, followed_symbols, provider, sm_lead) -> str:
+def _input_hash(as_of, what_changed, followed_symbols, provider, sm_lead, ledger_state=None) -> str:
     material = {
         "as_of": as_of.isoformat() if as_of else None,
         "news_ids": [it["id"] for it in what_changed],
         "followed": sorted(s.upper() for s in (followed_symbols or [])),
         "provider": provider,
         "sm_lead": (sm_lead or {}).get("symbol"),
+        # The accountability section is the point of the brief, so a claim resolving MUST bust the
+        # cache. Without this the reader gets yesterday's scorecard next to today's news.
+        "ledger": ledger_state,
     }
     return hashlib.sha256(json.dumps(material, sort_keys=True).encode()).hexdigest()
+
+
+def accountability(conn: psycopg.Connection, hours: int = 24) -> dict:
+    """What the system got right and wrong since yesterday, and what it is still on the hook for.
+
+    The brief asks for "yesterday's Ledger outcomes so the user sees the system held to account
+    daily", and that is the section that earns the rest of the page. A brief that only tells you
+    what it thinks, never how its last thoughts turned out, is a newsletter."""
+    from . import ledger
+    with conn.cursor() as cur:
+        cur.execute(
+            """SELECT o.subject, o.predicted, o.excess_return, o.verdict, c.confidence, c.horizon,
+                      c.mechanism, e.title
+                 FROM claim_outcomes o
+                 JOIN claims c ON c.id = o.claim_id
+                 LEFT JOIN events e ON e.id = c.event_id
+                WHERE o.measured_at >= now() - make_interval(hours => %s)
+                  AND o.verdict IN ('hit', 'miss')
+             ORDER BY o.measured_at DESC, abs(coalesce(o.excess_return, 0)) DESC
+                LIMIT 8""", (hours,))
+        cols = ("subject", "predicted", "excess_return", "verdict", "confidence", "horizon",
+                "mechanism", "headline")
+        resolved = [dict(zip(cols, r, strict=True)) for r in cur.fetchall()]
+        cur.execute("SELECT count(*) FROM claims WHERE status = 'open'")
+        still_open = cur.fetchone()[0]
+
+    hits = sum(1 for r in resolved if r["verdict"] == "hit")
+    misses = len(resolved) - hits
+    overall = ledger.summary(conn)["overall"]
+    if not resolved:
+        line = (f"Nothing resolved since yesterday. {still_open} interpretation"
+                f"{'' if still_open == 1 else 's'} still open.")
+    else:
+        line = (f"{hits} right and {misses} wrong resolved since yesterday. "
+                f"Running record: {overall['hit_rate']:.0%} of {overall['n']}."
+                if overall.get("hit_rate") is not None else
+                f"{hits} right and {misses} wrong resolved since yesterday.")
+    return {"line": line, "resolved": resolved, "hits": hits, "misses": misses,
+            "still_open": still_open, "overall": overall}
+
+
+def live_claims(conn: psycopg.Connection, limit: int = 5) -> list[dict]:
+    """Interpretations currently on the hook — what the system is claiming right now, so the reader
+    can watch it be scored tomorrow."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """SELECT c.id, c.mechanism, c.confidence, c.horizon, c.affected,
+                      cardinality(c.contradicts) AS disputes, e.title, e.source_url
+                 FROM claims c LEFT JOIN events e ON e.id = c.event_id
+                WHERE c.status = 'open' AND c.event_id IS NOT NULL
+             ORDER BY c.confidence DESC, c.created_at DESC LIMIT %s""", (limit,))
+        cols = ("id", "mechanism", "confidence", "horizon", "affected", "disputes",
+                "headline", "url")
+        return [dict(zip(cols, r, strict=True)) for r in cur.fetchall()]
 
 
 def compose(conn: psycopg.Connection, *, as_of, tier: str, delayed_hours: int,
@@ -132,6 +189,8 @@ def compose(conn: psycopg.Connection, *, as_of, tier: str, delayed_hours: int,
     your = _your_names(conn, followed_symbols, signal_syms)
     crowd = social.board(conn, hours=96, limit=6, enrich_top=6)   # what the crowd is watching (attention velocity + why)
     coming = events.brief_events(conn, days=7, limit=6)            # what's coming (earnings + macro, cross-plane)
+    held_to_account = accountability(conn)                          # yesterday's Ledger outcomes
+    on_the_hook = live_claims(conn)                                 # what it is claiming right now
     return {
         "date": (as_of.date() if as_of else datetime.now(UTC).date()).isoformat(),
         "as_of": as_of.isoformat() if as_of else None,
@@ -142,6 +201,8 @@ def compose(conn: psycopg.Connection, *, as_of, tier: str, delayed_hours: int,
         "crowd_watching": crowd,
         "whats_coming": coming,
         "smart_money": {k: v for k, v in sm.items() if k != "lead"},
+        "held_to_account": held_to_account,
+        "on_the_hook": on_the_hook,
         "your_names": your,
         "sources_status": news.sources_status(conn),
         "generated_at": datetime.now(UTC).isoformat(),
@@ -164,7 +225,12 @@ def cached_compose(conn: psycopg.Connection, *, user_id: int | None, as_of, tier
                            FROM signal_clusters c WHERE c.as_of=%s ORDER BY c.score DESC LIMIT 1""", (as_of,))
             r = cur.fetchone()
             sm_lead_sym = r[0] if r else None
-    h = _input_hash(as_of, what_changed, followed_symbols, provider, {"symbol": sm_lead_sym})
+    with conn.cursor() as cur:
+        cur.execute("SELECT count(*), max(measured_at) FROM claim_outcomes")
+        n_out, last_measured = cur.fetchone()
+    ledger_state = f"{n_out}:{last_measured.isoformat() if last_measured else 'none'}"
+    h = _input_hash(as_of, what_changed, followed_symbols, provider,
+                    {"symbol": sm_lead_sym}, ledger_state)
 
     with conn.cursor() as cur:
         if user_id is None:

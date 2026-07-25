@@ -93,3 +93,23 @@ def test_rank_value_decays_with_age():
     assert round(day_old, 0) == 40                                   # one half-life -> halved
     # a day-old high-impact event still outranks a fresh low-impact one
     assert day_old > news.rank_value(38, now, now)
+
+
+# ------------------------------------------------------------------ brief accountability (Phase 6)
+
+def test_the_brief_cache_key_changes_when_a_claim_resolves():
+    """The accountability section is the point of the brief. If the cache key ignores the Ledger,
+    a reader gets yesterday's scorecard beside today's news — which is exactly the kind of quiet
+    staleness this product is supposed to make impossible."""
+    from tradeos.brief import _input_hash
+    args = (None, [], [], "gemini", {"symbol": "NVDA"})
+    before = _input_hash(*args, "10:2026-07-24T00:00:00")
+    after = _input_hash(*args, "11:2026-07-25T00:00:00")
+    assert before != after
+
+
+def test_the_brief_cache_key_is_stable_when_nothing_resolved():
+    from tradeos.brief import _input_hash
+    args = (None, [], [], "gemini", {"symbol": "NVDA"})
+    state = "10:2026-07-24T00:00:00"
+    assert _input_hash(*args, state) == _input_hash(*args, state)

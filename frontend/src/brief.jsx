@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { fetchBrief, fetchJobs } from "./api";
 import { NewsCard } from "./news.jsx";
+import { Icon } from "./icons.jsx";
 
 function AutoUpdate() {
   const [j, setJ] = useState(null);
@@ -14,6 +15,70 @@ function AutoUpdate() {
   const ago = mins < 1 ? "just now" : mins < 60 ? `${mins}m ago` : `${Math.round(mins / 60)}h ago`;
   const ok = (j.jobs || []).filter((x) => x.status === "ok").length;
   return <span className="auto-upd" title={`${ok}/${j.jobs.length} update jobs healthy`}><i className="live-dot" /> auto-updating · last refresh {ago}</span>;
+}
+
+
+/** Yesterday's scorecard. This section leads because it is what earns the rest of the page: a
+ *  brief that only tells you what it thinks, and never how its last thoughts turned out, is a
+ *  newsletter. */
+function HeldToAccount({ a, onNav }) {
+  if (!a) return null;
+  const pct = (v) => `${v >= 0 ? "+" : ""}${(v * 100).toFixed(1)}%`;
+  return (
+    <div className="sec bf-account">
+      <div className="sec-head">
+        <div className="sec-title"><span className="ico"><Icon name="target" size={15} /></span> Held to account</div>
+        <button className="sec-link" onClick={() => onNav("ledger")}>The Ledger <Icon name="arrow" size={13} /></button>
+      </div>
+      <div className="bf-account-line">{a.line}</div>
+      {a.resolved?.length > 0 && (
+        <div className="bf-resolved">
+          {a.resolved.map((r, i) => (
+            <div key={i} className={`bf-res ${r.verdict}`}>
+              <span className={`bf-res-v ${r.verdict}`}>{r.verdict === "hit" ? "right" : "wrong"}</span>
+              <span className="bf-res-sym">{r.subject}</span>
+              <span className="bf-res-said">said {r.predicted}</span>
+              <span className={`bf-res-got ${r.excess_return >= 0 ? "pos-pos" : "pos-neg"}`}>
+                {pct(r.excess_return)} vs SPY
+              </span>
+              <span className="spacer" />
+              <span className="name">{Math.round(r.confidence * 100)}% confident · {r.horizon}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** What the system is claiming right now, so the reader can watch it be scored tomorrow. */
+function OnTheHook({ claims, onNav }) {
+  if (!claims?.length) return null;
+  return (
+    <div className="sec">
+      <div className="sec-head">
+        <div className="sec-title">On the hook today</div>
+        <button className="sec-link" onClick={() => onNav("radar")}>Radar <Icon name="arrow" size={13} /></button>
+      </div>
+      {claims.map((c) => (
+        <div key={c.id} className="bf-hook">
+          <span className="rd-conf band-medium">{Math.round(c.confidence * 100)}%</span>
+          <span className="bf-hook-body">
+            <span>{c.mechanism}</span>
+            <span className="bf-hook-meta">
+              over {c.horizon}
+              {(c.affected || []).slice(0, 3).map((x, i) => (
+                <span key={i} className={`rd-chip dir-${x.direction}`}>
+                  {x.direction === "up" ? "▲" : "▼"} {x.value}
+                </span>
+              ))}
+              {c.disputes > 0 && <span className="cx-dir">{c.disputes} disagree</span>}
+            </span>
+          </span>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export function BriefView({ user, onOpenSymbol, onOpenProfile, onNav }) {
@@ -49,6 +114,11 @@ export function BriefView({ user, onOpenSymbol, onOpenProfile, onNav }) {
           <span className="dot-sep">·</span> grounded in the items below, not advice
         </div>
       </div>
+
+      {/* Accountability leads: what the system got right and wrong since yesterday, before
+          anything it wants to tell you today. */}
+      <HeldToAccount a={b.held_to_account} onNav={onNav} />
+      <OnTheHook claims={b.on_the_hook} onNav={onNav} />
 
       {b.your_names ? (
         <section className="brief-sec">
