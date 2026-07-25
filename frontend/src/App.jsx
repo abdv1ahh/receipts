@@ -19,23 +19,25 @@ import { Dashboard } from "./dashboard.jsx";
 import { IntegrationsView } from "./integrations.jsx";
 import { RadarView } from "./radar.jsx";
 import { GlobeView } from "./globe.jsx";
+import { ExposureView } from "./exposure.jsx";
+import { CalendarView } from "./calendar.jsx";
 import { LedgerView } from "./ledger.jsx";
 import { ErrorBoundary, useRoute } from "./shell.jsx";
 import { Icon } from "./icons.jsx";
 
 const BRAND = "Rhumb";
-const NAV_LABELS = { radar: "Radar", globe: "The World", ledger: "Ledger", dashboard: "Dashboard", brief: "Morning Brief", news: "News", events: "Calendar", home: "Smart Money", trending: "Social", crypto: "Crypto", journal: "Journal", portfolios: "Portfolio", watchlist: "Watchlist", alerts: "Alerts", assistant: "AI Assistant", screener: "Screener", library: "Library", methodology: "Methodology", integrations: "Integrations" };
-const NAV_ICONS = { radar: "radar", globe: "layers", ledger: "target", dashboard: "grid", brief: "sparkles", news: "news", events: "calendar", home: "signal", trending: "trending", crypto: "crypto", journal: "journal", portfolios: "briefcase", watchlist: "star", alerts: "bell", assistant: "compass", screener: "filter", library: "book", methodology: "target", integrations: "plug" };
+const NAV_LABELS = { radar: "Radar", globe: "The World", ledger: "Ledger", dashboard: "Dashboard", brief: "Morning Brief", news: "News", events: "Calendar", home: "Smart Money", trending: "Social", crypto: "Crypto", journal: "Journal", exposure: "Exposure", watchlist: "Watchlist", alerts: "Alerts", assistant: "AI Assistant", screener: "Screener", library: "Library", methodology: "Methodology", integrations: "Integrations" };
+const NAV_ICONS = { radar: "radar", globe: "layers", ledger: "target", dashboard: "grid", brief: "sparkles", news: "news", events: "calendar", home: "signal", trending: "trending", crypto: "crypto", journal: "journal", exposure: "briefcase", watchlist: "star", alerts: "bell", assistant: "compass", screener: "filter", library: "book", methodology: "target", integrations: "plug" };
 // A calmer rail: the essentials up front, utilities tucked into a collapsible "More".
 const SIDEBAR = [
   { label: "Overview", items: ["radar", "globe", "dashboard", "brief"] },
   { label: "Intelligence", items: ["ledger", "home", "trending", "news", "crypto", "events"] },
-  { label: "Your desk", items: ["journal", "portfolios", "watchlist", "assistant", "alerts"] },
+  { label: "Your desk", items: ["journal", "exposure", "watchlist", "assistant", "alerts"] },
 ];
 const MORE = ["screener", "library", "integrations", "methodology"];
 // Everything reachable from the ⌘K command palette.
 const CMD_ITEMS = [
-  ...["radar", "globe", "ledger", "dashboard", "brief", "home", "trending", "news", "crypto", "events", "journal", "portfolios", "watchlist", "assistant", "alerts", "screener", "library", "integrations", "methodology"]
+  ...["radar", "globe", "ledger", "dashboard", "brief", "home", "trending", "news", "crypto", "events", "journal", "exposure", "watchlist", "assistant", "alerts", "screener", "library", "integrations", "methodology"]
     .map((v) => ({ v, label: NAV_LABELS[v], icon: NAV_ICONS[v], group: "Go to" })),
   { v: "pricing", label: "Upgrade plan", icon: "sparkles", group: "Actions" },
   { v: "notifications", label: "Notifications", icon: "bell", group: "Actions" },
@@ -290,9 +292,11 @@ export default function App() {
           ) : view === "news" ? (
             <NewsView onOpenSymbol={openSymbol} />
           ) : view === "events" ? (
-            <EventsView onOpenSymbol={openSymbol} />
+            <CalendarView onOpenSymbol={openSymbol} />
           ) : view === "alerts" ? (
             <AlertsView onLogin={() => go("auth")} onOpenSymbol={openSymbol} />
+          ) : view === "exposure" ? (
+            <ExposureView user={user} onLogin={() => go("auth")} onNav={go} />
           ) : view === "portfolios" ? (
             <PortfoliosView user={user} onLogin={() => go("auth")} onOpenSymbol={openSymbol} />
           ) : view === "journal" ? (

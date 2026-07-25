@@ -35,6 +35,7 @@ from . import (
     config,
     crypto,
     db,
+    exposure,
     flags,
     geography,
     insights,
@@ -542,6 +543,65 @@ def profile_frame_set(req: ProfileFrameReq, response: Response,
              req.sectors or [], req.risk_appetite))
         conn.commit()
     return {"saved": True}
+
+
+@app.get("/api/exposure")
+def exposure_view(tos_session: str | None = Cookie(None)) -> dict:
+    """What your holdings are actually exposed to — the surface that replaces the position tracker.
+
+    A broker shows what you own and what it is worth, better and with real prices. What no broker
+    shows is which live events reach you, through which holding, and by what mechanism."""
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            return {"authenticated": False}
+        profile, _exp, watchlist = _reader_frame(cur, user)
+
+        # Holdings = the watchlist plus anything held in a portfolio. Both are things the reader
+        # told us they care about; neither is a claim about what they actually own.
+        cur.execute("""SELECT DISTINCT p.symbol FROM portfolio_positions p
+                        JOIN portfolios pf ON pf.id = p.portfolio_id
+                       WHERE pf.user_id = %s AND p.symbol IS NOT NULL""", (user["id"],))
+        holdings = sorted(watchlist | {r[0].upper() for r in cur.fetchall()})
+        if not holdings:
+            return {"authenticated": True, "holdings": [], "empty": True}
+
+        cur.execute("""SELECT c.id, c.mechanism, c.affected, c.confidence, c.horizon,
+                              c.contradicts, e.title, e.source_url, e.category
+                         FROM claims c LEFT JOIN events e ON e.id = c.event_id
+                        WHERE c.created_at >= now() - interval '21 days'""")
+        ccols = ("id", "mechanism", "affected", "confidence", "horizon", "contradicts",
+                 "headline", "url", "category")
+        claims_rows = [dict(zip(ccols, r, strict=True)) for r in cur.fetchall()]
+
+        cur.execute("""SELECT country, name, currency, export_partners, import_partners
+                         FROM country_exposure""")
+        ecols = ("country", "name", "currency", "export_partners", "import_partners")
+        exposure_rows = [dict(zip(ecols, r, strict=True)) for r in cur.fetchall()]
+
+        upcoming = events_mod.upcoming(conn, days=21)
+
+    held = set(holdings)
+    touching = exposure.claims_touching(claims_rows, held)
+    reach = exposure.geographic_reach(claims_rows, held)
+    corridors = geography.corridors(exposure_rows)
+    home = (profile or {}).get("country")
+    names = {e["country"]: e["name"] for e in exposure_rows}
+
+    return {
+        "authenticated": True,
+        "holdings": holdings,
+        "home": home,
+        "summary": exposure.summarise(holdings, touching, reach,
+                                      exposure.upcoming_intersections(upcoming, held)),
+        "claims": touching[:20],
+        "reach": [{**r, "name": names.get(r["country"], r["country"])} for r in reach],
+        "corridors": exposure.corridor_dependence(reach, corridors, home),
+        "upcoming": exposure.upcoming_intersections(upcoming, held)[:10],
+        "concentration": exposure.concentration([c["category"] for c in touching if c.get("category")]),
+        "note": ("Exposure describes connections that already exist between what you watch and "
+                 "what is happening. It is not advice, and it does not grade your choices."),
+    }
 
 
 @app.get("/api/globe")
