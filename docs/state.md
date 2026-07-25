@@ -7,8 +7,10 @@ Read this after `CLAUDE.md` and before `docs/plan.md` at the start of every sess
 
 ## Current phase
 
-**Phase 1 (repair) — complete.** Branch `phase/1-repair`, 6 commits, not merged.
-**Phase 2 (the ingestion spine) is unblocked and is next.**
+**Phase 2 (the ingestion spine) — core complete.** Branch `phase/2-ingestion`, 3 commits.
+**Phase 3 (impact engine + Ledger) is unblocked and is next.**
+
+Phase 0 and Phase 1 are complete; their reports are in `docs/progress/`.
 
 ---
 
@@ -33,12 +35,16 @@ Nothing. Phase 1 has no partial work.
 
 ## Next three tasks
 
-1. Open `phase/2-ingestion`, plan mode first.
-2. Migration `024`: the `events` spine — the brief's `Event` shape, generalising `news_items`
-   rather than running a parallel table. Plus `event_sources`, `event_clusters`,
-   `watchlist_accounts`.
-3. GDELT as the primary news backbone (keyless, global, machine-coded actors and locations) and
-   Bluesky for social, both behind the source registry that now exists.
+1. Open `phase/3-claims`, plan mode first.
+2. Migration `025`: `claims`, `claim_outcomes`, `country_exposure`. Claim generation with a
+   STRICT output schema validated on return — that validation is also the prompt-injection
+   boundary, since Phase 2 now ingests arbitrary text from GDELT.
+3. Outcome measurement on the existing scheduler, reusing `prices_eod` and `backtest/engine.py`
+   — the price-series machinery is already built and point-in-time correct.
+
+Carried over, not blocking: confirm GDELT ingests once its rate limit clears (the adapter is
+built and covered, but a live ingest is unverified — see `docs/progress/phase_2.md`), and add
+Bluesky as a real `SocialSource`.
 
 ## Open questions waiting on the owner
 
@@ -104,3 +110,18 @@ Nothing on this list blocks Phase 2.
 12. **A source that no-ops because it is unkeyed still records `status: ok`** in `job_runs`.
     `sources.health()` deliberately does not count that as a successful fetch, or the page would
     report Reddit as working when it has never run.
+
+13. **GDELT rate-limits for over an hour after a burst.** Three unpaced probe requests throttled
+    this IP for the rest of the phase. `gdelt.MIN_INTERVAL_S` is 6 seconds and a 429 ends the
+    whole pass — do not "optimise" either.
+
+14. **SEC filing headlines are templated**, so trigram similarity matches the template rather
+    than the story. Cluster matching requires shared entities when both sides name any. Removing
+    that check re-merges eight companies into one "story".
+
+15. **`_require_admin` returns the USER on success and None on failure.** Branch on
+    `if not _require_admin(...)`. Getting it backwards serves admin data to everyone, silently.
+    `tests/test_sources.py` asserts every call site uses a safe shape.
+
+16. **Clusters re-derive their category from members.** Without that, improving the classifier
+    and reprocessing creates duplicate clusters instead of correcting existing ones.
