@@ -1,6 +1,6 @@
 # docs/state.md — where the work stands
 
-Updated: 2026-07-25, end of Phase 1.
+Updated: 2026-07-25, end of Phase 2.
 Read this after `CLAUDE.md` and before `docs/plan.md` at the start of every session.
 
 ---
@@ -29,9 +29,21 @@ Phase 0 and Phase 1 are complete; their reports are in `docs/progress/`.
 - Ruff + CI + 222 tests, zero lint errors.
 - A vulnerability in my own new endpoint found by `/security-review` and fixed.
 
+**Phase 2 — the ingestion spine.** Full report in `docs/progress/phase_2.md`. Headlines:
+
+- Migration 024: `events`, `event_clusters`, `watchlist_accounts`, `source_calls`.
+- `spine.py` — normalise, cluster (trigram, not embeddings), score novelty and velocity.
+- GDELT wired as the global backbone; existing news adapted in rather than duplicated.
+- Influence watchlist as first-class editable data with an admin API.
+- 268 tests. Three bugs found by real data, plus an authorization bug I introduced and caught.
+
 ## Half finished
 
-Nothing. Phase 1 has no partial work.
+**GDELT has never been observed ingesting.** The adapter is built, its parsing is covered by
+offline tests against real captured payloads, and its 429 backoff is verified — but my own
+unpaced probing throttled this IP for the rest of the phase, so no article has landed in
+`events` yet. The hourly scheduler job will confirm it once the limit clears; check
+`/api/integrations` or `SELECT count(*) FROM events WHERE source='gdelt'`.
 
 ## Next three tasks
 
@@ -55,7 +67,7 @@ Bluesky as a real `SocialSource`.
 | 3 | OpenRouter free key (<https://openrouter.ai/keys>), optional | Second link in the provider chain |
 | 4 | The six ASK rulings in `docs/dead_code.md` | Cleanup only |
 
-Nothing on this list blocks Phase 2.
+Nothing on this list blocks Phase 3.
 
 ## Decisions already taken
 
