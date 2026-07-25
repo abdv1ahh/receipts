@@ -14,21 +14,42 @@ import os
 import re
 import secrets
 import time
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from io import BytesIO
 from pathlib import Path
 
 from fastapi import Cookie, FastAPI, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from starlette.exceptions import HTTPException as StarletteHTTPException
 from psycopg.types.json import Json
 from pydantic import BaseModel
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import (admin, apikeys, assistant, authn, billing, brief as brief_mod, community, config,
-               crypto, dashboard as dashboard_mod, db, events as events_mod, flags, insights,
-               news as news_mod, portfolio, presentation, scheduler as scheduler_mod, search,
-               sentiment, social as social_mod, sources, trades)
+from . import (
+    admin,
+    apikeys,
+    assistant,
+    authn,
+    billing,
+    community,
+    config,
+    crypto,
+    db,
+    flags,
+    insights,
+    portfolio,
+    presentation,
+    search,
+    sentiment,
+    sources,
+    trades,
+)
+from . import brief as brief_mod
+from . import dashboard as dashboard_mod
+from . import events as events_mod
+from . import news as news_mod
+from . import scheduler as scheduler_mod
+from . import social as social_mod
 
 SESSION_COOKIE = "tos_session"
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").lower() == "true"  # true behind TLS in prod
@@ -429,7 +450,7 @@ def _symbol_for(cur, entity_id: int) -> str | None:
 
 
 def _staleness(event_time, knowable_time) -> dict:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return {
         "event_time": event_time.isoformat(),
         "knowable_time": knowable_time.isoformat(),
@@ -974,7 +995,7 @@ def _txt(x, n):
     return ((x or "").strip()[:n]) or None
 
 
-def _sanitize_trade(req: "TradeReq", cur) -> dict:
+def _sanitize_trade(req: TradeReq, cur) -> dict:
     """Validate enums, clamp text/numbers, resolve symbol->entity. Field names are fixed internal
     identifiers (never user input), so building the column list from them is injection-safe."""
     sym = _txt(req.symbol, 12)
@@ -998,7 +1019,7 @@ def _sanitize_trade(req: "TradeReq", cur) -> dict:
 
 
 def _trade_to_dict(row) -> dict:
-    m = dict(zip(_TRADE_COLS, row))
+    m = dict(zip(_TRADE_COLS, row, strict=True))
     d = m["direction"]
     m["reward_risk"] = trades.reward_risk(m["entry_price"], m["stop_price"], m["target_price"], d)
     m["rr"] = m["reward_risk"]  # alias consumed by summarize_performance
@@ -1061,7 +1082,7 @@ def trade_get(tid: int, tos_session: str | None = Cookie(None)) -> dict:
         row = _load_trade(cur, tid)
         if not row:
             return {"found": False}
-        m = dict(zip(_TRADE_COLS, row))
+        m = dict(zip(_TRADE_COLS, row, strict=True))
         owner = bool(me and me["id"] == m["user_id"])
         if not m["is_public"] and not owner:
             return {"found": False}  # never reveal a private trade's existence
@@ -1123,7 +1144,7 @@ def trade_analysis(tid: int, tos_session: str | None = Cookie(None)) -> dict:
         row = _load_trade(cur, tid)
         if not row:
             return {"found": False}
-        m = dict(zip(_TRADE_COLS, row))
+        m = dict(zip(_TRADE_COLS, row, strict=True))
         if not m["is_public"] and not (me and me["id"] == m["user_id"]):
             return {"found": False}
         # AI kill-switch: off -> deterministic template analysis, no LLM call
@@ -1138,6 +1159,7 @@ def trade_chart_analysis(tid: int, refresh: int = 0, tos_session: str | None = C
     private). Cached per trade and invalidated by the image hash; `refresh=1` re-runs it (e.g. after a
     vision model is connected). Falls back to the deterministic level-based analysis with no model."""
     import hashlib
+
     from .intelligence import vision
     with db.connect() as conn, conn.cursor() as cur:
         user = authn.session_user(conn, tos_session)
@@ -1146,7 +1168,7 @@ def trade_chart_analysis(tid: int, refresh: int = 0, tos_session: str | None = C
         row = _load_trade(cur, tid)
         if not row:
             return {"found": False}
-        m = dict(zip(_TRADE_COLS, row))
+        m = dict(zip(_TRADE_COLS, row, strict=True))
         if m["user_id"] != user["id"]:
             return {"found": False}                       # owner-only; never reveal another's trade
         if not m["image_path"]:
@@ -1216,7 +1238,7 @@ def trade_similar(tid: int, tos_session: str | None = Cookie(None)) -> dict:
         row = _load_trade(cur, tid)
         if not row:
             return {"found": False}
-        m = dict(zip(_TRADE_COLS, row))
+        m = dict(zip(_TRADE_COLS, row, strict=True))
         if not (me and me["id"] == m["user_id"]):
             return {"found": False}
         target = {"id": m["id"], "symbol": m["symbol"], "direction": m["direction"],
@@ -1772,8 +1794,8 @@ def follows_list(tos_session: str | None = Cookie(None)) -> dict:
             return {"authenticated": False, "follows": []}
         cur.execute("SELECT id, kind, ref, label, created_at FROM follows WHERE user_id=%s ORDER BY created_at DESC",
                     (user["id"],))
-        follows = [{"id": i, "kind": k, "ref": r, "label": l, "created_at": ca.isoformat()}
-                   for i, k, r, l, ca in cur.fetchall()]
+        follows = [{"id": i, "kind": k, "ref": ref, "label": label, "created_at": ca.isoformat()}
+                   for i, k, ref, label, ca in cur.fetchall()]
     return {"authenticated": True, "follows": follows}
 
 
@@ -1900,7 +1922,7 @@ def _default_opened_on(cur, symbol: str, entity_id: int | None):
     r = cur.fetchone()
     if r and r[0]:
         return r[0] - timedelta(days=90)
-    return datetime.now(timezone.utc).date()
+    return datetime.now(UTC).date()
 
 
 @app.post("/api/portfolios")
@@ -2137,7 +2159,7 @@ def v1_clusters(request: Request, min_confidence: str = "medium", limit: int = 5
                        WHERE c.as_of=%s ORDER BY c.score DESC""",
                     (aso,),
                 )
-                for ent, name, score, bucket, voices, classes, sym in cur.fetchall():
+                for _ent, name, score, bucket, voices, classes, sym in cur.fetchall():
                     if _BUCKET_RANK[bucket] < min_rank:
                         continue
                     rows.append({"symbol": sym, "name": name,

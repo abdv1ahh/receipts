@@ -9,12 +9,10 @@ Two honest halves:
 """
 from __future__ import annotations
 
-import math
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import psycopg
 
-from . import config
 from .ingestion.news_rss import FEEDS
 
 # Intrinsic newsworthiness by category (0..100 before adjustments). Ordered by how much a category
@@ -45,7 +43,7 @@ def rank_value(impact: int, knowable: datetime, now: datetime | None = None) -> 
     """Read-time ranking = intrinsic impact tapered by age. Keeps the brief fresh without letting
     recency rewrite intrinsic importance — a 36h half-life keeps yesterday's earnings above today's
     lifestyle column."""
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     age_h = max(0.0, (now - knowable).total_seconds() / 3600.0)
     return round(impact * (0.5 ** (age_h / RANK_HALF_LIFE_H)), 3)
 
@@ -91,9 +89,9 @@ def signal_symbols(conn: psycopg.Connection) -> set[str]:
 
 
 def _rows_to_items(rows, sig_syms: set[str]) -> list[dict]:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     items = []
-    for (nid, source, url, headline, summary, category, knowable, meta,
+    for (nid, source, url, headline, summary, category, knowable, _meta,
          symbols, impact, why, confidence, sources_json, model_id, used_template) in rows:
         syms = [s for s in (symbols or []) if s]
         has_sig = any(s in sig_syms for s in syms)

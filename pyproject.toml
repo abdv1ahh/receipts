@@ -1,0 +1,41 @@
+# One formatter and one linter, configured once (brief §5). Ruff is both, in one dependency.
+[tool.ruff]
+line-length = 108          # matches the existing code, which is written wider than 79
+target-version = "py312"
+exclude = ["frontend", ".venv", "__pycache__"]
+
+[tool.ruff.lint]
+select = [
+    "F",      # pyflakes: unused imports/variables, undefined names
+    "E", "W", # pycodestyle
+    "I",      # import sorting
+    "UP",     # pyupgrade: modern syntax for the target version
+    "B",      # bugbear: likely bugs (mutable defaults, unused loop vars, ...)
+    "S",      # bandit: security patterns — this app sits next to money and untrusted text
+    "C4",     # comprehension clarity
+]
+ignore = [
+    "E501",   # line length is enforced by the formatter, not the linter
+    "S101",   # assert: fine in tests, and used as an invariant check in a few places
+    "B008",   # FastAPI's Depends()/Cookie() defaults are the framework's idiom
+    # S608 flags every f-string that builds SQL. All 20 current sites were read on 2026-07-25 and
+    # interpolate ONLY module constants (_TRADE_COLS), generated "%s" placeholder lists, or a
+    # table name chosen from a hardcoded allowlist after validation — every VALUE is still a
+    # bound parameter. The rule cannot tell those apart from a real injection, and 20 noqa
+    # comments would be noise. THE INVARIANT: nothing derived from a request may ever be
+    # interpolated into a query string. Phase 9 replaces these with psycopg.sql composition so
+    # the invariant is enforced by the type system rather than by review, and re-enables this.
+    "S608",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S105", "S106", "S311"]   # hardcoded test credentials and non-crypto randomness
+
+# NOT adopting `ruff format`. Checked against the tree on 2026-07-25: it de-indents continuation
+# strings so they lose their visual association with the key they belong to, and it strips the
+# aligned trailing comments this codebase uses consistently in ~89 files. That is a large, purely
+# mechanical diff that makes the code harder to read, which fails the brief's own test — match the
+# existing conventions unless they are actively harmful. Ruff is the linter here; the style is the
+# house style. Revisit only if the style stops being consistent.
+[tool.ruff.format]
+quote-style = "double"

@@ -8,7 +8,7 @@ be recomputed. Meaning cannot drift silently.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import psycopg
 from psycopg.types.json import Json
@@ -128,7 +128,7 @@ def compute_daily(conn: psycopg.Connection, from_date, to_date) -> list[dict]:
     day = from_date
     while day <= to_date:
         if day.weekday() < 5:
-            as_of = datetime(day.year, day.month, day.day, 23, 59, 59, tzinfo=timezone.utc)
+            as_of = datetime(day.year, day.month, day.day, 23, 59, 59, tzinfo=UTC)
             out.append(compute_and_store(conn, as_of))
         day += timedelta(days=1)
     return out

@@ -68,7 +68,7 @@ def detail(conn: psycopg.Connection, portfolio_id: int, user_id: int) -> dict:
         cur.execute("SELECT id, symbol, entity_id, opened_on, note FROM portfolio_positions "
                     "WHERE portfolio_id=%s ORDER BY opened_on DESC", (portfolio_id,))
         rows = cur.fetchall()
-    from . import news   # local import avoids any module-load cycle
+    from . import news  # local import avoids any module-load cycle
     sig = news.signal_symbols(conn)   # cross-plane: which positions still show a smart-money signal
     spy = _series(conn, BENCHMARK)
     positions = []

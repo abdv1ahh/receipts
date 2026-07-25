@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import date, datetime, timezone
+from datetime import UTC, datetime
 
 import psycopg
 from psycopg.types.json import Json
@@ -133,7 +133,7 @@ def compose(conn: psycopg.Connection, *, as_of, tier: str, delayed_hours: int,
     crowd = social.board(conn, hours=96, limit=6, enrich_top=6)   # what the crowd is watching (attention velocity + why)
     coming = events.brief_events(conn, days=7, limit=6)            # what's coming (earnings + macro, cross-plane)
     return {
-        "date": (as_of.date() if as_of else datetime.now(timezone.utc).date()).isoformat(),
+        "date": (as_of.date() if as_of else datetime.now(UTC).date()).isoformat(),
         "as_of": as_of.isoformat() if as_of else None,
         "tier": tier, "delayed_hours": delayed_hours,
         "scope": "personal" if followed_symbols else "market",
@@ -144,7 +144,7 @@ def compose(conn: psycopg.Connection, *, as_of, tier: str, delayed_hours: int,
         "smart_money": {k: v for k, v in sm.items() if k != "lead"},
         "your_names": your,
         "sources_status": news.sources_status(conn),
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
     }
 
 
@@ -153,7 +153,7 @@ def cached_compose(conn: psycopg.Connection, *, user_id: int | None, as_of, tier
     """compose(), but memoized in daily_briefs by an inputs-hash so the LLM opener isn't re-spent until
     the underlying facts (as_of, the top news set, the user's names, the provider) actually change."""
     scope = "personal" if followed_symbols else "market"
-    today = (as_of.date() if as_of else datetime.now(timezone.utc).date())
+    today = (as_of.date() if as_of else datetime.now(UTC).date())
     # cheap pre-read to build the hash key without the (possibly LLM) executive summary
     what_changed = news.ranked_news(conn, hours=72, limit=WHAT_CHANGED_LIMIT)
     sm_lead_sym = None

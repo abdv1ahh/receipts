@@ -19,10 +19,10 @@ from zoneinfo import ZoneInfo
 
 import psycopg
 
+from ..resolution.entities import get_or_create_entity
 from . import form4, sgml
 from .common import reject, update_health
 from .edgar_client import EdgarClient
-from ..resolution.entities import get_or_create_entity
 
 log = logging.getLogger("tradeos.ingest.schedule13")
 SOURCE = "edgar/13dg"

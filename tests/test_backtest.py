@@ -4,8 +4,13 @@ episode de-duplication, and the calibration insufficient-sample rule. No network
 """
 from datetime import date, timedelta
 
-from tradeos.backtest.engine import (Series, bucket_calibration, excess_return,
-                                     group_episodes, wilson_interval)
+from tradeos.backtest.engine import (
+    Series,
+    bucket_calibration,
+    excess_return,
+    group_episodes,
+    wilson_interval,
+)
 
 
 def _bdays(start: date, end: date) -> list[date]:

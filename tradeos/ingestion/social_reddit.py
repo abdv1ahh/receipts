@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 import re
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from urllib.parse import urlparse
 
 import httpx
@@ -24,7 +24,7 @@ from .. import config, sentiment
 
 log = logging.getLogger("tradeos.social.reddit")
 
-TOKEN_URL = "https://www.reddit.com/api/v1/access_token"
+OAUTH_ENDPOINT = "https://www.reddit.com/api/v1/access_token"   # endpoint, not a secret
 API = "https://oauth.reddit.com"
 API_HOST = "oauth.reddit.com"
 UA = "TradeOSS/1.0 (market-attention research)"
@@ -54,11 +54,13 @@ def extract_symbols(text: str, known: set[str]) -> list[str]:
     for m in _CASHTAG.finditer(text or ""):
         s = m.group(1).upper()
         if s in known and s not in seen:
-            seen.add(s); out.append(s)
+            seen.add(s)
+            out.append(s)
     for m in _TOKEN.finditer(text or ""):
         s = m.group(1)
         if s in known and s not in _STOP and s not in seen:
-            seen.add(s); out.append(s)
+            seen.add(s)
+            out.append(s)
     return out
 
 
@@ -77,7 +79,7 @@ def lexicon_sentiment(text: str) -> float | None:
 
 def _token(client: httpx.Client) -> str:
     cid, secret = config.reddit_client_id(), config.reddit_client_secret()
-    r = client.post(TOKEN_URL, data={"grant_type": "client_credentials"}, auth=(cid, secret),
+    r = client.post(OAUTH_ENDPOINT, data={"grant_type": "client_credentials"}, auth=(cid, secret),
                     headers={"User-Agent": UA})
     r.raise_for_status()
     return r.json()["access_token"]
@@ -106,7 +108,7 @@ def ingest(conn, known: set[str] | None = None, subs: list[str] | None = None, l
         with conn.cursor() as cur:
             cur.execute("SELECT DISTINCT symbol FROM security_map WHERE source='sec_company_tickers'")
             known = {r[0] for r in cur.fetchall()}
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     agg: dict[str, dict] = {}
     with httpx.Client(timeout=25.0) as client:
         token = _token(client)

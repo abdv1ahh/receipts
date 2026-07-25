@@ -4,7 +4,6 @@ opener is guard-clean by construction (no advice, no fabricated numbers). No net
 from tradeos.explain.guards import allowed_numbers, directive_guard, numbers_guard
 from tradeos.intelligence import analyst
 
-
 # ------------------------------------------------------------------ citation guard (new to this plane)
 
 def test_citation_guard_blocks_foreign_tickers():

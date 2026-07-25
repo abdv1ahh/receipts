@@ -17,21 +17,21 @@ from __future__ import annotations
 import argparse
 import logging
 import os
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import UTC, date, datetime, time, timedelta
 
 from . import alerts, authn, db
+from .backtest import run as backtest
 from .config import sec_user_agent
 from .ingestion import form13f, schedule13
 from .ingestion.edgar_client import EdgarClient
 from .ingestion.finra import FinraClient, ingest_short_interest
 from .ingestion.prices import TiingoClient, ingest_prices
 from .ingestion.runner import ingest_day as ingest_form4_day
+from .library import sync_library
 from .resolution.entities import backfill_insider_entities
 from .resolution.openfigi import OpenFigiClient, resolve_cusips
 from .resolution.tickers import sync_tickers
 from .signals import definitions
-from .backtest import run as backtest
-from .library import sync_library
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 
@@ -122,11 +122,11 @@ def cmd_signals_register(args) -> None:
 
 def _parse_as_of(s: str | None) -> datetime:
     if not s:
-        return datetime.now(timezone.utc)
+        return datetime.now(UTC)
     if len(s) == 10:  # a bare date means end of that day (everything knowable by then)
-        return datetime.combine(date.fromisoformat(s), time(23, 59, 59), tzinfo=timezone.utc)
+        return datetime.combine(date.fromisoformat(s), time(23, 59, 59), tzinfo=UTC)
     dt = datetime.fromisoformat(s)
-    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
 
 
 def cmd_compute_signals(args) -> None:
@@ -326,6 +326,7 @@ def cmd_generate_alerts(_args) -> None:
 
 def cmd_seed_admin(args) -> None:
     import getpass
+
     import pyotp
     pw = os.environ.get("TRADEOS_ADMIN_PASSWORD") or getpass.getpass("admin password: ")
     if authn.is_weak_password(pw):

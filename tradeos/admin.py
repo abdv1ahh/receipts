@@ -55,7 +55,7 @@ def _like(term: str) -> str:
 def overview(conn: psycopg.Connection) -> dict:
     with conn.cursor() as cur:
         cur.execute("SELECT tier, count(*) FROM users GROUP BY tier")
-        by_tier = {t: n for t, n in cur.fetchall()}
+        by_tier = dict(cur.fetchall())
         cur.execute("SELECT count(*) FROM users WHERE banned")
         banned = cur.fetchone()[0]
         cur.execute("SELECT count(*) FROM trades")

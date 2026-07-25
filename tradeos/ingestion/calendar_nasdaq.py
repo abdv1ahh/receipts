@@ -9,7 +9,7 @@ Nasdaq fingerprints non-browser clients, so a browser UA is required; the host i
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from urllib.parse import urlparse
 
 import httpx
@@ -115,7 +115,7 @@ def _health(conn, source, n) -> None:
     with conn.cursor() as cur:
         cur.execute("SELECT max(event_date) FROM market_events WHERE source=%s", (source,))
         freshest = cur.fetchone()[0]
-    ts = datetime.combine(freshest, datetime.min.time(), tzinfo=timezone.utc) if freshest else None
+    ts = datetime.combine(freshest, datetime.min.time(), tzinfo=UTC) if freshest else None
     update_health(conn, source, n, 0, ts)
 
 

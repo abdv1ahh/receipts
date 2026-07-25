@@ -18,7 +18,7 @@ import hashlib
 import logging
 import re
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from urllib.parse import urlparse
 
@@ -120,7 +120,7 @@ def _parse_when(raw: str) -> datetime | None:
             dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))  # ISO-8601 (Atom)
         except ValueError:
             return None
-    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
 
 
 @dataclass(frozen=True)
@@ -236,7 +236,7 @@ def ingest(conn, client: RssClient, limit_per_feed: int = 40) -> dict:
         added = 0
         for e in entries:
             ext = hashlib.sha256(e.external_id.encode()).hexdigest()[:32]
-            knowable = e.published_at or datetime.now(timezone.utc)
+            knowable = e.published_at or datetime.now(UTC)
             with conn.cursor() as cur:
                 cur.execute(
                     """INSERT INTO news_items (source, external_id, url, headline, summary, category,

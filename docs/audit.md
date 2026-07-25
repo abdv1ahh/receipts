@@ -218,12 +218,17 @@ Portfolio becomes Exposure.
 ### Rework
 
 **Social & Attention** — the concept is right (velocity vs each name's own baseline, honest
-manipulation flags, transparent source states). The execution is undermined by a data bug:
-the board is topped by `BALL`, `POOL`, `PAG`, `DOV`, `FIX`, `CRM`… because Wikipedia
-pageviews for the *common English words* "Ball", "Pool", "Dover", "Fix" are being attributed
-to the tickers. 20 of 20 rows show "attention only" (no mood, because Reddit is unkeyed) and
-15 of 20 carry a "single source" warning. The panel is honest about being thin but the data
-underneath is largely noise. Fixing entity resolution matters more than any UI change here.
+manipulation flags, transparent source states). The execution was undermined by a data bug
+that put `BALL`, `POOL`, `PAG`, `DOV`, `FIX` at the top of the board.
+
+> **Correction (Phase 1).** This section originally attributed that to Wikipedia title
+> resolution matching common nouns. That was wrong — the titles resolve correctly. The real
+> causes were a fuzzy Hacker News search query and a double-counting error in the board's
+> scoring. Both are fixed and measured; see `docs/bugs.md` B-02 for the full trace.
+
+The remaining honest weakness is thinness: with Reddit unkeyed, no connected source measures
+*mood*, so every row reads "attention only". That is now stated with a route to fixing it
+rather than a bare "n/a".
 
 **Crypto** — the owner is exactly right: a data mirror. Price, 24h, 7d, market cap, sparkline,
 gainers/losers, trending. All real, all available free elsewhere, zero interpretation. The

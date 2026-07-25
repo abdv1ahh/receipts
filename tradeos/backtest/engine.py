@@ -27,7 +27,7 @@ class Series:
     close: dict[date, float]
 
     @classmethod
-    def from_rows(cls, rows: list[tuple[date, float]]) -> "Series":
+    def from_rows(cls, rows: list[tuple[date, float]]) -> Series:
         rows = sorted(rows)
         return cls([d for d, _ in rows], {d: float(c) for d, c in rows})
 

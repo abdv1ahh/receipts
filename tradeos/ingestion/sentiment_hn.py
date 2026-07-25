@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 import re
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from urllib.parse import urlparse
 
 import httpx
@@ -74,7 +74,7 @@ def ingest_hn(conn, universe, window_hours: int = 48, baseline_days: int = 14) -
     Queries by company name (more precise than a short ticker). Returns rows written."""
     if urlparse(HN_URL).hostname != HN_HOST:
         raise ValueError("HN host allowlist violation")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     win_start = int((now - timedelta(hours=window_hours)).timestamp())
     base_start = int((now - timedelta(days=baseline_days)).timestamp())
     windows = max(1.0, (baseline_days * 24 - window_hours) / window_hours)

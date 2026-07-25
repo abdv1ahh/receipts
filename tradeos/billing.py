@@ -10,12 +10,15 @@ so upgrading structurally unlocks live signals without any client flag.
 """
 from __future__ import annotations
 
+import logging
 import os
 
 import psycopg
 from psycopg.types.json import Json
 
 from . import authn
+
+log = logging.getLogger("tradeos.billing")
 
 PLANS = {
     "free":   {"name": "Free",   "price": 0,  "tier": "free"},
@@ -127,8 +130,10 @@ def cancel(conn: psycopg.Connection, user: dict) -> dict:
                 r = cur.fetchone()
             if r and r[0]:
                 stripe.Subscription.modify(r[0], cancel_at_period_end=True)
-        except Exception:
-            pass
+        except Exception as exc:
+            # The local downgrade still happens — the user asked to cancel — but a provider
+            # failure here means the subscription may still be live upstream. Never silent.
+            log.warning("stripe cancel failed for user %s (%s)", user["id"], type(exc).__name__)
     _set_plan(conn, user["id"], "free", prov, status="canceled")
     return {"canceled": True}
 

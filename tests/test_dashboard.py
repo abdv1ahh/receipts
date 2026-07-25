@@ -10,7 +10,6 @@ from datetime import date, timedelta
 
 from tradeos import dashboard
 
-
 # ------------------------------------------------------------------ helpers
 
 def _flow(ratio, total, buys=None, sells=None):

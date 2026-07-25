@@ -1,99 +1,154 @@
-# TradeOSS — Slice 1: skeleton + Form 4 pipeline
+# Rhumb
 
-Real ingestion of real SEC Form 4 filings into a point-in-time Postgres store,
-with an API exposing feed freshness. No fabricated data anywhere; test fixtures
-are clearly fictional and never enter the database.
+A world-event interpretation engine that happens to be very good at explaining market
+consequences. It answers one question continuously: *something just happened in the world, so
+what does it mean for me specifically?*
 
-## Run it (10 minutes)
+Three commitments make that defensible:
 
-Prerequisites: Docker with Compose, or Python 3.12 + a local Postgres.
+- **Causal chains, not headlines.** Every item carries the event, the mechanism by which it
+  propagates, what it touches, historical episodes that rhymed with it, and a confidence level.
+- **A public track record.** Every interpretation is timestamped when made, then scored against
+  what actually happened. The misses are shown, not buried.
+- **Personal relevance.** The same event reads differently from Sharjah than from São Paulo.
 
-```bash
-cp .env.example .env
-# edit .env: set SEC_USER_AGENT to "TradeOSS your@email.com" (SEC requires a contact)
+Currently a working SEC/news intelligence platform being rebuilt around those three ideas. The
+full brief is `docs/tradeoss_veryimportant_prompt.md`; the plan is `docs/plan.md`; where the work
+stands is `docs/state.md`. **If you are an agent working on this repository, read `CLAUDE.md`
+first.**
 
-docker compose up -d          # starts Postgres + API on :8000
-```
+`TradeOSS` remains the internal codename — the Python package, the Docker services and the
+database are named for it and are not renamed for branding. The display name is one config value
+(`BRAND_NAME`).
 
-Apply migrations and ingest one real day of filings (run inside the api container
-or locally with the venv, DATABASE_URL pointing at localhost):
+---
 
-```bash
-docker compose exec api python -m tradeos.cli migrate
-docker compose exec api python -m tradeos.cli ingest-form4 --date 2026-07-10 --limit 25
-docker compose exec api python -m tradeos.cli status
-```
+## Run it
 
-Then open http://localhost:8000/api/feeds — you are looking at the seed of the
-product's honesty surface: real record counts, real freshness, real reject counts.
-
-Backfill a range (respects EDGAR throttling; a full day is a few minutes):
+Prerequisites: Docker with Compose.
 
 ```bash
-docker compose exec api python -m tradeos.cli backfill-form4 --from 2026-06-01 --to 2026-07-14
+cp .env.example .env      # set SEC_USER_AGENT at minimum; every other key is optional
+docker compose up -d --build
 ```
 
-## Run the tests
+That starts Postgres, the API on <http://localhost:8000>, and the scheduler worker. Then load a
+demo dataset:
 
 ```bash
-pip install -r requirements.txt
-python -m pytest tests/ -q      # 13 tests, all offline, no network needed
+make demo                 # quick data window: ingests, resolves, computes signals, backtests
+docker compose exec api python -m tradeos.cli seed-admin --email you@example.com
 ```
 
-## Local (no Docker)
+`make backfill-full` is the overnight 24-month calibration backfill; do it before publishing any
+track record.
+
+### Development
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-export DATABASE_URL=postgresql://tradeos:${POSTGRES_PASSWORD}@localhost:5432/tradeos
-export SEC_USER_AGENT="TradeOSS your@email.com"
-python -m tradeos.cli migrate
-python -m tradeos.cli ingest-form4 --date 2026-07-10 --limit 25
-uvicorn tradeos.app:app --reload
+make dev                  # Python reloads in place; tests/ mounted; serves frontend/dist
+make web                  # rebuild the UI (~0.3s) — no image rebuild needed
+make test                 # 213 tests, fully offline, under a second
+make lint                 # ruff
 ```
+
+Without `make dev`, the frontend bundle is baked into the image at build time, so a UI change
+needs `docker compose up -d --build`. This is the single biggest time sink in this repo.
+
+---
+
+## Configuration
+
+Every variable is documented in `.env.example` with a link to where each free key is obtained.
+Only `SEC_USER_AGENT` is required — the SEC's fair-access policy requires a contact address, and
+the app refuses to start without one.
+
+`python -m tradeos.cli preflight` checks production readiness. The **Integrations** page in the
+app (`/integrations`) shows every external source, whether it is connected, what it powers, when
+it last succeeded and the last error — you should never have to guess why a panel is empty.
+
+### The language model
+
+`EXPLAIN_PROVIDER` is a comma-separated fallback chain, so one provider going down does not
+silence every AI surface:
+
+```
+EXPLAIN_PROVIDER=gemini,openai
+```
+
+`gemini` is Google AI Studio's free tier. `openai` is any OpenAI-compatible `/chat/completions`
+endpoint — OpenRouter and Groq both have free tiers. `template` means no model at all, and every
+caller falls back to deterministic output rather than failing.
+
+Two model roles are configurable per provider: a small fast model for classification and
+extraction, and the strongest available for reasoning about mechanisms.
+
+---
 
 ## What is in here
 
-- `tradeos/ingestion/edgar_client.py` — throttled, allowlisted, checksummed EDGAR fetcher
-- `tradeos/ingestion/form4.py` — index/submission/XML parsing + validation (XXE-safe)
-- `tradeos/ingestion/runner.py` — idempotent day-level ingestion with loud rejects
-- `tradeos/migrations/001_init.sql` — append-only raw layer (trigger-enforced), PIT derived table
-- `docs/decision-log.md` — every consequential decision, veto by number
-- `docs/threat-models/form4.md` — written before the pipeline, per the mandate
+```
+tradeos/            the Python package — see CLAUDE.md for the full directory map
+  app.py            FastAPI, 99 routes
+  llm.py            one transport for every model call: provider chain + circuit breakers
+  sources.py        the source registry that backs /api/integrations and every degradation gate
+  scheduler.py      the background worker: job registry, restart-safe cursors, error isolation
+  ingestion/        one module per external source; nothing else calls an external API
+  migrations/       ordered .sql, run by db.py. Never edit an applied migration.
+frontend/src/       React + Vite. No router library, no state library, no CSS framework.
+tests/              pytest, offline, fixture-driven
+docs/               audit, bugs, dead_code, plan, state, progress/, decision-log, threat-models
+```
+
+---
 
 ## Point-in-time discipline (the one thing to internalize)
 
-Every insider transaction row carries two times: `event_time` (when the insider
-traded) and `knowable_time` (when the filing became public at the SEC). All signal
-computation and every backtest queries through `knowable_time` only. This is what
-makes look-ahead leakage structurally impossible rather than merely avoided.
+Every filing-derived row carries two times: `event_time` (when it happened) and `knowable_time`
+(when it became public). All signal computation and every backtest query through `knowable_time`
+only. This is what makes look-ahead leakage structurally impossible rather than merely avoided,
+and it is what will make the accuracy ledger worth believing. **Do not break it.**
 
-## Full demo (all slices)
+---
 
-```bash
-make demo    # builds + loads a quick data window, computes signals, backtests, seeds invites
-docker compose exec api python -m tradeos.cli seed-admin --email you@example.com   # prompts for password
-```
+## Honesty rules this codebase enforces
 
-Then open http://localhost:8000. See `docs/demo-script.md` for the investor walkthrough and
-`docs/decision-log.md` for every consequential decision (37 entries).
+These are not aspirational; they are why several things are built the way they are.
 
-## Auth, entitlements, security (Slice 6)
+- **Never fabricate.** No placeholder numbers styled to look real. If a source is unavailable the
+  interface says so and says what to do about it.
+- **Degrade, never block.** A missing key renders a gate explaining what the source would add and
+  linking to where the free key is obtained, while everything else keeps working.
+- **Say the real reason.** When AI output is unavailable, the user is told whether it was a
+  missing key, a quota trip, or a guard — never a generic "not connected". A wrong explanation is
+  worse than none.
+- **Every fact carries provenance.** Source, retrieval timestamp, link.
+- **Describe, never advise.** Model prose passes an advice guard before display; anything that
+  fails is withheld and named.
+
+---
+
+## Security posture
 
 - Invite-gated registration; argon2id passwords; SHA-256-hashed session tokens in
-  HttpOnly/SameSite=Lax cookies; per-IP+per-account login rate limits; TOTP required for admin.
-- The free tier sees signals on a **48-hour delay enforced as a server-side WHERE clause** — no
-  request parameter can reach fresher data (the anti-exfiltration floor).
-- Security headers (CSP, X-Frame-Options DENY, X-Content-Type-Options, Referrer-Policy), CSRF
-  origin checks, uniform error shape, and a non-root container image.
-- Runbooks in `docs/runbooks/`; staff-trading policy template in `docs/staff-trading-policy.md`.
+  HttpOnly/SameSite cookies; per-IP and per-account login rate limits; TOTP for admins.
+- The free tier's data delay is a server-side `WHERE` clause — no request parameter reaches
+  fresher data.
+- CSP without `unsafe-inline` for scripts, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`,
+  CSRF origin checks, a request id on every response, uniform error shape, non-root container.
+- Uploads are re-encoded through Pillow (strips EXIF, neutralises polyglots), stored under opaque
+  names, served through an authenticated route.
+- Runbooks in `docs/runbooks/`; threat models in `docs/threat-models/`.
 
-### Deployment notes (production)
+Phase 9 of the plan is a full adversarial security pass, including prompt-injection defences for
+ingested text and a git-history secret scan. Until then, treat the posture above as *present but
+unverified by an adversarial review*.
 
-- Set `COOKIE_SECURE=true` behind TLS (Caddy/Railway/host TLS); enables Secure cookies + HSTS.
-- **Egress allowlist**: production ingestion should be restricted to exactly `sec.gov`,
-  `openfigi.com`, `finra.org`, `api.tiingo.com`, and the LLM provider host
-  (`generativelanguage.googleapis.com`) — set this on the host/network layer so a compromised
-  container cannot reach anything else.
-- Back up Postgres daily and **test the restore** (an untested backup is not a backup). Pin the
-  base image by digest.
+### Deployment notes
+
+- Set `COOKIE_SECURE=true` behind TLS; enables Secure cookies and HSTS.
+- **Egress allowlist**: restrict production ingestion to exactly `sec.gov`, `openfigi.com`,
+  `finra.org`, `api.tiingo.com`, `hn.algolia.com`, `en.wikipedia.org`, `wikimedia.org`,
+  `api.coingecko.com`, `oauth.reddit.com`, and your LLM provider host — at the network layer, so
+  a compromised container cannot reach anything else.
+- Back up Postgres daily and **test the restore**. Pin the base image by digest.

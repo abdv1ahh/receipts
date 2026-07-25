@@ -6,7 +6,12 @@ tests include the exact cases Feature Spec 5.5 requires — a 'you should buy' o
 hit-rate the payload never contained both force the template.
 """
 from tradeos.explain import template
-from tradeos.explain.guards import allowed_numbers, base_rate_integrity_guard, directive_guard, numbers_guard
+from tradeos.explain.guards import (
+    allowed_numbers,
+    base_rate_integrity_guard,
+    directive_guard,
+    numbers_guard,
+)
 
 DETAIL = {
     "cluster_id": 1, "issuer_entity": 862, "symbol": "ELAN", "name": "Elanco Animal Health Inc",

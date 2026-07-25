@@ -10,8 +10,8 @@ from zoneinfo import ZoneInfo
 
 import psycopg
 
-from .edgar_client import EdgarClient
 from . import form4
+from .edgar_client import EdgarClient
 
 log = logging.getLogger("tradeos.ingest.form4")
 SOURCE = "edgar/form4"

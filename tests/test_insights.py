@@ -5,7 +5,6 @@ No network, no database."""
 from tradeos import insights as I
 from tradeos.explain.guards import allowed_numbers, directive_guard, numbers_guard
 
-
 # ---------------- similarity + finder ----------------
 
 def _t(id, ac="equity", d="long", strat="breakout", rr=2.0, tf="swing", pnl=None, status="closed"):

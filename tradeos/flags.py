@@ -112,5 +112,5 @@ def all_states(conn: psycopg.Connection) -> list[dict]:
     """Console view: every known flag with its current effective value."""
     with conn.cursor() as cur:
         cur.execute("SELECT name, enabled FROM feature_flags WHERE name = ANY(%s)", (list(FLAGS),))
-        rows = {n: e for n, e in cur.fetchall()}
+        rows = dict(cur.fetchall())
     return resolve_states(rows)

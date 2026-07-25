@@ -6,6 +6,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from defusedxml.common import EntitiesForbidden
 
 from tradeos.ingestion import form4, form13f, schedule13, sgml
 
@@ -139,7 +140,8 @@ def test_13f_parser_rejects_external_entities():
         "<value>1</value></infoTable></informationTable>"
     )
     text = header + "<DOCUMENT><XML>" + evil + "</XML></DOCUMENT>"
-    with pytest.raises(Exception):
+    # Assert the SPECIFIC defence fired — see the note in test_form4.py.
+    with pytest.raises(EntitiesForbidden):
         form13f.parse_13f(text)
 
 
@@ -154,3 +156,17 @@ def test_13f_parser_rejects_filing_without_information_table():
     )
     with pytest.raises(form13f.Form13FParseError):
         form13f.parse_13f(text)
+
+
+def test_price_row_rejects_high_below_low():
+    """Guards the OHLC sanity check. This path had no test, which is how a variable rename
+    silently broke it (the reference to the old name only failed at runtime)."""
+    from datetime import date
+
+    from tradeos.ingestion.prices import _valid_row
+    today = date(2026, 7, 25)
+    good = {"date": "2026-07-24", "adjOpen": 10, "adjHigh": 12, "adjLow": 9, "adjClose": 11, "adjVolume": 100}
+    assert _valid_row(good, today) == (date(2026, 7, 24), 10, 12, 9, 11, 100)
+    assert _valid_row({**good, "adjHigh": 8, "adjLow": 9}, today) is None      # high < low -> reject
+    assert _valid_row({**good, "adjClose": 0}, today) is None                  # non-positive close
+    assert _valid_row({**good, "date": "2026-07-26"}, today) is None           # future bar

@@ -70,7 +70,7 @@ class OpenFigiClient:
                     time.sleep(60)
                     resp = self._client.post(OPENFIGI_URL, json=body)
                 resp.raise_for_status()
-                for cusip, item in zip(batch, resp.json()):
+                for cusip, item in zip(batch, resp.json(), strict=True):
                     data = item.get("data") if isinstance(item, dict) else None
                     out[cusip] = self._pick_ticker(data) if data else None
             except (httpx.HTTPError, ValueError) as exc:

@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 import os
 import time
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 
 from psycopg.types.json import Json
 
@@ -120,7 +120,7 @@ def is_due(last_success: datetime | None, interval_s: int, now: datetime | None 
     """True if a job has never succeeded or its interval has elapsed since the last success. Pure."""
     if last_success is None:
         return True
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     return (now - last_success).total_seconds() >= interval_s
 
 
@@ -132,7 +132,7 @@ def _last_success(conn, job: str) -> datetime | None:
 
 def run_job(conn, name: str, fn) -> dict:
     """Run one job, recording the attempt in job_runs whether it succeeds or fails (degrade loudly)."""
-    started = datetime.now(timezone.utc)
+    started = datetime.now(UTC)
     t0 = time.monotonic()
     try:
         detail = fn(conn) or {}

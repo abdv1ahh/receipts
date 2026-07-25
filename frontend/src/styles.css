@@ -530,13 +530,7 @@ table.clusters { width: 100%; border-collapse: collapse; }
 .chat-input input { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 9px; color: var(--text); padding: 10px 12px; font: inherit; font-size: 13.5px; }
 .chat-input input:focus { outline: none; border-color: var(--accent); }
 
-/* ---- Sentiment & Trend Scanner (Slice H) ---------------------------------------------------- */
-.src-status { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
-.src-stat { font-size: 11.5px; color: var(--muted); }
-.src-stat.s-connected { color: var(--text); }
-.att-bar { position: relative; height: 16px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
-.att-fill { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 6px 0 0 6px; }
-.att-num { position: absolute; right: 6px; top: 0; line-height: 16px; font-size: 10.5px; font-weight: 700; font-family: var(--mono); color: var(--text); }
+/* Manipulation-resistance flag chip (attention board, brief, crypto, admin). */
 .flag-chip { border-color: rgba(255,182,72,0.5); color: #ffcd80; }
 
 /* ---- Community & social (Slice F) ------------------------------------------------------------ */
@@ -1284,3 +1278,7 @@ div.intg-warn { margin-top: 8px; border: 0; border-radius: 8px; padding: 7px 10p
   font-family: var(--mono); color: var(--faint); }
 .intg-stats b { color: var(--muted); }
 .intg-stats .bad { color: #ff9db0; }
+
+/* Data age: "live" is a claim, so it only shows when it is true (see dashboard.jsx). */
+.dash-live.stale { color: #ffc25c; }
+.dash-live.stale .live-dot { background: #ffc25c; animation: none; }

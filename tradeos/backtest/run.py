@@ -6,11 +6,11 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from datetime import date
 
 import psycopg
 
-from .engine import (HORIZONS, Series, bucket_calibration, entry_day_after,
-                     excess_return, group_episodes)
+from .engine import HORIZONS, Series, bucket_calibration, entry_day_after, excess_return, group_episodes
 
 log = logging.getLogger("tradeos.backtest")
 ALL_BUCKETS = ("low", "medium", "high")
@@ -158,7 +158,7 @@ def compute_calibration(conn: psycopg.Connection) -> dict:
 
     values: dict[str, dict[int, list[float]]] = {b: {h: [] for h in HORIZONS} for b in ALL_BUCKETS}
     episodes_total = priced = excl_no_symbol = excl_no_history = too_recent = 0
-    horizons_open = {h: 0 for h in HORIZONS}
+    horizons_open = dict.fromkeys(HORIZONS, 0)
     for items in grouped.values():
         symbol = items[0][3]
         for episode in group_episodes([(d, cid, b) for (d, cid, b, _s) in items]):

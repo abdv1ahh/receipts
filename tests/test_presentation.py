@@ -6,7 +6,6 @@ the real bucket edges) rather than any predictive claim. The story tests assert 
 facts and names real actors — and never emits a directive (the advice line)."""
 from tradeos import presentation as pr
 
-
 # --------------------------------------------------------------- Smart Money Score
 
 def test_score_anchors_to_bucket_edges():

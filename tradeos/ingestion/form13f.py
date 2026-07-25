@@ -25,10 +25,10 @@ from zoneinfo import ZoneInfo
 import psycopg
 from defusedxml import ElementTree as SafeET
 
+from ..resolution.entities import get_or_create_entity
 from . import form4, sgml
 from .common import reject, update_health
 from .edgar_client import EdgarClient
-from ..resolution.entities import get_or_create_entity
 
 log = logging.getLogger("tradeos.ingest.form13f")
 SOURCE = "edgar/13f"

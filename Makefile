@@ -4,7 +4,7 @@
 
 X = docker compose exec -T api python -m tradeos.cli
 
-.PHONY: demo test up down logs seed backfill-full
+.PHONY: demo test dev web lint fix up down logs seed backfill-full
 
 # Reproducible demo from scratch. Uses a QUICK data window (a few weeks) so it finishes in
 # minutes; the full 24-month backfill (backfill-full) is a separate overnight job.
@@ -36,8 +36,30 @@ backfill-full:
 	$(X) backfill-form4 --from 2024-07-01 --to 2026-07-14
 	$(X) resolve-entities
 
+# tests/ is deliberately NOT copied into the image (test files have no business in a production
+# artifact), so the suite runs against a mount. `make test` used to fail with "file or directory
+# not found" because it omitted this.
 test:
-	docker compose run --rm -T api python -m pytest tests/ -q
+	docker compose run --rm -T \
+	  -v "$(CURDIR)/tests:/app/tests" -v "$(CURDIR)/tradeos:/app/tradeos" \
+	  api python -m pytest tests/ -q
+
+# Development stack: Python reloads in place, tests/ is mounted, and the locally built frontend is
+# served, so a UI change needs only `make web` instead of a full image rebuild.
+dev:
+	docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+
+web:
+	cd frontend && npm run build
+
+# Ruff is the linter. It is deliberately NOT the formatter here — see the note in pyproject.toml.
+lint:
+	docker compose run --rm -T --user root -v "$(CURDIR):/src" -w /src \
+	  api sh -c "pip install --quiet --root-user-action=ignore ruff && python -m ruff check tradeos tests"
+
+fix:
+	docker compose run --rm -T --user root -v "$(CURDIR):/src" -w /src \
+	  api sh -c "pip install --quiet --root-user-action=ignore ruff && python -m ruff check --fix tradeos tests"
 
 up:
 	docker compose up -d --build

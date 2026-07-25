@@ -15,7 +15,7 @@ degrades gracefully: with no data the pulse still renders as a neutral, honestly
 """
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 import psycopg
 
@@ -191,7 +191,7 @@ def compose(conn: psycopg.Connection, *, as_of, tier: str, delayed_hours: int,
     high_conviction = [o for o in opportunities if o.get("confidence_bucket") == "high"]
 
     return {
-        "date": (as_of.date() if as_of else datetime.now(timezone.utc).date()).isoformat(),
+        "date": (as_of.date() if as_of else datetime.now(UTC).date()).isoformat(),
         "as_of": as_of.isoformat() if as_of else None,
         "tier": tier, "delayed_hours": delayed_hours,
         "market_pulse": pulse,
@@ -202,5 +202,5 @@ def compose(conn: psycopg.Connection, *, as_of, tier: str, delayed_hours: int,
         "radar": radar,
         "attention": [a for a in attention if a.get("symbol")][:5],
         "sources_status": news.sources_status(conn),
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
     }

@@ -3,6 +3,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from defusedxml.common import EntitiesForbidden
 
 from tradeos.ingestion import form4
 from tradeos.ingestion.edgar_client import EdgarClient
@@ -92,7 +93,9 @@ def test_parse_rejects_external_entities():
         "<ownershipDocument><issuer><issuerCik>1</issuerCik>"
         "<issuerName>&xxe;</issuerName></issuer></ownershipDocument>"
     )
-    with pytest.raises(Exception):
+    # Assert the SPECIFIC defence fired. `raises(Exception)` would pass even if the parser blew
+    # up for an unrelated reason, which is exactly the wrong property for a security test.
+    with pytest.raises(EntitiesForbidden):
         form4.parse_form4_xml(evil)
 
 
@@ -104,11 +107,11 @@ def test_parse_rejects_missing_issuer():
 # ------------------------------------------------------------------ validation
 
 def _txn(**overrides) -> form4.Transaction:
-    base = dict(
-        seq=1, security_title="Common Stock", event_time=date(2026, 7, 8),
-        transaction_code="P", shares=Decimal("100"), price_per_share=Decimal("10"),
-        acquired_disposed="A", shares_after=Decimal("1000"), direct_indirect="D",
-    )
+    base = {
+        "seq": 1, "security_title": "Common Stock", "event_time": date(2026, 7, 8),
+        "transaction_code": "P", "shares": Decimal("100"), "price_per_share": Decimal("10"),
+        "acquired_disposed": "A", "shares_after": Decimal("1000"), "direct_indirect": "D",
+    }
     base.update(overrides)
     return form4.Transaction(**base)
 

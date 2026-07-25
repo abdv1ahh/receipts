@@ -16,8 +16,6 @@ import math
 import psycopg
 from psycopg.types.json import Json
 
-from . import config
-
 DEFAULT_WINDOW_HOURS = 48
 MIN_MENTIONS = 3           # below this a symbol is not a 'trend' (honest floor)
 

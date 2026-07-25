@@ -7,7 +7,6 @@ from tradeos.ingestion import attention_wiki as W
 from tradeos.ingestion import social_reddit as R
 from tradeos.intelligence import analyst
 
-
 # ------------------------------------------------------------------ Wikipedia pageview velocity
 
 def test_velocity_from_views():

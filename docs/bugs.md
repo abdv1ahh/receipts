@@ -58,25 +58,47 @@ and a test asserting the guard permits descriptive risk/reward prose.
 ---
 
 ### B-02 · The attention board is dominated by companies whose names are common English words
-**Severity S1** (it is the entire content of the Social surface).
+**Severity S1** (it is the entire content of the Social surface). **FIXED in Phase 1.**
 
-**Observed:** the top of the 96-hour board reads `BALL` (7,547 mentions, 5.48× baseline),
-`POOL` (4.96×), `PAG`, `DOV`, `FIX`, `NOW`, `CRM`. Wikipedia pageviews for the articles
-behind the words *Ball*, *Pool*, *Dover*, *Fix* are being attributed to those tickers.
+**Observed:** the top of the 96-hour board read `BALL` (7,547 mentions, 5.48× baseline),
+`POOL` (4.96×), then `PAG`, `DOV`, `FIX`, `NOW`, `CRM`.
 
-**Cause:** `wiki_titles` maps tickers to Wikipedia article titles by company-name match with
-no disambiguation check and no popularity sanity check. A company literally named "Ball
-Corporation" resolves to an article that a very large number of people read for reasons that
-have nothing to do with the company.
+**My first hypothesis was wrong, and it is recorded here because a wrong root cause in a bug
+file is exactly the sort of confidently-misleading note this project is trying not to leave.**
+I assumed Wikipedia title resolution was matching common nouns. It is not: `wiki_titles` maps
+`BALL → "Ball Corporation"`, `POOL → "Pool Corporation"`, `DOV → "Dover Corporation"` — all
+correct. The Wikipedia observations were sane throughout (`BALL: 312 views, 1.01× baseline`).
 
-**Consequence:** the ranked board is mostly noise, which makes the whole surface look broken
-even though every number displayed is technically real. It also poisons `social.attention_
-universe()`, which feeds the analyst's catalyst matching.
+**The two actual causes, both verified by measurement:**
 
-**Fix (Phase 1/2):** require the Wikipedia title to be disambiguated to the company (title
-containing `(company)`, or the article's Wikidata entity typed as a business), compare
-pageviews against the article's own long-run baseline rather than a global one, and drop any
-symbol whose resolved title is a common noun. Log rejections to `ingest_rejects`.
+1. **Hacker News was counting fuzzy matches.** `sentiment_hn._count` sent the bare company name
+   to Algolia, whose default search is an OR/fuzzy match, so `"BALL Corp"` matched every HN post
+   containing "ball" or "corp". Measured over the same window: `BALL Corp` → **6,757 hits**,
+   `NVIDIA CORP` → **5,303**. The implementation asserted that Hacker News discusses a
+   packaging company more than it discusses Nvidia.
+
+2. **`score_symbol` summed snapshots and mismatched its ratio.** `trending_board` selected
+   *every* observation in the window, and `score_symbol` added them up. Each source writes a
+   snapshot of the same underlying measure on every run, so a 24-hour window of Wikipedia runs
+   turned 312 daily views into "7,547 mentions". Worse, velocity was
+   `sum(all mentions) / sum(baselines where present)` — a source with no baseline contributed
+   to the numerator but not the denominator, which by itself turned a 1.01× name into 5.48×.
+
+**Fix shipped:**
+- Exact quoted phrase with `advancedSyntax=true`; legal suffixes stripped so `NVIDIA CORP`
+  searches `"NVIDIA"`; the suffix *kept* for names that are ordinary English words
+  (`"BALL Corp"`), via a short explicit table. Re-measured: `NVIDIA` 14,272, `Salesforce`
+  1,418, `Union Pacific` 37, `BALL` 0.
+- One current reading per `(symbol, source)` via `DISTINCT ON`, and velocity as a
+  mention-weighted mean of per-source ratios over only the sources that have a baseline.
+- Poisoned HN observations deleted and re-ingested.
+
+**Board after:** `NWBO 2.78×`, `AIDX 2.33×`, `GCBC 2.05×`, `RXST 1.93×`, `UNP 1.91×` — real
+names with plausible ratios. Regression tests in `tests/test_hn_query.py` and
+`tests/test_sentiment.py`.
+
+**Residual:** `GOOG` and `GOOGL` appear as two rows for one company. Share classes should
+collapse to a single board entry. Not fixed; carried to Phase 2 with entity resolution.
 
 ---
 

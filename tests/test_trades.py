@@ -7,7 +7,6 @@ from datetime import date
 from tradeos import trades as T
 from tradeos.explain.guards import directive_guard
 
-
 # ------------------------------------------------------------------ pure math
 
 def test_reward_risk_long_and_short():

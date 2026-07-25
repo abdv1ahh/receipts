@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 import time
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from urllib.parse import quote, urlparse
 
 import httpx
@@ -109,7 +109,7 @@ def ingest(conn, universe, days: int = 16) -> int:
     trailing daily mean (baseline), which the velocity score turns into an attention reading."""
     if urlparse(WIKI_API).hostname != WIKI_API_HOST:
         raise ValueError("wiki api host allowlist violation")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     written = 0
     with httpx.Client(timeout=20.0, headers=UA, follow_redirects=True) as client:
         titles = _titles_for(conn, client, universe)

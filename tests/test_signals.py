@@ -6,14 +6,14 @@ The characterization test is the "signals never silently change meaning" tripwir
 a base weight, the magnitude formula, or the collapse rule, and the exact score moves and
 this test fails — which (with the code_hash lock) forces a logged version bump.
 """
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from tradeos.signals import convergence as cv
 from tradeos.signals.definitions import DefinitionMismatch, check_definition
 
-AS_OF = datetime(2026, 7, 15, tzinfo=timezone.utc)
+AS_OF = datetime(2026, 7, 15, tzinfo=UTC)
 
 
 def _ev(subtype, voice, magnitude=None, age_days=0.0):

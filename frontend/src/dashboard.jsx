@@ -267,7 +267,16 @@ export function Dashboard({ user, onOpenSymbol, onNav }) {
 
   const name = user?.email ? user.email.split("@")[0] : null;
   const dateStr = new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
-  const live = d.delayed_hours > 0 ? `${d.delayed_hours}h delayed feed` : "live";
+  // `delayed_hours` is the TIER's feed delay, not the data's age. Reporting "live" because a pro
+  // account has no tier delay, while the signal snapshot is three days old, is a lie of omission.
+  // Say how old the data actually is, and only claim "live" when it genuinely is.
+  const ageH = d.as_of ? (Date.now() - new Date(d.as_of).getTime()) / 3600000 : null;
+  const live = d.delayed_hours > 0 ? `${d.delayed_hours}h delayed feed`
+    : ageH == null ? "freshness unknown"
+    : ageH < 2 ? "live"
+    : ageH < 48 ? `data ${Math.round(ageH)}h old`
+    : `data ${Math.round(ageH / 24)} days old`;
+  const staleClass = ageH != null && ageH >= 48 ? " stale" : "";
 
   return (
     <div className="dash">
@@ -277,7 +286,9 @@ export function Dashboard({ user, onOpenSymbol, onNav }) {
           <div className="dash-date">
             {dateStr}
             <span className="dot-sep">·</span>
-            <span className="dash-live"><span className="live-dot" /> {live}</span>
+            <span className={`dash-live${staleClass}`} title={d.as_of ? `signal snapshot: ${d.as_of}` : ""}>
+              <span className="live-dot" /> {live}
+            </span>
           </div>
         </div>
       </div>

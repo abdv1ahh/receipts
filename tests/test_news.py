@@ -1,11 +1,10 @@
 """Offline tests for News Intelligence pure logic: 8-K item extraction + headline composition (a
 controlled-vocabulary lookup, never a guess), RSS/Atom parsing, HIGH-PRECISION ticker tagging (no
 fabricated associations), and the deterministic impact + recency ranking. No network, no database."""
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from tradeos import news
 from tradeos.ingestion import news_rss, news_sec
-
 
 # ------------------------------------------------------------------ SEC 8-K item extraction + headline
 
@@ -87,7 +86,7 @@ def test_intrinsic_impact_weights_signal_and_mention():
 
 
 def test_rank_value_decays_with_age():
-    now = datetime(2026, 7, 22, tzinfo=timezone.utc)
+    now = datetime(2026, 7, 22, tzinfo=UTC)
     fresh = news.rank_value(80, now, now)
     day_old = news.rank_value(80, now - timedelta(hours=news.RANK_HALF_LIFE_H), now)
     assert fresh == 80

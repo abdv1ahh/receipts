@@ -150,9 +150,9 @@ def register(conn: psycopg.Connection, email: str, password: str, invite_code: s
         try:
             cur.execute("INSERT INTO users (email, password_hash) VALUES (%s, %s) RETURNING id, tier",
                         (email, hash_password(password)))
-        except psycopg.errors.UniqueViolation:
+        except psycopg.errors.UniqueViolation as exc:
             conn.rollback()
-            raise AuthError("email already registered")
+            raise AuthError("email already registered") from exc
         uid, tier = cur.fetchone()
         cur.execute("UPDATE invites SET used_by = %s, used_at = now() WHERE code = %s AND used_by IS NULL",
                     (uid, invite_code))

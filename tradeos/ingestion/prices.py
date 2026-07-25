@@ -70,13 +70,13 @@ def _valid_row(row: dict, today: date) -> tuple[date, float, float, float, float
         return None
     if day > today:
         return None
-    o, h, l, c = row.get("adjOpen"), row.get("adjHigh"), row.get("adjLow"), row.get("adjClose")
+    o, h, low, c = row.get("adjOpen"), row.get("adjHigh"), row.get("adjLow"), row.get("adjClose")
     v = row.get("adjVolume")
     if c is None or c <= 0:
         return None
-    if h is not None and l is not None and h < l:
+    if h is not None and low is not None and h < low:
         return None
-    return day, o, h, l, c, v
+    return day, o, h, low, c, v
 
 
 def ingest_prices(conn: psycopg.Connection, client: TiingoClient, symbols: list[str], start: date) -> dict:
@@ -98,14 +98,14 @@ def ingest_prices(conn: psycopg.Connection, client: TiingoClient, symbols: list[
                 v = _valid_row(row, today)
                 if v is None:
                     continue
-                day, o, h, l, c, vol = v
+                day, o, h, low, c, vol = v
                 cur.execute(
                     """INSERT INTO prices_eod (symbol, day, open, high, low, close, volume, source)
                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
                        ON CONFLICT (symbol, day) DO UPDATE SET
                            open=EXCLUDED.open, high=EXCLUDED.high, low=EXCLUDED.low,
                            close=EXCLUDED.close, volume=EXCLUDED.volume, source=EXCLUDED.source""",
-                    (symbol.upper(), day, o, h, l, c, vol, SOURCE),
+                    (symbol.upper(), day, o, h, low, c, vol, SOURCE),
                 )
                 inserted += 1
         conn.commit()

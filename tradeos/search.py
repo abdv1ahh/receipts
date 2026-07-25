@@ -31,13 +31,15 @@ def search(conn: psycopg.Connection, q, limit=6) -> dict:
         seen, syms = set(), []
         for s, n, e in pref:
             if s not in seen and len(syms) < limit:
-                seen.add(s); syms.append({"symbol": s, "name": n, "entity_id": e})
+                seen.add(s)
+                syms.append({"symbol": s, "name": n, "entity_id": e})
         if len(syms) < limit:
             cur.execute(f"SELECT DISTINCT ON (m.symbol) m.symbol, e.name, m.entity_id {_issuer} "
                         f"AND e.name ILIKE %s ORDER BY m.symbol LIMIT %s", (like, limit))
             for s, n, e in cur.fetchall():
                 if s not in seen and len(syms) < limit:
-                    seen.add(s); syms.append({"symbol": s, "name": n, "entity_id": e})
+                    seen.add(s)
+                syms.append({"symbol": s, "name": n, "entity_id": e})
         out["symbols"] = syms
         cur.execute("SELECT id, name FROM entities WHERE kind='institution' AND name ILIKE %s "
                     "ORDER BY name LIMIT %s", (like, limit))

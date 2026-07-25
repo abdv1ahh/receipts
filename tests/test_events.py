@@ -5,7 +5,6 @@ crowd is already watching. No network, no database."""
 from tradeos import events
 from tradeos.ingestion import calendar_nasdaq as C
 
-
 # ------------------------------------------------------------------ Nasdaq classification (pure)
 
 def test_classify_macro_us_movers_only():

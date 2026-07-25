@@ -46,7 +46,8 @@ def classify(question: str) -> dict:
     """Cheap intent flags from the raw question. Multiple can be true (a question can ask about a
     ticker AND a concept). The DB retrieval decides what real context actually exists."""
     q = f" {question.lower()} "
-    hit = lambda kws: any(k in q for k in kws)
+    def hit(kws):
+        return any(k in q for k in kws)
     return {"performance": hit(_PERF), "sentiment": hit(_SENT), "why_moving": hit(_MOVE),
             "concept": hit(_CONCEPT), "personal": hit(_PERSONAL)}
 
@@ -78,7 +79,7 @@ def build_answer(question: str, ctx: dict) -> tuple[str, list[str]]:
     for s in ctx.get("symbols", []):
         c = s.get("cluster")
         if c:
-            classes = ", ".join((c.get("source_classes") or [])).replace("_", " ") or "disclosures"
+            classes = ", ".join(c.get("source_classes") or []).replace("_", " ") or "disclosures"
             parts.append(
                 f"{s['name']} ({s['symbol']}) currently shows a {c['bucket']}-confidence smart-money "
                 f"convergence: {c['voices']} independent filers across {classes}, at a convergence "

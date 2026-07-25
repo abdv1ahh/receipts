@@ -1,0 +1,44 @@
+# CI: the 189+ test suite is fast (under a second) and fully offline, so there is no reason for a
+# push to ever land untested. Lint and a secret scan run on the same trigger.
+name: ci
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0            # gitleaks needs history, not just the tip
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt ruff
+      - name: Lint
+        run: ruff check tradeos tests   # linter only; see the note in pyproject.toml
+      - name: Tests
+        run: python -m pytest tests/ -q
+      - name: Secret scan (full history)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run build

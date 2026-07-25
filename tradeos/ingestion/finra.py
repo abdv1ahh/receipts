@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 import time
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from urllib.parse import urlparse
 
 import httpx
@@ -75,7 +75,7 @@ class FinraClient:
 def _entity_map(conn: psycopg.Connection) -> dict[str, int]:
     with conn.cursor() as cur:
         cur.execute("SELECT symbol, entity_id FROM security_map WHERE source = 'sec_company_tickers'")
-        return {sym: eid for sym, eid in cur.fetchall()}
+        return dict(cur.fetchall())
 
 
 def ingest_short_interest(conn: psycopg.Connection, client: FinraClient, start: date) -> dict:
@@ -96,7 +96,7 @@ def ingest_short_interest(conn: psycopg.Connection, client: FinraClient, start: 
             except (KeyError, TypeError, ValueError):
                 continue
             knowable = datetime.combine(_add_business_days(settlement, PUBLICATION_LAG_BDAYS),
-                                        datetime.min.time(), tzinfo=timezone.utc).replace(hour=21)
+                                        datetime.min.time(), tzinfo=UTC).replace(hour=21)
             cur_short = row.get("currentShortPositionQuantity")
             prev_short = row.get("previousShortPositionQuantity")
             change = row.get("changePreviousNumber")
