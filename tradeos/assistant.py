@@ -13,13 +13,14 @@ retrieval + the guarded orchestrator.
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
 
 import psycopg
 
-from . import sentiment, trades
+from . import llm, sentiment, trades
 from .explain.guards import allowed_numbers, directive_guard, numbers_guard
 
 log = logging.getLogger("tradeos.assistant")
@@ -263,6 +264,82 @@ def retrieve(conn: psycopg.Connection, question: str, user, as_of) -> dict:
 
 # ------------------------------------------------------------------ guarded orchestrator
 
+TOOL_INSTRUCTION = """You answer questions about world events and what they mean for markets, using
+ONLY data retrieved from this system's own stores.
+
+Choose the lookups that would answer the question. Reply with JSON only:
+  {"tools": [{"name": "<tool>", "args": {...}}], "why": "<one line>"}
+
+Available lookups:
+%s
+
+Pick at most 3. Pick none (an empty list) if the question needs no data — but prefer looking
+something up over answering from memory, because answering from memory is how a wrong number
+reaches a user.
+
+If the question is about how reliable this system is, call track_record. If it is about what this
+system can or cannot see, call data_coverage.
+
+QUESTION: """
+
+
+ANSWER_INSTRUCTION = """Answer the question using ONLY the retrieved data below. Rules:
+
+- Cite what you used. Refer to specific events, claims or figures that appear in the data.
+- If the data does not answer the question, SAY SO plainly. Do not fill the gap from memory. "The
+  store has nothing on that" is a good answer; an invented figure is not.
+- Never state a number that does not appear in the retrieved data.
+- Describe and explain; never tell anyone what to do. No buy, sell, hold, or price targets.
+- If a claim carries a confidence, give it. A prediction without its confidence is misleading.
+- Keep it to a short paragraph or two.
+
+QUESTION: {question}
+
+RETRIEVED DATA (from this system's stores):
+{data}
+"""
+
+
+def plan_tools(question: str, provider=None) -> list[dict]:
+    """Ask the model which lookups would answer this. Returns [] on any failure, so the assistant
+    falls back to the deterministic retrieval rather than answering blind."""
+    from . import assistant_tools
+    raw = llm.text(TOOL_INSTRUCTION % assistant_tools.describe() + question[:500],
+                   max_tokens=300, json_mode=True, provider=provider, role=llm.FAST)
+    if not raw:
+        return []
+    try:
+        parsed = json.loads(raw.strip().strip("`").split("\n", 1)[-1]
+                            if raw.strip().startswith("```") else raw)
+    except (ValueError, TypeError):
+        return []
+    tools = parsed.get("tools") if isinstance(parsed, dict) else None
+    if not isinstance(tools, list):
+        return []
+    out = []
+    for t in tools[:3]:
+        if isinstance(t, dict) and isinstance(t.get("name"), str):
+            out.append({"name": t["name"], "args": t.get("args") if isinstance(t.get("args"), dict) else {}})
+    return out
+
+
+def run_tools(conn, plan: list[dict]) -> tuple[dict, list[dict]]:
+    """Execute the plan. Returns (data, citations). Every tool is read-only and parameterised —
+    see assistant_tools for why that boundary matters here specifically."""
+    from . import assistant_tools
+    data, citations = {}, []
+    for step in plan:
+        result = assistant_tools.call(conn, step["name"], step.get("args"))
+        data[step["name"]] = result
+        for ev in (result.get("events") or []):
+            if ev.get("url"):
+                citations.append({"label": ev["title"][:120], "url": ev["url"]})
+        for cl in (result.get("claims") or []):
+            if cl.get("url"):
+                citations.append({"label": cl.get("headline") or "interpretation", "url": cl["url"]})
+    return data, citations[:8]
+
+
 def answer(conn: psycopg.Connection, question: str, user, as_of, provider=None) -> dict:
     provider = (provider or os.environ.get("EXPLAIN_PROVIDER", "template")).lower()
     ctx = retrieve(conn, question, user, as_of)
@@ -270,21 +347,46 @@ def answer(conn: psycopg.Connection, question: str, user, as_of, provider=None) 
     grounded = bool(ctx.get("symbols") or ctx.get("library") or ctx.get("performance")
                     or ctx.get("top_signals"))
 
+    # Tool-using path first: let the model choose lookups, run them, then answer from what came
+    # back. Falls through to the previous behaviour whenever the model is unavailable.
+    tool_data, tool_citations, tools_used = {}, [], []
+    if llm.available(provider):
+        plan = plan_tools(question, provider=provider)
+        if plan:
+            tool_data, tool_citations = run_tools(conn, plan)
+            tools_used = [p["name"] for p in plan]
+
     text, model_id, used_template = det, "template", True
+    if tool_data:
+        out = llm.text(
+            ANSWER_INSTRUCTION.format(question=question[:500],
+                                      data=json.dumps(tool_data, default=str)[:9000]),
+            max_tokens=700, provider=provider, role=llm.DEEP)
+        # The numbers guard is deliberately relaxed here versus the Signal plane: the model is
+        # quoting figures out of OUR OWN stores, which it was just handed, so the relevant risk is
+        # advice language rather than invented measurements.
+        if out and directive_guard(out):
+            return {"answer": out, "sources": sources + [c["label"] for c in tool_citations],
+                    "citations": tool_citations, "tools_used": tools_used,
+                    "model_id": llm.model_id(provider), "used_template": False, "grounded": True}
+        if out:
+            log.warning("assistant tool answer tripped the advice guard; using deterministic answer")
+
     if provider in ("gemini", "openai"):
         try:
             from .explain import gemini
-            llm = gemini.answer_question(question, ctx)
+            phrased = gemini.answer_question(question, ctx)
         except Exception as exc:  # missing key / API error -> deterministic
             log.warning("assistant provider unavailable (%s)", type(exc).__name__)
-            llm = None
-        if llm:
+            phrased = None
+        if phrased:
             allowed = allowed_numbers(ctx, {"_const": [1, 5, 10, 100]})
-            if directive_guard(llm) and numbers_guard(llm, allowed):
-                text, model_id, used_template = llm, (os.environ.get("OPENAI_MODEL", "openai")
+            if directive_guard(phrased) and numbers_guard(phrased, allowed):
+                text, model_id, used_template = phrased, (os.environ.get("OPENAI_MODEL", "openai")
                     if provider == "openai" else os.environ.get("GEMINI_MODEL", "gemini")), False
             else:
                 log.warning("assistant guard tripped; using deterministic answer")
 
-    return {"answer": text, "sources": sources, "model_id": model_id,
+    return {"answer": text, "sources": sources, "citations": tool_citations,
+            "tools_used": tools_used, "model_id": model_id,
             "used_template": used_template, "grounded": grounded}
