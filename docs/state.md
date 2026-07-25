@@ -1,189 +1,231 @@
 # docs/state.md — where the work stands
 
-Updated: 2026-07-25, Phase 6 partial.
-Read this after `CLAUDE.md` and before `docs/plan.md` at the start of every session.
+Updated: 2026-07-25, end of Phase 6 (Journal outstanding).
+**Read this after `CLAUDE.md` and before `docs/plan.md` at the start of every session.**
 
 ---
 
-## Current phase
+## Resume in one minute
 
-**Phases 0–5 complete. Phase 6 partial.** Branch `phase/6-sections`.
-Reports for every phase are in `docs/progress/`.
+```bash
+cd /path/to/receipts
+git checkout phase/6-sections          # 43 commits ahead of main; all work lives here
+make dev                               # reload-in-place stack on :8000
+make test                              # 440 pass, ~0.5s, offline
+make lint                              # ruff, zero errors is the standard
+```
 
-Done in Phase 6: Portfolio → **Exposure**, the **Calendar** (month/week/day, replacing a
-10,000-pixel scroll), and the **AI Assistant** with six read-only tools.
+Demo login `demo@tradeos.app` / `<generated at seed time>`. Surfaces: `/radar` `/globe` `/ledger`
+`/exposure` `/crypto` `/news` `/brief` `/events` `/integrations` `/journal`.
 
-Still to do in Phase 6: Morning Brief (fold in Ledger outcomes), Smart Money (feed signals into
-the claim/Ledger machinery), News (fold into the impact engine + source comparison), Crypto
-(still a data mirror), Journal (attach world context at trade time).
-
-Outstanding inside Phase 4: saved filter sets, in-place threading, subscribable alerts.
+**Verified state at handoff:** 440 tests pass · 0 lint errors · 0 console errors on every surface ·
+601 events · 556 clusters · 336 claims · 323 scored outcomes · migrations through 027.
 
 ---
 
-## Finished
+## Current position
 
-**Phase 0 — audit.** `CLAUDE.md`, `docs/audit.md`, `docs/bugs.md` (21 defects),
-`docs/dead_code.md`, `docs/plan.md`, `docs/progress/phase_0.md`.
+| Phase | Status |
+|---|---|
+| 0 — Audit | complete |
+| 1 — Repair | complete |
+| 2 — Ingestion spine | complete |
+| 3 — Impact engine + Ledger | complete |
+| 4 — Radar | core complete (threading, saved filters, alerts outstanding) |
+| 5 — Globe | complete |
+| **6 — Rework sections** | **7 of 8 done — Journal outstanding** |
+| 7 — Marketing site | not started |
+| 8 — Accounts, limits, deployment | not started |
+| 9 — Security | not started |
 
-**Phase 1 — repair.** Full report in `docs/progress/phase_1.md`. Headlines:
+Every phase has a report in `docs/progress/`.
 
-- Journal chart coach fixed and verified live against the real stored screenshot.
-- LLM transport rebuilt as a provider chain; switched off GitHub Models before its 30 July
-  shutdown; Gemini free tier confirmed working.
-- Attention board's real bug found and fixed (my Phase 0 root cause was wrong — see below).
-- Routing, error boundaries, source gates, integration status page, honest data age.
-- Ruff + CI + 222 tests, zero lint errors.
-- A vulnerability in my own new endpoint found by `/security-review` and fixed.
+---
 
-**Phase 2 — the ingestion spine.** Full report in `docs/progress/phase_2.md`. Headlines:
+## NEXT STEPS, in the order I would do them
 
-- Migration 024: `events`, `event_clusters`, `watchlist_accounts`, `source_calls`.
-- `spine.py` — normalise, cluster (trigram, not embeddings), score novelty and velocity.
-- GDELT wired as the global backbone; existing news adapted in rather than duplicated.
-- Influence watchlist as first-class editable data with an admin API.
-- 268 tests. Three bugs found by real data, plus an authorization bug I introduced and caught.
+### 1. Finish Phase 6 — the Journal (the only section left)
 
-## Half finished
+The brief: *"When a trade is logged, attach the world context at that moment: what the Radar was
+showing, which claims were live. Over time the coach can identify genuine behavioural patterns,
+because it knows both what the user did and what was happening. Track process quality rather than
+outcomes alone, and keep the coaching constructive rather than punishing."*
 
-**GDELT has never been observed ingesting.** The adapter is built, its parsing is covered by
-offline tests against real captured payloads, and its 429 backoff is verified — but my own
-unpaced probing throttled this IP for the rest of the phase, so no article has landed in
-`events` yet. The hourly scheduler job will confirm it once the limit clears; check
-`/api/integrations` or `SELECT count(*) FROM events WHERE source='gdelt'`.
+Concretely:
+- Migration 028: `trade_context` (trade_id, captured_at, live_claim_ids, radar_snapshot jsonb).
+- On `POST /api/trades`, snapshot the top relevance-ranked claims live at that moment.
+- Surface it on the trade detail: *"When you entered, the Radar was showing…"*.
+- Extend the coach in `insights.journal_report` to read context across trades — e.g. "you tend to
+  enter on days with high novelty scores", a behavioural pattern no journal alone can see.
+- **Keep it constructive.** A coach that makes someone feel worse after a loss is one they stop
+  opening. Hold that line.
 
-**Phase 3 + 4 core.** Full report in `docs/progress/phase_3_4.md`. Headlines:
+### 2. Phase 7 — the marketing site
 
-- Migration 025: `claims`, `claim_outcomes`, `country_exposure`, `user_profiles`.
-- `claims.py` — the impact engine. Rejects any "mechanism" that names a direction without a
-  channel, and writes NOTHING rather than falling back to a template.
-- `ledger.py` — outcome measurement vs SPY with a noise floor; `unscoreable` counted, not dropped.
-- `relevance.py` — personal ranking, no model involved.
-- Radar and Ledger surfaces; Radar is now where a signed-in reader lands.
+`site/` as a **sibling Vite project** to `frontend/`, sharing `shared/tokens.css`. Not npm
+workspaces — decided in `docs/plan.md` §6 and the reason still holds.
 
-## Next three tasks
+Hero is the live product. Then the daily real-event walkthrough, then **the public Ledger**, which
+is now genuinely persuasive because it reads *41% of 282, with the misses shown*. Then the
+personalisation globe demo, then FAQ with `FAQPage` structured data.
 
-1. Finish Phase 6: Crypto is the weakest surface left and the owner named it directly — it needs
-   interpretation (on-chain flows tied to events, funding rates read against news flow, scenario
-   analysis with explicit invalidation conditions) rather than more numbers.
-2. Morning Brief: fold in yesterday's Ledger outcomes so the reader sees the system held to
-   account daily.
-3. Smart Money: route its convergence signals through `claims.py` so they are scored by the same
-   Ledger as everything else.
+**Design direction is specified and non-obvious** — re-read `docs/tradeoss_veryimportant_prompt.md`
+§13 before designing. It explicitly rules out the current defaults (cream + serif + terracotta;
+near-black + one acid accent; broadsheet grid) and asks for a cartographic/instrumental vocabulary.
+Present the token system for review **before** building.
 
-Carried over, not blocking: confirm GDELT ingests once its rate limit clears, and add Bluesky as
-a real `SocialSource`.
+### 3. Phase 8 — accounts, limits, deployment
 
-## Open questions waiting on the owner
+Email + OAuth, sub-minute onboarding capturing country/currency/watchlist (the `user_profiles`
+table and `PUT /api/profile/frame` already exist — onboarding just has to fill them), server-side
+tier gating, and `docs/deploy.md`.
+
+### 4. Phase 9 — security
+
+Threat model first. `/security-review` has already run twice this project and found a **real
+vulnerability each time**, so budget for findings rather than a clean pass. Known work:
+- Re-enable the `S608` ruff rule and replace f-string SQL with `psycopg.sql` composition
+  (`pyproject.toml` documents exactly why it is off and what the invariant is).
+- gitleaks over full history — wired into CI, never run locally.
+- Adversarial authorization tests across every per-user object.
+
+### 5. Carried over, not blocking anything
+
+- **Phase 4 remainder**: saved filter sets, in-place threading of developing stories, subscribable
+  alerts.
+- **GDELT has never been observed ingesting.** Adapter built, parsing covered by offline tests
+  against real captured payloads, 429 backoff verified. My own unpaced probing throttled the IP;
+  it now backs off six hours. Check `SELECT count(*) FROM events WHERE source='gdelt'`.
+- **Bluesky** as a real `SocialSource` — the interface exists, the implementation does not.
+- **`/simplify` and `/code-review` have never been run** on any phase diff.
+- **`GOOG`/`GOOGL` render as two board rows** for one company; needs share-class collapsing.
+
+---
+
+## Open questions for the owner
 
 | # | Question | Blocks |
 |---|---|---|
-| 1 | Reddit free key (<https://www.reddit.com/prefs/apps>, type "script") | B-13 — the only source that measures mood |
-| 2 | OpenFIGI free key (<https://www.openfigi.com/api>) | B-14 — 19,851 invisible 13F holdings |
-| 3 | OpenRouter free key (<https://openrouter.ai/keys>), optional | Second link in the provider chain |
+| 1 | **OpenRouter free key** (<https://openrouter.ai/keys>) — offered, not yet provided | Nothing, but Gemini's daily allowance ran out twice in one session and it is the real throttle on claim generation |
+| 2 | Reddit free key (<https://www.reddit.com/prefs/apps>, type "script") | The only source that measures *mood* rather than attention |
+| 3 | OpenFIGI free key (<https://www.openfigi.com/api>) | 19,851 unmapped 13F holdings, invisible everywhere |
 | 4 | The six ASK rulings in `docs/dead_code.md` | Cleanup only |
-
-Nothing on this list blocks Phase 5.
 
 ## Decisions already taken
 
-- **Display name: Rhumb.** `BRAND_NAME` config value; `TradeOSS` stays the internal codename and
+- **Display name: Rhumb.** `BRAND_NAME` config value. `TradeOSS` stays the internal codename;
   nothing is renamed for branding.
-- **Portfolio → Exposure** approved, salvaging its shadow-vs-SPY track record into the Phase 3
-  Ledger rather than deleting it with the surface.
-- **Provider: Gemini free tier**, chain-configured so a second provider can be added without code.
+- **Portfolio → Exposure**, approved, with the shadow-vs-SPY track record salvaged into the Ledger.
+- **Provider: Gemini free tier**, chain-configured (`EXPLAIN_PROVIDER=gemini,openai`).
+- **PostgreSQL, not SQLite** (contra the brief — reasoned in `docs/plan.md` §1).
+- **Extend the existing scheduler**, never build a second worker.
 
 ---
 
 ## Things learned that are not obvious from the code
 
+Ordered roughly by how much time they would cost to rediscover.
+
 1. **The "AI never sees my screenshot" bug was not a transport bug.** `directive_guard` banned
    "target price" — which the prompt itself asks the model to discuss — and one tripped field
-   discarded the whole read. The fallback then blamed a missing provider. Fixed; see B-01.
+   discarded the whole read. The fallback then blamed a missing provider.
 
 2. **My Phase 0 root cause for the attention board was wrong.** I blamed Wikipedia title
-   resolution; the titles are correct. The real causes were a fuzzy Algolia query on Hacker News
-   and a double-counting error in the board's own scoring. `docs/audit.md` and `docs/bugs.md`
-   carry the correction. Treat this as a reminder to measure before concluding.
+   resolution; the titles are correct. The real causes were a fuzzy Algolia query and a
+   double-counting error in the board's own scoring. Measure before concluding.
 
-3. **Gemini's `maxOutputTokens` counts hidden reasoning.** Measured 769–1360 thinking tokens for
-   one chart image, so a caller asking for 800 gets truncated JSON. `THINKING_HEADROOM` in
-   `llm.py` pays for it. Do not remove it.
+3. **`str.replace` cannot sanitise a delimiter.** Single pass, no re-scan, so a marker split around
+   a nested copy of itself reassembles. The prompt fence uses a **per-request nonce** — do not
+   "simplify" it back to fixed markers. Found by `/security-review` on my own code.
 
-4. **`thinkingConfig` 400s on every Gemini model newer than 2.5.** Sending it had pinned the app
-   to legacy models. Do not reintroduce it.
+4. **Azure's content filter classifies text that QUOTES prompt-injection examples as a jailbreak**
+   and 400s the request. Our own defence made the provider unusable. Describe the rule in the
+   abstract; a test asserts no attack strings return.
 
-5. **Gemini quota is per model.** `gemini-2.0-flash` has a zero free-tier allowance and
-   `gemini-2.5-*` are closed to new keys. `gemini-flash-latest` and `gemini-flash-lite-latest`
-   work. The model id is load-bearing, not cosmetic.
+5. **Gemini's `maxOutputTokens` counts hidden reasoning.** Measured 769–1360 thinking tokens for one
+   chart, so a caller asking for 800 gets truncated JSON. `THINKING_HEADROOM` pays for it.
 
-6. **httpx puts the full request URL, query string included, in its exception messages.** Any
-   API authenticated with `?key=` leaks its credential through an unhandled error. `scheduler.redact()`
-   strips query strings before anything is stored or logged. Keep that invariant.
+6. **`thinkingConfig` 400s on every Gemini model newer than 2.5.** Sending it pinned the app to
+   legacy models. Do not reintroduce.
 
-7. **Frontend changes need `make web`** (0.3s) when running `make dev`, or a full
-   `docker compose up -d --build` otherwise. The bundle is baked into the image.
+7. **Gemini quota is per model and has a real daily ceiling.** `gemini-2.0-flash` has a zero
+   free-tier allowance; `gemini-2.5-*` are closed to new keys. Use `gemini-flash-latest` (DEEP) and
+   `gemini-flash-lite-latest` (FAST).
 
-8. **The scheduler is genuinely good** — restart-safe cursors via `job_runs`, per-job error
-   isolation. Phase 2 extends it; do not build a second worker.
+8. **httpx puts the full request URL, query string included, in exception messages.** Any API
+   authenticated with `?key=` leaks its credential through an unhandled error. `scheduler.redact()`
+   strips query strings before anything is stored or logged. Keep the invariant.
 
-9. **Portfolio hides a working Ledger.** Its shadow-vs-SPY track record publishes `−24.1%` and
-   `38%` without burying them. Salvage that mechanism in Phase 3.
+9. **GDELT's throttle is keyed on the User-Agent, not the IP.** Rotating it *would* restore access;
+   we deliberately do not, and `tests/test_gdelt.py` asserts the module still explains why.
 
-10. **All five brand names in the brief are taken** on .com/.io/.ai. Settled on Rhumb.
+10. **`geo` on an event is where the OUTLET sits, not what the story is about.** This distinction
+    was written into the GDELT adapter and then violated twice — once in the news adapter, once
+    when trying to use geography to corroborate cross-outlet clustering. The single most repeated
+    mistake in this project.
 
-11. The data is real and substantial: 664,923 insider transactions, 51,099 stake events, 24,982
-    institutional holdings, 149 live convergence clusters. Weigh that in any rewrite-vs-extend call.
+11. **Cross-outlet clustering needs shared PROPER NOUNS**, not title similarity and not geography.
+    Two reports of one event share who and where; two unrelated ones share topic vocabulary.
 
-12. **A source that no-ops because it is unkeyed still records `status: ok`** in `job_runs`.
-    `sources.health()` deliberately does not count that as a successful fetch, or the page would
-    report Reddit as working when it has never run.
+12. **SEC filing headlines are templated**, so trigram similarity matches the template rather than
+    the story. Cluster matching requires shared entities when both sides name any.
 
-13. **GDELT rate-limits for over an hour after a burst.** Three unpaced probe requests throttled
-    this IP for the rest of the phase. `gdelt.MIN_INTERVAL_S` is 6 seconds and a 429 ends the
-    whole pass — do not "optimise" either.
-
-14. **SEC filing headlines are templated**, so trigram similarity matches the template rather
-    than the story. Cluster matching requires shared entities when both sides name any. Removing
-    that check re-merges eight companies into one "story".
-
-15. **`_require_admin` returns the USER on success and None on failure.** Branch on
+13. **`_require_admin` returns the USER on success and None on failure.** Branch on
     `if not _require_admin(...)`. Getting it backwards serves admin data to everyone, silently.
     `tests/test_sources.py` asserts every call site uses a safe shape.
 
-16. **Clusters re-derive their category from members.** Without that, improving the classifier
-    and reprocessing creates duplicate clusters instead of correcting existing ones.
+14. **A threshold that fires on everything is as useless as one that never fires.** The crypto
+    positioning read was calibrated wrong in both directions against live data before it
+    discriminated. Measure against real data before trusting a threshold.
 
-17. **Azure's content filter classifies text that QUOTES prompt-injection examples as a jailbreak**
-    and 400s the whole request. Our own defence made the provider unusable. Describe the rule in
-    the abstract; `tests/test_claims.py` asserts no attack strings return.
+15. **Every migration file must INSERT its own version row** into `schema_migrations`; the runner
+    does not. A file that forgets re-runs and fails with "relation already exists".
 
-18. **The impact engine has NO template fallback, on purpose.** Every other AI path in this
-    codebase degrades to deterministic output. This one writes nothing, because a fabricated claim
-    inside a ledger built to measure honesty would poison the only thing that makes it defensible.
+16. **Frontend changes need `make web`** (0.3s) under `make dev`, or a full image rebuild otherwise.
 
-19. **`= ANY(%s::record[])` fails** — psycopg cannot bind an anonymous composite type. Use two
+17. **The browser check catches what tests do not.** A missing `Icon` import passed 435 tests and
+    threw `ReferenceError` on the page. Run both gates.
+
+18. **Clusters re-derive their category from members.** Without that, improving the classifier and
+    reprocessing creates duplicate clusters instead of correcting existing ones.
+
+19. **A source that no-ops because it is unkeyed still records `status: ok`** in `job_runs`.
+    `sources.health()` deliberately does not count that as a successful fetch.
+
+20. **The impact engine has NO template fallback, on purpose.** Every other AI path degrades to
+    deterministic output. This one writes nothing, because a fabricated claim inside a ledger built
+    to measure honesty would poison the only thing that makes it defensible.
+
+21. **`= ANY(%s::record[])` fails** — psycopg cannot bind an anonymous composite type. Use two
     parallel arrays with `unnest(%s::text[], %s::text[])`.
 
-20. **Every migration file must INSERT its own version row** into `schema_migrations`; the runner
-    does not. A file that forgets re-runs and fails with "relation already exists".
-    `tests/test_slice2.py` guards this.
+22. The data is real and substantial: 664,923 insider transactions, 51,099 stake events, 24,982
+    institutional holdings. Weigh that in any rewrite-vs-extend call.
 
-21. **Gemini's free tier has a real daily ceiling.** Claim generation is the heaviest consumer.
-    A second provider in the chain is the fix, not more retries. (It resets — the assistant is
-    running on Gemini again.)
+---
 
-22. **GDELT's throttle is keyed on the User-Agent, not the IP.** Rotating it WOULD restore access;
-    we deliberately do not, and `tests/test_gdelt.py` asserts the module still explains why. A 429
-    parks the source for six hours, persisted so a restart cannot reset the clock.
+## What the product actually does now
 
-23. **`str.replace` cannot sanitise a delimiter.** It is a single pass and does not re-scan its
-    output, so a marker split around a nested copy of itself reassembles. The prompt fence uses a
-    per-request nonce instead — do not "simplify" it back to fixed markers.
+So a fresh session knows what it is resuming, not just where the files are.
 
-24. **Azure's content filter is not the only provider quirk to expect.** Assume any provider may
-    refuse a prompt for reasons unrelated to its content being wrong; `llm.py` reports a
-    content-filter rejection distinctly from a transport failure because retrying never helps.
+**Radar** is the landing surface: interpretations ranked by personal relevance, leading with the
+consequence rather than the headline, confidence always visible, disagreements surfaced.
 
-25. **`answer()` in assistant.py had a local named `llm`** shadowing the module. If you add a
-    module-level import to a long function, check for shadowing first.
+**The Ledger** publishes **41% of 282 resolved calls**, misses first, with calibration (said 38% →
+landed 40%). Broken down by origin so the signal plane and the model are never pooled.
+
+**The World** places events by what their claims *affect*, with 62 sourced trade corridors; 3D
+lazy-loaded behind WebGL detection, flat map otherwise.
+
+**Exposure** answers what a broker cannot: which live events reach your holdings, through which
+name, by what mechanism.
+
+**Crypto** reads positioning — funding, open interest, crowding — with an invalidation condition on
+every reading.
+
+**News** compares how outlets in different countries frame the same event, and flags thin coverage.
+
+**Morning Brief** opens by scoring yesterday's calls before telling you anything new.
+
+**The Assistant** has six read-only tools and answers "how often are you right?" by reading the
+Ledger.

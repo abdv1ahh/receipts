@@ -11,10 +11,15 @@ command.
 
 ## What this is
 
-**Internal codename: TradeOSS.** A world-event interpretation engine that explains market
-consequences. Currently a working SEC/news intelligence app; being rebuilt around causal
-claims, a public accuracy ledger, and personal (country-level) relevance. The product brief
-is `docs/tradeoss_veryimportant_prompt.md` — it is the source of truth for scope.
+**Internal codename: TradeOSS. Display name: Rhumb** (`BRAND_NAME`). A world-event interpretation
+engine that explains market consequences. The product brief is
+`docs/tradeoss_veryimportant_prompt.md` — the source of truth for scope. **Phases 0–5 are done and
+Phase 6 is 7 of 8; `docs/state.md` has the resume instructions and the ordered next steps.**
+
+It now has a claim engine (`claims.py`), a self-scoring Ledger (`ledger.py`, publishing 41% of 282
+with the misses shown), an event spine (`spine.py`), personal relevance (`relevance.py`), and
+surfaces at `/radar` `/globe` `/ledger` `/exposure` `/crypto` `/news` `/brief` `/events`
+`/integrations`.
 
 The display name is a config value, not a hardcoded string (see `docs/plan.md` §rebrand).
 Never rename Python modules, database tables, or the `tradeos` package for branding.
@@ -63,9 +68,10 @@ The app is at <http://localhost:8000>. Demo login: `demo@tradeos.app` / `<genera
 ### Tests
 
 ```bash
-make test     # 222 tests, ~0.3s, fully offline (no network)
+make test     # 440 tests, ~0.5s, fully offline (no network)
 make lint     # ruff; zero errors is the standard
 make dev      # reload-in-place stack; then `make web` for a UI change
+make fix      # ruff --fix
 ```
 
 `tests/` is deliberately not copied into the production image, so the suite runs against a mount.
@@ -94,7 +100,9 @@ Commands: `migrate`, `sync-tickers`, `resolve-entities`, `resolve-cusips`,
 `signals-register`, `compute-signals`, `ingest-prices`, `ingest-short-interest`,
 `ingest-sentiment`, `ingest-news`, `analyze-news`, `ingest-calendar`, `scheduler`,
 `run-backtest`, `calibration`, `sync-library`, `generate-alerts`, `seed-admin`, `seed-demo`,
-`create-invites`, `status`, `preflight`.
+`create-invites`, `status`, `preflight`,
+`spine`, `reprocess`, `seed-watchlist`, `seed-exposure`, `interpret`, `measure-claims`,
+`ledger`, `import-signals`.
 
 `status` prints per-feed freshness. `preflight` checks production config, including every link in
 the `EXPLAIN_PROVIDER` chain.
@@ -131,12 +139,25 @@ tradeos/                  the Python package (all backend code)
   signals/                convergence scoring + versioned signal definitions
   resolution/             ticker / CUSIP / entity resolution (OpenFIGI, SEC)
   backtest/               outcome measurement for signal clusters
-  migrations/             001..023 ordered .sql; NEVER edit an applied migration
+  spine.py                normalise -> cluster -> score. The substrate everything hangs off.
+  claims.py               the impact engine. Mechanism rule + the prompt-injection boundary.
+  ledger.py               outcome measurement vs SPY; the self-scoring record.
+  relevance.py            personal ranking + country exposure reference data. No model.
+  geography.py            places events by what a claim AFFECTS, not who published it.
+  exposure.py             what holdings are exposed to (replaced the position tracker).
+  crypto_intel.py         positioning readings, each with an invalidation condition.
+  assistant_tools.py      six READ-ONLY tools; a security boundary, not a convenience layer.
+  smartmoney_claims.py    convergence signals expressed as scoreable claims.
+  watchlist_accounts.py   the consequential-accounts influence list.
+  migrations/             001..027 ordered .sql; NEVER edit an applied migration, and every
+                          file MUST insert its own schema_migrations row
   (surface modules)       dashboard, brief, news, social, sentiment, crypto, events,
                           trades, insights, portfolio, community, alerts, admin,
                           billing, search, library, presentation, assistant
 frontend/src/             React, one .jsx per surface, imported by App.jsx
   shell.jsx               routing, ErrorBoundary, LoadError/EmptyState, SourceGate
+  radar.jsx ledger.jsx    the two flagship surfaces
+  globe.jsx globe3d.jsx   globe3d is lazy-loaded ONLY; never import it statically
 tests/                    pytest; offline, fixture-driven (tests/fixtures/)
 docs/                     audit, bugs, dead_code, plan, state, progress/, decision-log,
                           threat-models/, runbooks/
@@ -173,32 +194,29 @@ when a phase touches it, not as a standalone refactor.
 
 ## Gotchas that will cost you an hour
 
-1. **Frontend changes need a rebuild.** Under `make dev` that is `make web` (~0.3s). Without
-   it, a full `docker compose up -d --build`. The bundle is baked into the image.
-2. **Gemini's `maxOutputTokens` counts hidden reasoning.** Measured 769–1360 thinking tokens for
-   one chart image, so a caller asking for 800 gets truncated JSON that looks like a parse bug.
-   `THINKING_HEADROOM` in `llm.py` pays for it — do not remove it.
-3. **`thinkingConfig` returns 400 on every Gemini model newer than 2.5.** Sending it had pinned
-   the app to legacy models. Do not reintroduce it.
-4. **Gemini quota is per model.** `gemini-2.0-flash` has a zero free-tier allowance and
-   `gemini-2.5-*` are closed to new keys. Use `gemini-flash-latest` (DEEP) and
-   `gemini-flash-lite-latest` (FAST). The model id is load-bearing.
-5. **`EXPLAIN_PROVIDER` is a chain**, comma-separated, tried in order. Circuit breakers are per
-   provider. A `None` from `llm.text()` may mean "every provider is cooling" — use
-   `llm.complete()` when you need the reason to show a user.
-6. **httpx puts the full request URL, query string included, in exception messages.** Any API
-   authenticated with `?key=` leaks its credential through an unhandled error.
-   `scheduler.redact()` strips query strings before anything is stored or logged. Keep it.
-7. **Postgres, not SQLite.** The product brief suggests SQLite; the app already has 23
-   migrations, 48 tables and 664k insider transactions in Postgres. Do not migrate.
-8. **Migrations are never edited once applied.** Add `024_*.sql` and move forward.
-9. **Never call an external API from a route handler or a component** — it goes in
-   `tradeos/ingestion/` and gets an entry in `tradeos/sources.py`, or the integration status page
-   silently stops telling the truth.
-10. **A source that no-ops because it is unkeyed still records `status: ok`** in `job_runs`.
-    `sources.health()` deliberately does not count that as a successful fetch.
+The full list, with the reasoning, is in `docs/state.md` §"Things learned". The ones that bite
+fastest:
 
----
+1. **Frontend changes need `make web`** (0.3s) under `make dev`, or a full image rebuild otherwise.
+2. **`geo` on an event is where the OUTLET sits, not what the story is about.** The single most
+   repeated mistake in this project — made three times.
+3. **Gemini's `maxOutputTokens` counts hidden reasoning** (measured 769-1360 tokens for one chart).
+   `THINKING_HEADROOM` in `llm.py` pays for it. Do not remove it. `thinkingConfig` 400s on every
+   model newer than 2.5 — do not reintroduce it.
+4. **Gemini quota is per model and has a real daily ceiling.** Use `gemini-flash-latest` (DEEP) and
+   `gemini-flash-lite-latest` (FAST). `gemini-2.0-flash` has a zero free-tier allowance.
+5. **httpx puts the full request URL, query string included, in exception messages.** Any API
+   authenticated with `?key=` leaks its credential. `scheduler.redact()` strips them. Keep it.
+6. **The prompt fence in `claims.py` uses a per-request nonce.** Do not "simplify" it to fixed
+   markers — `str.replace` cannot sanitise a delimiter, it reassembles. Found by `/security-review`.
+7. **Do not quote prompt-injection examples in a prompt.** Azure's content filter classifies that
+   as a jailbreak and 400s the whole request.
+8. **`_require_admin` returns the USER on success, None on failure.** Branch on `if not ...`.
+9. **Every migration must INSERT its own `schema_migrations` row**; the runner does not.
+10. **GDELT's throttle is keyed on the User-Agent.** Rotating it would work; we deliberately do not.
+11. **Postgres, not SQLite** (contra the brief; reasoned in `docs/plan.md` §1).
+12. **Run the browser check as well as the tests** — a missing import passed 435 tests and threw
+    on the page.
 
 ## External sources (all free tier)
 
