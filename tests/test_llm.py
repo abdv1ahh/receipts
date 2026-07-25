@@ -210,3 +210,21 @@ def test_truncated_reply_is_reported_not_returned(monkeypatch):
     out, why = llm.complete("x", provider="gemini")
     assert out is None and "ran out of output budget" in why
     assert llm.available("gemini") is True          # truncation is our fault, so no breaker trip
+
+
+def test_a_content_filter_rejection_is_reported_as_a_refusal_not_a_crash(monkeypatch):
+    """Azure's filter returns 400 with content_filter in the body. That is a REFUSED PROMPT, not a
+    broken transport: retrying never helps and the caller must be told which it was. Found the hard
+    way — the filter flagged our own prompt-injection defence as a jailbreak attempt."""
+    monkeypatch.setenv("OPENAI_API_KEY", "k")
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://models.example.ai/inference")
+
+    class _Filtered(_Resp):
+        def __init__(self):
+            super().__init__(400, {})
+            self.text = '{"error":{"code":"content_filter","innererror":{"code":"ResponsibleAIPolicyViolation"}}}'
+
+    _mock(monkeypatch, _Filtered())
+    out, why = llm.complete("x", provider="openai")
+    assert out is None
+    assert "refused the prompt" in why and "safety filter" in why

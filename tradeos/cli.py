@@ -338,6 +338,51 @@ def cmd_seed_watchlist(_args) -> None:
         print(f"seed-watchlist: {watchlist_accounts.seed(conn)}")
 
 
+def cmd_seed_exposure(_args) -> None:
+    from . import relevance
+    with db.connect() as conn:
+        print(f"seed-exposure: {relevance.seed(conn)}")
+
+
+def cmd_interpret(args) -> None:
+    from . import claims
+    with db.connect() as conn:
+        out = claims.interpret_recent(conn, hours=args.hours, limit=args.limit,
+                                      min_novelty=args.min_novelty)
+    print(f"interpret: {out['claims']} claims from {out['considered']} clusters")
+    for s in out["skipped"]:
+        print(f"  skipped event {s['event']}: {s['reason']}")
+
+
+def cmd_measure_claims(_args) -> None:
+    from . import ledger
+    with db.connect() as conn:
+        print(f"measure-claims: {ledger.measure_due(conn)}")
+
+
+def cmd_ledger(_args) -> None:
+    from . import ledger
+    with db.connect() as conn:
+        s = ledger.summary(conn)
+        misses = ledger.recent_misses(conn, limit=5)
+    o = s["overall"]
+    rate = f"{o['hit_rate']:.1%}" if o["hit_rate"] is not None else "—"
+    suff = "" if o["sufficient"] else "  (INSUFFICIENT SAMPLE — not a rate to publish)"
+    print(f"hit rate: {rate}  ({o['hit']} hit / {o['miss']} miss, n={o['n']}){suff}")
+    print(f"inconclusive {o['inconclusive']} · unscoreable {o['unscoreable']} · open {s['open_claims']}")
+    for label, rows in s["by"].items():
+        if rows:
+            print(f"\nby {label}:")
+            for r in rows:
+                rr = f"{r['hit_rate']:.0%}" if r["hit_rate"] is not None else "—"
+                flag = "" if r["sufficient"] else " (thin)"
+                print(f"  {str(r['key'])[:26]:28} {rr:>5}  n={r['n']}{flag}")
+    if misses:
+        print("\nrecent misses (shown first, on purpose):")
+        for m in misses:
+            print(f"  {m['subject']:8} said {m['predicted']:5} got {m['excess_return']:+.1%}  {str(m['headline'])[:52]}")
+
+
 def cmd_scheduler(args) -> None:
     from . import scheduler
     if args.once:
@@ -582,6 +627,21 @@ def main() -> None:
 
     sw = sub.add_parser("seed-watchlist", help="seed the consequential-accounts watchlist")
     sw.set_defaults(fn=cmd_seed_watchlist)
+
+    se = sub.add_parser("seed-exposure", help="load the country exposure reference data")
+    se.set_defaults(fn=cmd_seed_exposure)
+
+    ic = sub.add_parser("interpret", help="generate claims from recent event clusters (Phase 3)")
+    ic.add_argument("--hours", type=int, default=24)
+    ic.add_argument("--limit", type=int, default=5)
+    ic.add_argument("--min-novelty", type=float, default=0.4)
+    ic.set_defaults(fn=cmd_interpret)
+
+    mc = sub.add_parser("measure-claims", help="score claims whose horizon has elapsed")
+    mc.set_defaults(fn=cmd_measure_claims)
+
+    lg = sub.add_parser("ledger", help="print the accuracy record, including its misses")
+    lg.set_defaults(fn=cmd_ledger)
 
     sch = sub.add_parser("scheduler")
     sch.add_argument("--once", action="store_true", help="run one pass of due jobs and exit")

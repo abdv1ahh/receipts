@@ -175,6 +175,8 @@ def _openai(messages: list[dict], max_tokens: int, json_mode: bool, model: str) 
             break
         if resp.status_code in (429, 503):
             raise _Quota(f"openai {resp.status_code}")
+        if resp.status_code == 400 and "content_filter" in resp.text:
+            raise _Refused("the provider's safety filter rejected the prompt")
         resp.raise_for_status()
         data = resp.json()
     choices = data.get("choices") or []
@@ -185,6 +187,12 @@ def _openai(messages: list[dict], max_tokens: int, json_mode: bool, model: str) 
 
 class _Quota(RuntimeError):
     """Rate limit or capacity error — cool this provider and try the next one."""
+
+
+class _Refused(RuntimeError):
+    """The provider's safety filter rejected the PROMPT. Distinct from a transport failure: no
+    amount of retrying helps, and the caller needs to know it was refused rather than broken.
+    Measured: Azure's filter flags text that quotes prompt-injection examples as a jailbreak."""
 
 
 class _Truncated(RuntimeError):
@@ -242,6 +250,10 @@ def complete(prompt: str, image: tuple[bytes, str] | None = None, max_tokens: in
         except _Truncated as exc:
             log.warning("provider %s truncated a reply (budget %d)", p, max_tokens)
             problems.append(f"{p} {exc}")
+            continue
+        except _Refused as exc:
+            log.warning("provider %s refused the prompt: %s", p, exc)
+            problems.append(f"{p} refused the prompt (safety filter)")
             continue
         except Exception as exc:
             log.warning("provider %s failed (%s)", p, type(exc).__name__)

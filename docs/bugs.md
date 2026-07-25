@@ -251,3 +251,28 @@ cannot be traced across the API and worker.
 10. B-18, B-19, B-20, B-21 (hygiene)
 
 B-11, B-12, B-13, B-14, B-15 are Phase 4/6 rebuilds and are not Phase 1 work.
+
+---
+
+## Found later (Phase 3)
+
+### B-22 · Every user shares one watchlist, selectable by query parameter
+**Severity S2** (authorization + data isolation). Found while wiring personal relevance.
+
+`watchlists` is keyed by `user_key text NOT NULL DEFAULT 'demo'` — a free-text key, not a foreign
+key to `users`. `GET/POST/DELETE /api/watchlist` accept `user` as a **query parameter**:
+
+```python
+@app.get("/api/watchlist")
+def watchlist_get(user: str = "demo") -> dict:
+```
+
+So every account currently reads and writes the same `'demo'` list, and any caller can address any
+other key by changing one query parameter. There is no session check on these routes at all.
+
+The table predates real accounts. Consequences today are mild — a watchlist is not sensitive on its
+own — but it is a genuine authorization hole and it makes per-user relevance impossible.
+
+**Fix:** re-key to `user_id bigint REFERENCES users(id)` with a migration that maps existing rows,
+and scope every watchlist route by the session. Phase 8 (accounts) does the re-key; Phase 9 covers
+the authorization test. `_reader_frame` in `app.py` reads defensively in the meantime.

@@ -37,8 +37,10 @@ from . import (
     db,
     flags,
     insights,
+    ledger,
     portfolio,
     presentation,
+    relevance,
     search,
     sentiment,
     sources,
@@ -176,6 +178,14 @@ class AdminBanReq(BaseModel):
 
 class AdminFlagReq(BaseModel):
     enabled: bool
+
+
+class ProfileFrameReq(BaseModel):
+    """The reader's geographic and monetary frame — what makes relevance personal."""
+    country: str | None = None
+    base_currency: str | None = None
+    sectors: list[str] = []
+    risk_appetite: str | None = None
 
 
 class WatchlistAccountReq(BaseModel):
@@ -431,6 +441,121 @@ def feeds() -> dict:
         "counts": {"insider_transactions": insiders, "stake_events": stakes, "fund_holdings": holdings_total},
         "unresolved": {"fund_holdings": holdings_unresolved},
     }
+
+
+@app.get("/api/ledger")
+def ledger_view() -> dict:
+    """The system's own accuracy record, including its misses.
+
+    Public and read-only by design: this is the number that has to be believable, and a record
+    only visible to its author is worth nothing. Nothing here is user-scoped."""
+    with db.connect() as conn:
+        return {"ledger": ledger.summary(conn), "recent_misses": ledger.recent_misses(conn, limit=10),
+                "brand": config.brand_name()}
+
+
+@app.get("/api/claims")
+def claims_list(hours: int = 72, limit: int = 40, tos_session: str | None = Cookie(None)) -> dict:
+    """Live interpretations, ranked by relevance to the reader when they have a profile.
+
+    Relevance is computed here rather than in the client so the ranking cannot be gamed, and each
+    item carries WHY it ranked where it did — an unexplained order is indistinguishable from an
+    arbitrary one."""
+    hours, limit = max(1, min(720, hours)), max(1, min(100, limit))
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        profile, exposure, watchlist = _reader_frame(cur, user)
+        cur.execute(
+            """SELECT c.id, c.created_at, c.mechanism, c.affected, c.horizon, c.confidence,
+                      c.analogs, c.reasoning_trace, c.contradicts, c.status, c.model_version,
+                      e.title, e.source, e.source_url, e.geo, e.category,
+                      cl.novelty_score, cl.source_count
+                 FROM claims c
+                 LEFT JOIN events e ON e.id = c.event_id
+                 LEFT JOIN event_clusters cl ON cl.id = c.cluster_id
+                WHERE c.created_at >= now() - make_interval(hours => %s)
+             ORDER BY c.created_at DESC LIMIT %s""", (hours, limit))
+        cols = ("id", "created_at", "mechanism", "affected", "horizon", "confidence", "analogs",
+                "reasoning_trace", "contradicts", "status", "model_version", "headline", "source",
+                "url", "geo", "category", "novelty", "source_count")
+        rows = [dict(zip(cols, r, strict=True)) for r in cur.fetchall()]
+
+    out = []
+    for r in rows:
+        scored = relevance.score(r, profile, exposure, watchlist, r.get("novelty"))
+        r["created_at"] = r["created_at"].isoformat()
+        out.append({**r, **scored, "why_shown": relevance.explain(scored["parts"])})
+    out.sort(key=lambda x: x["relevance"], reverse=True)
+    return {"claims": out, "personalised": bool(profile and profile.get("country")),
+            "profile": profile,
+            "disclaimer": "Informational analysis of public information, not personalised "
+                          "investment advice. Every interpretation carries its confidence and is "
+                          "scored in the Ledger once its horizon elapses."}
+
+
+def _reader_frame(cur, user: dict | None):
+    """(profile, country exposure, watchlist) for the signed-in reader, or empty frames."""
+    if not user:
+        return None, None, set()
+    cur.execute("SELECT country, base_currency, sectors, risk_appetite FROM user_profiles "
+                "WHERE user_id = %s", (user["id"],))
+    row = cur.fetchone()
+    profile = ({"country": row[0], "base_currency": row[1], "sectors": row[2],
+                "risk_appetite": row[3]} if row else None)
+    exposure = None
+    if profile and profile["country"]:
+        cur.execute("""SELECT currency, currency_regime, pegged_to, export_partners,
+                              import_partners, commodity_exposure
+                         FROM country_exposure WHERE country = %s""", (profile["country"],))
+        e = cur.fetchone()
+        if e:
+            exposure = {"currency": e[0], "currency_regime": e[1], "pegged_to": e[2],
+                        "export_partners": e[3], "import_partners": e[4], "commodity_exposure": e[5]}
+    # watchlists is keyed by a TEXT user_key that defaults to 'demo', not by user id — the table
+    # predates real accounts and /api/watchlist still takes the key as a query parameter, so every
+    # user currently shares one list. Logged as B-22; Phase 8 re-keys it to user_id and Phase 9
+    # covers the authorization hole. Reading by email keeps this endpoint correct either way.
+    cur.execute("SELECT symbol FROM watchlists WHERE user_key IN (%s, %s)",
+                (str(user["id"]), user.get("email") or ""))
+    watchlist = {r[0].upper() for r in cur.fetchall()}
+    return profile, exposure, watchlist
+
+
+@app.put("/api/profile/frame")
+def profile_frame_set(req: ProfileFrameReq, response: Response,
+                      tos_session: str | None = Cookie(None)) -> dict:
+    """Set the reader's country and currency. Relevance scoring is worthless without it, which is
+    why onboarding (Phase 8) exists mainly to fill this in."""
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "log in to set your frame"}
+        if req.country:
+            cur.execute("SELECT 1 FROM country_exposure WHERE country = %s", (req.country.upper(),))
+            if not cur.fetchone():
+                response.status_code = 400
+                return {"error": f"no exposure data for {req.country} yet"}
+        cur.execute(
+            """INSERT INTO user_profiles (user_id, country, base_currency, sectors, risk_appetite)
+               VALUES (%s,%s,%s,%s,%s)
+               ON CONFLICT (user_id) DO UPDATE SET country=EXCLUDED.country,
+                   base_currency=EXCLUDED.base_currency, sectors=EXCLUDED.sectors,
+                   risk_appetite=EXCLUDED.risk_appetite, updated_at=now()""",
+            (user["id"], (req.country or "").upper() or None, req.base_currency,
+             req.sectors or [], req.risk_appetite))
+        conn.commit()
+    return {"saved": True}
+
+
+@app.get("/api/countries")
+def countries() -> dict:
+    """Which countries the product can currently personalise for. Small and honest — an unlisted
+    country gets a global frame rather than a guessed one."""
+    with db.connect() as conn, conn.cursor() as cur:
+        cur.execute("SELECT country, name, currency, main_index FROM country_exposure ORDER BY name")
+        return {"countries": [{"country": c, "name": n, "currency": cu, "main_index": mi}
+                              for c, n, cu, mi in cur.fetchall()]}
 
 
 @app.get("/api/integrations")

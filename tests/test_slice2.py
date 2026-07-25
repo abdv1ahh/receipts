@@ -170,3 +170,17 @@ def test_price_row_rejects_high_below_low():
     assert _valid_row({**good, "adjHigh": 8, "adjLow": 9}, today) is None      # high < low -> reject
     assert _valid_row({**good, "adjClose": 0}, today) is None                  # non-positive close
     assert _valid_row({**good, "date": "2026-07-26"}, today) is None           # future bar
+
+
+def test_every_migration_registers_itself():
+    """The runner tracks applied versions in schema_migrations but does NOT write to it — each
+    file must insert its own row. A file that forgets re-runs on the next migrate and fails with
+    'relation already exists', which is exactly what happened to 024."""
+    import pathlib
+    import re
+    migrations = pathlib.Path(__file__).parent.parent / "tradeos" / "migrations"
+    for path in sorted(migrations.glob("*.sql")):
+        version = int(re.match(r"(\d+)_", path.name).group(1))
+        body = path.read_text()
+        assert re.search(rf"INSERT INTO schema_migrations \(version\) VALUES \({version}\)", body), \
+            f"{path.name} does not register version {version} in schema_migrations"

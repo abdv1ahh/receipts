@@ -98,6 +98,20 @@ def _job_spine_news(conn) -> dict:
     return news_adapter.backfill(conn, since_hours=6)
 
 
+def _job_interpret(conn) -> dict:
+    """Turn the most consequential new clusters into claims. Bounded — inference is the scarcest
+    resource here, so it is spent on high-novelty events rather than everything that arrived."""
+    from . import claims
+    return claims.interpret_recent(conn, hours=6, limit=6)
+
+
+def _job_measure_claims(conn) -> dict:
+    """Score every claim whose horizon has elapsed. This is what makes the Ledger a record rather
+    than a collection of opinions."""
+    from . import ledger
+    return ledger.measure_due(conn)
+
+
 def _job_warm_brief(conn) -> dict:
     """Pre-compute + cache the shared market Morning Brief so it's instant to open. Runs after the news
     jobs so the LLM circuit is already warm and the brief reflects the latest data. Lazy app import
@@ -129,6 +143,8 @@ JOBS = [
     # for 5 queries; hourly keeps well inside what the free API tolerates.
     ("gdelt", 3600, _job_gdelt),
     ("spine_news", 1800, _job_spine_news),        # follows news_rss, which runs on the same tick
+    ("interpret", 3600, _job_interpret),          # claims from new clusters, hourly and bounded
+    ("measure_claims", 21600, _job_measure_claims),  # horizons close slowly; 4x a day is plenty
 ]
 
 

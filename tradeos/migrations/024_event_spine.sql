@@ -121,3 +121,5 @@ CREATE TABLE source_calls (
 );
 
 CREATE INDEX source_calls_source_at_idx ON source_calls (source, at DESC);
+
+INSERT INTO schema_migrations (version) VALUES (24);
