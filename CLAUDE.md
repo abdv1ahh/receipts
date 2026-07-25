@@ -74,13 +74,15 @@ make dev      # reload-in-place stack; then `make web` for a UI change
 ### Frontend
 
 ```bash
-cd frontend && npm ci && npm run build   # ~0.4s; emits frontend/dist
+make dev      # once: starts the reload-in-place stack
+make web      # after every UI edit (~0.3s) — this is what makes the change visible
 ```
 
-**The served bundle is baked into the image at build time** (`Dockerfile` stage 1 copies
-`/web/dist` to `/app/tradeos/static`). Editing `frontend/src/*` and reloading the browser
-changes nothing. You must `docker compose up -d --build` to see a frontend change. There is
-no hot-reload wired to the container. `frontend/dist/` and `tradeos/static/` are gitignored.
+**In production the bundle is baked into the image at build time** (`Dockerfile` stage 1 copies
+`/web/dist` to `/app/tradeos/static`), so without `make dev` a UI change needs a full
+`docker compose up -d --build`. `docker-compose.dev.yml` mounts `frontend/dist` over that path
+instead, which is why `make web` alone is enough. `frontend/dist/` and `tradeos/static/` are
+gitignored.
 
 ### Data / operations CLI
 
@@ -94,11 +96,11 @@ Commands: `migrate`, `sync-tickers`, `resolve-entities`, `resolve-cusips`,
 `run-backtest`, `calibration`, `sync-library`, `generate-alerts`, `seed-admin`, `seed-demo`,
 `create-invites`, `status`, `preflight`.
 
-`status` prints per-feed freshness. `preflight` checks production config — note it currently
-reports a false failure for `EXPLAIN_PROVIDER=openai` (stale validator; see `docs/bugs.md`).
+`status` prints per-feed freshness. `preflight` checks production config, including every link in
+the `EXPLAIN_PROVIDER` chain.
 
 `make demo` rebuilds a full demo dataset from scratch (minutes). `make backfill-full` is the
-overnight calibration backfill. `make test` is **broken** — use the command above.
+overnight calibration backfill.
 
 ### Database
 
@@ -113,7 +115,7 @@ docker compose exec -T db psql -U tradeos -d tradeos             # interactive
 
 ```
 tradeos/                  the Python package (all backend code)
-  app.py                  FastAPI app: 98 routes, 2200 lines. The one big file.
+  app.py                  FastAPI app: 99 routes, ~2250 lines. The one big file.
   db.py                   psycopg connect() + ordered .sql migration runner
   config.py               env accessors; raises ConfigError rather than defaulting secrets
   llm.py                  ONE transport for every model call: provider CHAIN + per-provider
