@@ -314,7 +314,7 @@ export default function App() {
           ) : view === "screener" ? (
             <Screener onOpenSymbol={openSymbol} />
           ) : view === "watchlist" ? (
-            <WatchlistView onOpenSymbol={openSymbol} />
+            <WatchlistView onOpenSymbol={openSymbol} onLogin={() => go("auth")} />
           ) : view === "auth" ? (
             <AuthPanel onAuthed={onAuthed} onBack={() => go(user ? "home" : "landing")} initialInvite={refCode} />
           ) : view === "library" ? (

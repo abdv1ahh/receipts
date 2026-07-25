@@ -92,3 +92,34 @@ def test_require_admin_contract_is_user_on_success_none_on_failure():
             following = "\n".join(src.splitlines()[line_no:line_no + 3])
             assert f"if not {var}" in following, (
                 f"line {line_no}: `{var} = _require_admin(...)` must be followed by `if not {var}`")
+
+
+# ------------------------------------------------------------------ B-22: watchlist ownership
+
+def test_no_watchlist_route_accepts_an_owner_as_a_parameter():
+    """B-22: /api/watchlist took the owner as a QUERY PARAMETER defaulting to 'demo', with no
+    session check — every account shared one list and any caller could address another's by
+    changing one parameter. The owner must come from the session and nowhere else."""
+    import inspect
+    import re
+
+    from tradeos import app as app_module
+
+    src = inspect.getsource(app_module)
+    for match in re.finditer(r"^def (watchlist_\w+)\((.*?)\)\s*->", src, re.M | re.S):
+        name, params = match.group(1), match.group(2)
+        assert "user:" not in params, f"{name} takes the owner as a parameter"
+        assert "user_key" not in params, f"{name} takes a raw key as a parameter"
+        assert "tos_session" in params, f"{name} does not read the session"
+
+
+def test_watchlist_queries_are_scoped_by_user_id():
+    """A query filtering on the old free-text key would silently reintroduce the shared pile."""
+    import inspect
+
+    from tradeos import app as app_module
+
+    src = inspect.getsource(app_module)
+    for line in src.splitlines():
+        if "FROM watchlists" in line or "INTO watchlists" in line:
+            assert "user_key" not in line, f"watchlist query still uses user_key: {line.strip()}"

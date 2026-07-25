@@ -283,11 +283,24 @@ function WatchCard({ w, onOpenSymbol, onRemove }) {
   );
 }
 
-export function WatchlistView({ onOpenSymbol }) {
+export function WatchlistView({ onOpenSymbol, onLogin }) {
   const [data, setData] = useState(null);
   const [sym, setSym] = useState("");
   const load = () => fetchWatchlist().then(setData).catch(() => setData({ watchlist: [] }));
   useEffect(() => { load(); }, []);
+  // The watchlist is now per-account (bug B-22 — it used to be one shared list keyed by a query
+  // parameter), so a logged-out reader gets an invitation rather than someone else's names.
+  if (data && data.authenticated === false) {
+    return (
+      <div>
+        <div className="page-head"><div><h1 className="page-title">Watchlist</h1></div></div>
+        <div className="empty" style={{ marginTop: 14 }}>
+          Log in to keep a watchlist. Names you watch also sharpen how the Radar ranks events for you.
+          <div style={{ marginTop: 10 }}><button className="act" onClick={onLogin}>log in</button></div>
+        </div>
+      </div>
+    );
+  }
   const add = async (s) => { if (s) { await addWatchlist(s); load(); } };
   const addMany = async (arr) => { for (const s of arr) await addWatchlist(s); load(); };
   const remove = async (s) => { await removeWatchlist(s); load(); };

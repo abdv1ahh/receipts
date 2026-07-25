@@ -511,12 +511,7 @@ def _reader_frame(cur, user: dict | None):
         if e:
             exposure = {"currency": e[0], "currency_regime": e[1], "pegged_to": e[2],
                         "export_partners": e[3], "import_partners": e[4], "commodity_exposure": e[5]}
-    # watchlists is keyed by a TEXT user_key that defaults to 'demo', not by user id — the table
-    # predates real accounts and /api/watchlist still takes the key as a query parameter, so every
-    # user currently shares one list. Logged as B-22; Phase 8 re-keys it to user_id and Phase 9
-    # covers the authorization hole. Reading by email keeps this endpoint correct either way.
-    cur.execute("SELECT symbol FROM watchlists WHERE user_key IN (%s, %s)",
-                (str(user["id"]), user.get("email") or ""))
+    cur.execute("SELECT symbol FROM watchlists WHERE user_id = %s", (user["id"],))
     watchlist = {r[0].upper() for r in cur.fetchall()}
     return profile, exposure, watchlist
 
@@ -1901,12 +1896,19 @@ def _watch_conviction(sm, att):
 
 
 @app.get("/api/watchlist")
-def watchlist_get(user: str = "demo") -> dict:
+def watchlist_get(tos_session: str | None = Cookie(None)) -> dict:
     """Each watched name enriched with the REAL per-ticker scores: smart-money conviction (from the
     convergence cluster), public attention (social), the latest impactful news, the next earnings date,
-    and a transparent conviction blend of the two. No fabricated technical/fundamental scores."""
+    and a transparent conviction blend of the two. No fabricated technical/fundamental scores.
+
+    Scoped to the session (bug B-22). This used to take the owner as a QUERY PARAMETER defaulting
+    to 'demo', so every account shared one list and any caller could read another's by changing a
+    parameter."""
     with db.connect() as conn, conn.cursor() as cur:
-        cur.execute("SELECT symbol FROM watchlists WHERE user_key=%s ORDER BY created_at", (user,))
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            return {"authenticated": False, "watchlist": []}
+        cur.execute("SELECT symbol FROM watchlists WHERE user_id=%s ORDER BY created_at", (user["id"],))
         symbols = [r[0] for r in cur.fetchall()]
         nextev: dict = {}   # soonest upcoming earnings per symbol, one pass over the calendar
         for e in events_mod.upcoming(conn, days=30):
@@ -1939,27 +1941,38 @@ def watchlist_get(user: str = "demo") -> dict:
             item["next_event"] = nextev.get(sym)
             item["conviction"] = _watch_conviction(sm, att)
             rows.append(item)
-    return {"user": user, "watchlist": rows}
+    return {"authenticated": True, "watchlist": rows}
 
 
 @app.post("/api/watchlist/{symbol}")
-def watchlist_add(symbol: str, user: str = "demo") -> dict:
+def watchlist_add(symbol: str, response: Response, tos_session: str | None = Cookie(None)) -> dict:
     sym = symbol.strip().upper()
+    if not sym or len(sym) > 12 or not re.fullmatch(r"[A-Z0-9.\-]+", sym):
+        response.status_code = 400
+        return {"error": "not a valid symbol"}
     with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "log in to keep a watchlist"}
         cur.execute(
-            "INSERT INTO watchlists (user_key, symbol) VALUES (%s,%s) ON CONFLICT (user_key, symbol) DO NOTHING",
-            (user, sym),
-        )
+            "INSERT INTO watchlists (user_id, symbol) VALUES (%s,%s) "
+            "ON CONFLICT (user_id, symbol) DO NOTHING", (user["id"], sym))
         conn.commit()
-    return {"user": user, "symbol": sym, "added": True}
+    return {"symbol": sym, "added": True}
 
 
 @app.delete("/api/watchlist/{symbol}")
-def watchlist_remove(symbol: str, user: str = "demo") -> dict:
+def watchlist_remove(symbol: str, response: Response, tos_session: str | None = Cookie(None)) -> dict:
     with db.connect() as conn, conn.cursor() as cur:
-        cur.execute("DELETE FROM watchlists WHERE user_key=%s AND symbol=%s", (user, symbol.strip().upper()))
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "log in to keep a watchlist"}
+        cur.execute("DELETE FROM watchlists WHERE user_id=%s AND symbol=%s",
+                    (user["id"], symbol.strip().upper()))
         conn.commit()
-    return {"user": user, "symbol": symbol.strip().upper(), "removed": True}
+    return {"symbol": symbol.strip().upper(), "removed": True}
 
 
 # ------------------------------------------------------------ follows / alerts (Slice B)
