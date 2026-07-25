@@ -99,3 +99,29 @@ def test_queries_are_a_deliberate_quota_budget():
 def test_minimum_interval_respects_the_measured_limit():
     """Measured 2026-07-25: three rapid requests earned a 429 that outlasted an hour."""
     assert gdelt.MIN_INTERVAL_S >= 5.0
+
+
+# ------------------------------------------------------------------ backoff discipline
+
+def test_backoff_is_long_enough_to_be_a_real_pause():
+    """Measured: GDELT's penalty outlasts an hour. Retrying on the next scheduler tick would just
+    re-earn it, which is how a free source gets lost permanently."""
+    assert gdelt.BACKOFF_HOURS >= 1
+
+
+def test_the_user_agent_is_honest_and_constant():
+    """Rotating the User-Agent WOULD restore access after a 429 — GDELT's throttle is keyed on it.
+    We deliberately do not: that is evasion of a rate limit on a free service, and it breaks the
+    moment they tighten the check. The identifier must name this product and stay put."""
+    ua = gdelt.UA["User-Agent"]
+    assert "Rhumb" in ua
+    assert not any(b in ua for b in ("Mozilla", "Chrome", "Safari", "AppleWebKit")), \
+        "the User-Agent must not impersonate a browser"
+
+
+def test_the_reason_for_not_rotating_is_written_down():
+    """A future maintainer hitting a 429 will reach for a new UA string. The module must explain
+    why that is the wrong fix, or the reasoning is lost the first time someone is in a hurry."""
+    import inspect
+    src = inspect.getsource(gdelt)
+    assert "evasion" in src.lower()

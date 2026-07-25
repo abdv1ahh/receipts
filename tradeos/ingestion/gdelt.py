@@ -32,8 +32,32 @@ HOST = "api.gdeltproject.org"
 URL = "https://api.gdeltproject.org/api/v2/doc/doc"
 UA = {"User-Agent": "Rhumb/1.0 (world-event research; contact via the application)"}
 
-MIN_INTERVAL_S = 6.0        # measured: faster than ~5s earns a 429
+MIN_INTERVAL_S = 6.0        # GDELT's own message asks for one request every 5 seconds
+BACKOFF_HOURS = 6           # after a 429, stay away this long — see below
 _last_call = 0.0
+
+# Measured over several hours on 2026-07-25: GDELT's throttle is keyed on the User-Agent and has a
+# cumulative volume cap well beyond the published "one request every 5 seconds". Once a UA is
+# penalised it stays penalised for hours, and every fresh UA string works once or twice before
+# being penalised in turn.
+#
+# The conclusion matters more than the mechanism: rotating the User-Agent WOULD restore access, and
+# we deliberately do not. That is evasion of a rate limit on a free service, it breaks the moment
+# they tighten the check, and this project does not ship things that work by not being noticed. So
+# the identifier stays honest and constant, and instead we back off hard and persistently — a
+# penalised source is skipped entirely rather than re-hammered on every scheduler tick.
+
+
+def _in_backoff(conn) -> float:
+    """Hours remaining before it is polite to try again, or 0. Persisted in source_calls rather
+    than in memory, so a container restart cannot reset the penalty clock."""
+    with conn.cursor() as cur:
+        cur.execute("""SELECT extract(epoch FROM now() - max(at)) / 3600.0
+                         FROM source_calls WHERE source = 'gdelt' AND status = 429""")
+        hours_since = cur.fetchone()[0]
+    if hours_since is None:
+        return 0.0
+    return max(0.0, BACKOFF_HOURS - float(hours_since))
 
 # What the spine is actually watching for. Each is one paced request, so this list is a quota
 # budget as much as a topic list — keep it short and consequential. Queries are GDELT syntax.
@@ -146,6 +170,11 @@ def ingest(conn, queries=None, timespan: str = "2h", maxrecords: int = 60) -> di
     the next scheduled run is only minutes away. Losing one cycle is cheap; losing the source is
     not."""
     out: dict = {"events": 0, "clusters": 0, "queries": 0, "rate_limited": False}
+    remaining = _in_backoff(conn)
+    if remaining > 0:
+        out["skipped"] = f"backing off for another {remaining:.1f}h after a 429"
+        log.info("gdelt: %s", out["skipped"])
+        return out
     with httpx.Client(timeout=45.0, headers=UA, follow_redirects=True) as client:
         for category, query in (queries or QUERIES):
             t0 = time.monotonic()
