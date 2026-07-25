@@ -360,6 +360,16 @@ def cmd_measure_claims(_args) -> None:
         print(f"measure-claims: {ledger.measure_due(conn)}")
 
 
+def cmd_import_signals(args) -> None:
+    """Express historical convergence signals as scoreable claims and import their measured
+    outcomes. Idempotent — re-running never inflates the record."""
+    from . import smartmoney_claims
+    with db.connect() as conn:
+        out = smartmoney_claims.build(conn, horizon_days=args.horizon, since=args.since)
+    print(f"import-signals: {out['claims_made']} claims, {out['outcomes_imported']} outcomes "
+          f"({out['model_version']}), {out['skipped']} skipped")
+
+
 def cmd_ledger(_args) -> None:
     from . import ledger
     with db.connect() as conn:
@@ -639,6 +649,12 @@ def main() -> None:
 
     mc = sub.add_parser("measure-claims", help="score claims whose horizon has elapsed")
     mc.set_defaults(fn=cmd_measure_claims)
+
+    isig = sub.add_parser("import-signals",
+                          help="express convergence signals as claims and import their outcomes")
+    isig.add_argument("--horizon", type=int, default=30, choices=[30, 90])
+    isig.add_argument("--since", default=None, help="only clusters on/after this date")
+    isig.set_defaults(fn=cmd_import_signals)
 
     lg = sub.add_parser("ledger", help="print the accuracy record, including its misses")
     lg.set_defaults(fn=cmd_ledger)

@@ -176,8 +176,15 @@ def summary(conn, min_sample: int = 20) -> dict:
         open_claims = cur.fetchone()[0]
 
         by = {}
-        for label, expr in (("category", "e.category"), ("horizon", "c.horizon"),
-                            ("source", "e.source")):
+        # `origin` falls back to the model version so signal-plane claims stay separable from
+        # model-generated ones. A reader has to be able to ask "how does the MODEL do on its own?"
+        # — if the two were pooled under one hit rate, neither number would mean anything.
+        for label, expr in (("category", "coalesce(e.category, 'smart-money signal')"),
+                            ("horizon", "c.horizon"),
+                            ("source", "coalesce(e.source, c.model_version)"),
+                            ("origin", "case when c.event_id is null "
+                                       "then 'signal plane (backtested)' "
+                                       "else 'impact engine (model)' end")):
             cur.execute(
                 f"""SELECT {expr} AS k,
                            count(*) FILTER (WHERE o.verdict='hit') AS hits,

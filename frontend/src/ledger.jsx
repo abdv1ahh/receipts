@@ -172,6 +172,9 @@ export function LedgerView() {
 
       {o.n > 0 && (
         <>
+          {/* Origin leads: pooling a backtested signal's hit rate with the model's would make
+              both numbers meaningless, so they are always shown apart. */}
+          <Breakdown title="origin" rows={l.by?.origin} />
           <Calibration rows={l.calibration} />
           <div className="dash-grid">
             <Breakdown title="category" rows={l.by?.category} />

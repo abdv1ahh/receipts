@@ -106,10 +106,12 @@ def _job_interpret(conn) -> dict:
 
 
 def _job_measure_claims(conn) -> dict:
-    """Score every claim whose horizon has elapsed. This is what makes the Ledger a record rather
-    than a collection of opinions."""
-    from . import ledger
-    return ledger.measure_due(conn)
+    """Score every claim whose horizon has elapsed, then pick up any newly-closed signal-plane
+    outcomes. This is what makes the Ledger a record rather than a collection of opinions."""
+    from . import ledger, smartmoney_claims
+    out = ledger.measure_due(conn)
+    imported = smartmoney_claims.build(conn, horizon_days=30)
+    return {**out, "signal_claims_imported": imported["claims_made"]}
 
 
 def _job_crypto_structure(conn) -> dict:

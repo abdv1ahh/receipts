@@ -1516,3 +1516,7 @@ div.intg-warn { margin-top: 8px; border: 0; border-radius: 8px; padding: 7px 10p
 .cx-narr { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0;
   border-top: 1px solid var(--hairline); font-size: 13px; line-height: 1.55; }
 .cx-src { margin-top: 8px; font-size: 11.5px; color: var(--faint); font-family: var(--mono); }
+.sm-lag { display: flex; align-items: flex-start; gap: 9px; margin-top: 14px; padding: 11px 14px;
+  border-radius: 11px; background: rgba(255,194,92,0.07); border: 1px solid rgba(255,194,92,0.22);
+  color: #ffcd80; font-size: 12.5px; line-height: 1.6; }
+.sm-lag b { color: #ffe0a8; }

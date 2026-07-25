@@ -161,6 +161,19 @@ export function SmartMoneyView({ calibration, horizon, minC, user, onLogin, onNa
             <button key={b} className={conf === b ? "on" : ""} onClick={() => setConf(b)}>{b === "low" ? "all" : b}</button>
           ))}
         </div>
+      {/* The 13F lag is stated up front, not in a footnote. A holding can be 45 days stale by the
+          time it is public, and a surface that omits that is misleading even when every number on
+          it is correct. */}
+      <div className="sm-lag" data-testid="reporting-lag">
+        <Icon name="alert" size={14} />
+        <span>
+          <b>Reporting lag.</b> Institutional 13F holdings are disclosed up to <b>45 days</b> after
+          the quarter ends, so a position here may already have changed. Insider Form 4 filings are
+          far fresher — typically two business days. Every signal below is scored in the{" "}
+          <b>Ledger</b> like any other interpretation.
+        </span>
+      </div>
+
       </div>
 
       {data && (
