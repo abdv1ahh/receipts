@@ -61,6 +61,9 @@ from . import brief as brief_mod
 from . import dashboard as dashboard_mod
 from . import events as events_mod
 from . import news as news_mod
+from . import (
+    radar as radar_mod,
+)
 from . import scheduler as scheduler_mod
 from . import social as social_mod
 
@@ -209,6 +212,17 @@ class TokenReq(BaseModel):
 class ResetConfirmReq(BaseModel):
     token: str
     password: str
+
+
+class RadarFilterReq(BaseModel):
+    """A saved filter set. `spec` is normalised into a fixed shape before storage — see
+    radar.normalise_spec; nothing arbitrary is ever persisted or matched against."""
+    name: str
+    spec: dict = {}
+    subscribed: bool = False
+    channel: str | None = None
+    webhook_url: str | None = None
+    throttle_mins: int = 360
 
 
 class OnboardingReq(BaseModel):
@@ -730,6 +744,55 @@ def public_live(limit: int = 5) -> dict:
         return {"claims": public_site.live_claims(conn, limit), "brand": config.brand_name()}
 
 
+# ------------------------------------------------------------------- saved filters (Phase 4)
+
+@app.get("/api/radar/filters")
+def radar_filters(tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            return {"authenticated": False, "filters": []}
+        return {"authenticated": True, "filters": radar_mod.listing(conn, user["id"]),
+                "min_throttle_mins": radar_mod.MIN_THROTTLE_MINS,
+                "max_filters": radar_mod.MAX_FILTERS}
+
+
+@app.post("/api/radar/filters")
+def radar_filter_save(req: RadarFilterReq, response: Response,
+                      tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "log in to save a filter"}
+        out = radar_mod.save(conn, user["id"], req.name, req.spec, req.subscribed,
+                             req.channel, req.webhook_url, req.throttle_mins)
+        if out.get("error"):
+            response.status_code = 400
+        return out
+
+
+@app.delete("/api/radar/filters/{fid}")
+def radar_filter_delete(fid: int, response: Response,
+                        tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "not authenticated"}
+        return radar_mod.delete(conn, user["id"], fid)
+
+
+@app.post("/api/radar/filters/preview")
+def radar_filter_preview(req: RadarFilterReq, tos_session: str | None = Cookie(None)) -> dict:
+    """How many recent claims this spec would have caught — so a filter that matches nothing is
+    visible while editing rather than after a week of silence."""
+    with db.connect() as conn:
+        if not authn.session_user(conn, tos_session):
+            return {"authenticated": False}
+        return {"authenticated": True, **radar_mod.preview(conn, req.spec)}
+
+
 @app.get("/api/claims")
 def claims_list(hours: int = 72, limit: int = 40, tos_session: str | None = Cookie(None)) -> dict:
     """Live interpretations, ranked by relevance to the reader when they have a profile.
@@ -745,7 +808,7 @@ def claims_list(hours: int = 72, limit: int = 40, tos_session: str | None = Cook
             """SELECT c.id, c.created_at, c.mechanism, c.affected, c.horizon, c.confidence,
                       c.analogs, c.reasoning_trace, c.contradicts, c.status, c.model_version,
                       e.title, e.source, e.source_url, e.geo, e.category,
-                      cl.novelty_score, cl.source_count
+                      cl.novelty_score, cl.source_count, c.cluster_id, c.supersedes
                  FROM claims c
                  LEFT JOIN events e ON e.id = c.event_id
                  LEFT JOIN event_clusters cl ON cl.id = c.cluster_id
@@ -753,7 +816,7 @@ def claims_list(hours: int = 72, limit: int = 40, tos_session: str | None = Cook
              ORDER BY c.created_at DESC LIMIT %s""", (hours, limit))
         cols = ("id", "created_at", "mechanism", "affected", "horizon", "confidence", "analogs",
                 "reasoning_trace", "contradicts", "status", "model_version", "headline", "source",
-                "url", "geo", "category", "novelty", "source_count")
+                "url", "geo", "category", "novelty", "source_count", "cluster_id", "supersedes")
         rows = [dict(zip(cols, r, strict=True)) for r in cur.fetchall()]
 
     out = []
@@ -762,6 +825,9 @@ def claims_list(hours: int = 72, limit: int = 40, tos_session: str | None = Cook
         r["created_at"] = r["created_at"].isoformat()
         out.append({**r, **scored, "why_shown": relevance.explain(scored["parts"])})
     out.sort(key=lambda x: x["relevance"], reverse=True)
+    # Threading (Phase 4): claims on one cluster are one developing story, newest reading first
+    # with its history attached, rather than twelve near-duplicate cards.
+    out = radar_mod.thread(out)
     return {"claims": out, "personalised": bool(profile and profile.get("country")),
             "profile": profile,
             "disclaimer": "Informational analysis of public information, not personalised "

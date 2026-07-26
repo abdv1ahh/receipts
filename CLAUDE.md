@@ -69,7 +69,7 @@ The app is at <http://localhost:8000>. Demo login: `demo@tradeos.app` / `<genera
 ### Tests
 
 ```bash
-make test     # 564 tests, <1s. Offline except 17 authz tests that need the local DB
+make test     # 598 tests, ~1s. Offline except 17 authz tests that need the local DB
 make lint     # ruff; zero errors is the standard
 make dev      # reload-in-place stack; then `make web` for a UI change
 make fix      # ruff --fix
@@ -129,7 +129,7 @@ docker compose exec -T db psql -U tradeos -d tradeos             # interactive
 
 ```
 tradeos/                  the Python package (all backend code)
-  app.py                  FastAPI app: 123 routes, ~3010 lines. The one big file.
+  app.py                  FastAPI app: 127 routes, ~3070 lines. The one big file.
   db.py                   psycopg connect() + ordered .sql migration runner
   config.py               env accessors; raises ConfigError rather than defaulting secrets
   llm.py                  ONE transport for every model call: provider CHAIN + per-provider
@@ -153,6 +153,7 @@ tradeos/                  the Python package (all backend code)
   onboarding.py           first-run frame capture. Gates nothing — a skip costs the reader nothing.
   mail.py                 the ONE outbound-email path. Refuses to send unconfigured, never half-sends.
   ratelimit.py            sliding-window limits on the public + model paths. IN-PROCESS; see docstring.
+  radar.py                saved filter sets, threading, subscribable alerts. The SSRF defence lives here.
   oauth.py                Sign in with Google. Built, config-gated, NEVER RUN against Google.
   journal_context.py      the Radar frozen at trade time; the coach's process patterns. No model.
   geography.py            places events by what a claim AFFECTS, not who published it.
@@ -161,7 +162,7 @@ tradeos/                  the Python package (all backend code)
   assistant_tools.py      six READ-ONLY tools; a security boundary, not a convenience layer.
   smartmoney_claims.py    convergence signals expressed as scoreable claims.
   watchlist_accounts.py   the consequential-accounts influence list.
-  migrations/             001..031 ordered .sql; NEVER edit an applied migration, and every
+  migrations/             001..032 ordered .sql; NEVER edit an applied migration, and every
                           file MUST insert its own schema_migrations row
   (surface modules)       dashboard, brief, news, social, sentiment, crypto, events,
                           trades, insights, portfolio, community, alerts, admin,

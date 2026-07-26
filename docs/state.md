@@ -11,15 +11,15 @@ Updated: 2026-07-26. **All ten phases (0–9) are complete.**
 cd /path/to/receipts
 git checkout phase/6-sections          # all work lives here; not yet merged to main
 make dev                               # reload-in-place stack on :8000
-make test                              # 564 pass, <1s (17 need the local DB)
+make test                              # 598 pass, ~1s (17 need the local DB)
 make lint                              # ruff, zero errors is the standard
 ```
 
 Demo login `demo@tradeos.app` / `<generated at seed time>`. Surfaces: `/radar` `/globe` `/ledger`
 `/exposure` `/crypto` `/news` `/brief` `/events` `/integrations` `/journal`.
 
-**Verified state at handoff:** 564 tests pass · 0 lint errors · 0 console errors on twelve
-surfaces incl. the marketing site, checked in a headless browser · migrations through **031**,
+**Verified state at handoff:** 598 tests pass · 0 lint errors · 0 console errors on twelve
+surfaces incl. the marketing site, checked in a headless browser · migrations through **032**,
 applied cleanly to an EMPTY database and re-run as a no-op · 60 tables · gitleaks clean over 53
 commits · pip-audit and npm audit clean · the Ledger reads 40.8% of 282 (115 hit / 167 miss). The marketing site is at
 <http://localhost:8000/site/> after `cd site && npm install` then `make site`. `docs/deploy.md` is
@@ -40,7 +40,7 @@ returns `used_template: false` rather than trusting the suite, which runs on `te
 | 1 — Repair | complete |
 | 2 — Ingestion spine | complete |
 | 3 — Impact engine + Ledger | complete |
-| 4 — Radar | core complete (threading, saved filters, alerts outstanding) |
+| 4 — Radar | complete — threading, saved filters and alerts landed 2026-07-26 |
 | 5 — Globe | complete |
 | 6 — Rework sections | complete (all eight) |
 | 7 — Marketing site | complete — `site/`, served at `/site` |
@@ -80,8 +80,13 @@ correct it in the same change that discovers a mistake.
 
 ### 3. Carried over, not blocking anything
 
-- **Phase 4 remainder**: saved filter sets, in-place threading of developing stories, subscribable
-  alerts.
+- ~~Phase 4 remainder~~ **DONE 2026-07-26.** Saved filter sets (five dimensions, previewed live
+  while editing, addressable), in-place threading (a cluster that gains sources is re-read, and the
+  card carries the earlier readings — *a superseded claim is still scored, so revising can never
+  erase a miss*), and subscriptions by email or webhook with a hard throttle. The webhook is a
+  user-supplied URL the server fetches, so `radar.webhook_target_ok` refuses non-https, private,
+  loopback, link-local and metadata addresses on every resolved IP, re-checks at send time, and
+  refuses redirects.
 - ~~GDELT has never been observed ingesting.~~ **RESOLVED 2026-07-25** — it came back after the
   backoff elapsed and it has kept flowing — **22 events** as of 2026-07-26, up from 4 the day
   before, with gdelt-sourced claims on the Radar and in the marketing site's hero.

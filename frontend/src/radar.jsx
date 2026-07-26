@@ -14,6 +14,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { fetchClaims, fetchCountries, saveProfileFrame } from "./api";
 import { Icon } from "./icons.jsx";
+import { SavedFilters, ThreadHistory } from "./radarfilters.jsx";
 import { EmptyState, LoadError } from "./shell.jsx";
 
 const DIR = { up: "▲", down: "▼" };
@@ -62,6 +63,10 @@ function Card({ c, onOpenClaim }) {
       <p className="rd-mechanism">{c.mechanism}</p>
 
       <Affected items={c.affected} />
+
+      {/* On the card, not behind the expand: the whole point of threading is that a reader can
+          SEE the system changed its mind, which a collapsed panel does not achieve. */}
+      <ThreadHistory claim={c} />
 
       {c.contradicts?.length > 0 && (
         <div className="rd-contra" title="two live interpretations disagree">
@@ -143,6 +148,9 @@ export function RadarView({ user, onLogin }) {
   const [d, setD] = useState(undefined);
   const [filter, setFilter] = useState("all");
   const [category, setCategory] = useState("");
+  // A saved filter set, applied client-side over the loaded page. The same spec is what the
+  // subscription evaluates server-side, so what you see is what you would be alerted about.
+  const [savedSpec, setSavedSpec] = useState(null);
 
   const load = () => { setD(undefined); fetchClaims({ hours: 336 }).then(setD).catch(() => setD(null)); };
   useEffect(load, [user]);
@@ -160,7 +168,17 @@ export function RadarView({ user, onLogin }) {
   if (d === null) return <LoadError what="the radar" onRetry={load} />;
 
   const active = FILTERS.find((f) => f.k === filter) || FILTERS[0];
-  const shown = claims.filter((c) => active.test(c) && (!category || c.category === category));
+  const bySpec = (c) => {
+    if (!savedSpec) return true;
+    if ((c.confidence || 0) < (savedSpec.min_confidence || 0)) return false;
+    const any = (list, val) => !list?.length || list.includes(val);
+    if (!any(savedSpec.categories, c.category)) return false;
+    if (!any(savedSpec.horizons, c.horizon)) return false;
+    if (!any(savedSpec.sources, c.source)) return false;
+    if (savedSpec.geo?.length && !(c.geo || []).some((g) => savedSpec.geo.includes(g))) return false;
+    return true;
+  };
+  const shown = claims.filter((c) => active.test(c) && (!category || c.category === category) && bySpec(c));
 
   return (
     <div>
@@ -182,6 +200,8 @@ export function RadarView({ user, onLogin }) {
             <button className="act" onClick={onLogin}>Log in to make it yours</button>
           </div>
         )}
+
+      <SavedFilters claims={claims} activeSpec={savedSpec} onApply={setSavedSpec} />
 
       {claims.length > 0 && (
         <div className="j-tabs" style={{ marginTop: 14 }}>

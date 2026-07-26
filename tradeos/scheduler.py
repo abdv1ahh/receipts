@@ -139,6 +139,20 @@ def _job_warm_brief(conn) -> dict:
 
 
 # name, interval_seconds, fn — intervals chosen for how fast each source actually moves
+def _job_reinterpret(conn):
+    """Re-read stories that have developed since their last claim (Phase 4 threading). Runs after
+    `interpret` on the same tick so a cluster that just gained sources is considered promptly."""
+    from . import claims
+    return claims.reinterpret_developing(conn, hours=72, limit=3)
+
+
+def _job_radar_alerts(conn):
+    """Deliver subscriptions whose throttle has elapsed. The per-filter throttle is the real
+    control; this only decides how often the queue is looked at."""
+    from . import radar
+    return radar.deliver_due(conn)
+
+
 JOBS = [
     ("news_rss", 1800, _job_news_rss),        # headlines move -> every 30 min
     ("news_sec", 21600, _job_news_sec),       # 8-K filings -> every 6h
@@ -154,6 +168,10 @@ JOBS = [
     ("gdelt", 3600, _job_gdelt),
     ("spine_news", 1800, _job_spine_news),        # follows news_rss, which runs on the same tick
     ("interpret", 3600, _job_interpret),          # claims from new clusters, hourly and bounded
+    # Re-interpretation is bounded harder than first interpretation: a revision spends the same
+    # quota as a new claim and there are always more new events than developing ones.
+    ("reinterpret", 7200, _job_reinterpret),      # developing stories -> every 2h, 3 at a time
+    ("radar_alerts", 900, _job_radar_alerts),     # check the queue every 15 min; throttles are per filter
     ("measure_claims", 21600, _job_measure_claims),  # horizons close slowly; 4x a day is plenty
     ("crypto_structure", 240, _job_crypto_structure),  # just inside the 300s cache TTL
 ]

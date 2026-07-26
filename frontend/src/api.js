@@ -52,6 +52,11 @@ export const requestVerify = (email) => post("/api/auth/verify/request", { email
 export const confirmEmail = (token) => post("/api/auth/verify/confirm", { token });
 export const requestReset = (email) => post("/api/auth/reset/request", { email });
 export const confirmReset = (token, password) => post("/api/auth/reset/confirm", { token, password });
+// Saved filter sets and their subscriptions (Phase 4 remainder).
+export const fetchRadarFilters = () => get("/api/radar/filters");
+export const saveRadarFilter = (f) => post("/api/radar/filters", f);
+export const previewRadarFilter = (f) => post("/api/radar/filters/preview", f);
+export const deleteRadarFilter = (id) => fetch(`/api/radar/filters/${id}`, { method: "DELETE" }).then((r) => r.json());
 export const fetchFrameSetup = () => get("/api/profile/onboarding");
 export const saveFrameSetup = (body) => post("/api/profile/onboarding", body);
 export const snoozeFrameSetup = () => post("/api/profile/onboarding/skip", {});

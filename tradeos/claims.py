@@ -244,7 +244,7 @@ def cluster_content(conn, cluster_id: int | None, fallback: dict) -> tuple[str, 
     return "\n\n---\n\n".join(parts), sorted({r[0] for r in rows})
 
 
-def interpret(conn, event: dict, provider: str | None = None) -> dict:
+def interpret(conn, event: dict, provider: str | None = None, supersedes: int | None = None) -> dict:
     """Generate one claim for an event. Returns {"ok": bool, ...}; never raises.
 
     On any failure — no provider, quota, malformed reply, vague mechanism — this returns a reason
@@ -286,11 +286,12 @@ def interpret(conn, event: dict, provider: str | None = None) -> dict:
     with conn.cursor() as cur:
         cur.execute(
             """INSERT INTO claims (event_id, cluster_id, model_version, mechanism, affected,
-                                   horizon, horizon_days, confidence, analogs, reasoning_trace)
-               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+                                   horizon, horizon_days, confidence, analogs, reasoning_trace,
+                                   supersedes)
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
             (event.get("id"), event.get("cluster_id"), llm.model_id(provider), claim["mechanism"],
              Json(claim["affected"]), claim["horizon"], claim["horizon_days"], claim["confidence"],
-             Json(claim["analogs"]), Json(claim["reasoning_trace"])))
+             Json(claim["analogs"]), Json(claim["reasoning_trace"]), supersedes))
         claim_id = cur.fetchone()[0]
     conn.commit()
     link_contradictions(conn, claim_id)
@@ -372,3 +373,55 @@ def interpret_recent(conn, hours: int = 6, limit: int = 8, min_novelty: float = 
         else:
             skipped.append({"event": ev["id"], "reason": res["reason"]})
     return {"considered": len(events), "claims": made, "skipped": skipped}
+
+
+def reinterpret_developing(conn, hours: int = 72, limit: int = 4, min_new_sources: int = 1,
+                           provider: str | None = None) -> dict:
+    """Re-read stories that have DEVELOPED since they were last interpreted (Phase 4 threading).
+
+    A cluster gains sources over days. The first reading was made from what was known then, and
+    the brief asks that a reader be able to watch the system change its mind — which requires it to
+    actually change its mind, in a second claim linked to the first.
+
+    Bounded the same way `interpret_recent` is, and for the same reason: inference is the scarcest
+    resource here. A story is re-read only when the cluster has genuinely grown since the last
+    reading, never merely because time passed — re-running the model on unchanged input would spend
+    quota to produce a differently-worded version of the same thing and call it a revision.
+
+    **The superseded claim keeps its place in the Ledger.** It is not withdrawn, not marked
+    unscoreable, and not excluded from the hit rate. It was live, it committed to a direction, and
+    it is scored against what happened. Anything else would make "changing its mind" a mechanism
+    for erasing misses, and the Ledger is the one number this product cannot allow to be editable.
+    """
+    with conn.cursor() as cur:
+        cur.execute(
+            """SELECT e.id, e.cluster_id, e.title, e.body, e.category, e.geo, e.knowable_time,
+                      e.entities, c.source_count, c.novelty_score, latest.id, latest.n_sources
+                 FROM event_clusters c
+                 JOIN events e ON e.id = COALESCE(c.canonical_event,
+                                                  (SELECT min(id) FROM events WHERE cluster_id = c.id))
+                 JOIN LATERAL (
+                        SELECT cl.id,
+                               (SELECT count(*) FROM events ev WHERE ev.cluster_id = c.id
+                                  AND ev.knowable_time <= cl.created_at) AS n_sources
+                          FROM claims cl
+                         WHERE cl.cluster_id = c.id
+                      ORDER BY cl.created_at DESC, cl.id DESC LIMIT 1
+                      ) latest ON true
+                WHERE c.last_seen >= now() - make_interval(hours => %s)
+                  AND c.source_count >= latest.n_sources + %s
+             ORDER BY c.source_count - latest.n_sources DESC, c.novelty_score DESC NULLS LAST
+                LIMIT %s""",
+            (hours, min_new_sources, limit))
+        cols = ("id", "cluster_id", "title", "body", "category", "geo", "knowable_time",
+                "entities", "source_count", "novelty", "prior_claim", "sources_then")
+        rows = [dict(zip(cols, r, strict=True)) for r in cur.fetchall()]
+
+    revised, skipped = 0, []
+    for ev in rows:
+        res = interpret(conn, ev, provider=provider, supersedes=ev["prior_claim"])
+        if res["ok"]:
+            revised += 1
+        else:
+            skipped.append({"cluster": ev["cluster_id"], "reason": res["reason"]})
+    return {"developing": len(rows), "revised": revised, "skipped": skipped}
