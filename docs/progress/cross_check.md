@@ -467,3 +467,58 @@ way, and how many calls it would take to find out.
 That is the honest answer to "make it work": **the signal has not been shown to fail, the record was
 never able to tell the difference, and now it can.** The remaining work is sample, and the sample is
 a backfill away.
+
+## Three silent blockers, found by trying to grow the sample
+
+"Make it work" turned out to mean "find out why it cannot be measured". The signal's history was
+capped at ~583 episodes not by the data, but by three defects that each failed *quietly* — no
+error, no failed test, exit code zero.
+
+### 1. EDGAR spells the form two ways, and only one was matched
+
+Measured against the live daily index on 2026-07-26:
+
+| index | form types present |
+|---|---|
+| `master.20230515.idx` | `SC 13D`, `SC 13G`, `SC 13D/A`, `SC 13G/A` |
+| `master.20250515.idx` | `SCHEDULE 13D`, `SCHEDULE 13G`, `SCHEDULE 13D/A`, `SCHEDULE 13G/A` |
+
+`schedule13.FORM_TYPES` contained only the modern spelling — with a comment asserting it was the
+right one. Every backfill before the SEC's 2024 modernisation therefore logged *"0 Schedule 13D/G
+filings in index"* and succeeded. **Fourteen years of filings skipped with no error.** One 2023 day
+that previously yielded nothing now yields 98 filings. Legacy spellings normalise to the modern one
+so the stored rows keep a single vocabulary, and five tests hold it — including that a 2023
+activist filing still classifies as activist rather than losing that status to spelling.
+
+### 2. A lint fix silently disabled signal computation
+
+`compute-signals` refuses to run unless `convergence.py`'s hash matches the registered definition —
+a good guard (decision #24), protecting against a signal silently changing meaning. It had been
+refusing since **2026-07-25**, because the Phase 1 lint pass removed an unused `timezone` import
+from that module. One line, no thresholds or weights touched.
+
+The guard was right to fire and nothing surfaced that it had. Verified the diff line by line, then
+registered v4 with a changelog stating plainly that there is **no behavioural change**. This is the
+same failure family as B-23 in `docs/bugs.md`: a correct mechanism whose refusal nobody could see.
+
+### 3. The liquidity floor had no prices to stand on
+
+v3 added a point-in-time liquidity floor (90-day median dollar volume above $2M). `prices_eod` began
+at **2024-04-01**, so every historical `as_of` failed the floor and published nothing. Backfilled to
+2021-06-01; ~50,000 deep rows added.
+
+### What is left, with its measured cost
+
+Insider history is shallow too, and `min(knowable_time)` reads 2010 only because of a **single
+outlier row** — which is what made my earlier "Form 4 goes back to 2010" claim wrong. The real
+distribution starts in 2024. Clusters need insider *and* stake filings together, so 13D/G history
+alone produces no candidates.
+
+Measured: **one week of Form 4 backfill takes over ten minutes**, so 2.5 years is a twenty-hour job.
+That is the remaining work and it is time, not engineering — the three defects that made it
+*impossible* are fixed. `make backfill-full` is the command; it should be run overnight, then
+`compute-signals`, `run-backtest` and `import-signals` in that order.
+
+**What this changes about the verdict.** The signal was never measured on enough data to judge, and
+three separate bugs guaranteed it never would be. It still has not been shown to work. It has also
+never been given the chance, and the Ledger can now tell those two apart.
