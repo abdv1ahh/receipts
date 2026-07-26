@@ -125,3 +125,61 @@ def test_the_two_planes_are_never_pooled_into_one_record():
     assert any(k.startswith("signal plane") for k in origins)
     # Every resolved row is attributed to exactly one plane, so nothing hides in an aggregate.
     assert sum(r["n"] for r in s["by"]["origin"]) == s["overall"]["n"]
+
+
+# ------------------------------------------------------------------ can the record tell "no edge"
+#                                                                     from "not enough data"?
+#
+# The ledger published a -1.52% expectancy and a 41% hit rate as bare point estimates, and both the
+# app and the marketing site read them as proof the signal failed. The mean's 95% interval spans
+# zero: on this sample nothing is established either way. A track record that cannot say that is a
+# vanity metric pointed the other way round.
+
+def test_a_mean_whose_interval_spans_zero_is_not_significant():
+    # Symmetric noise around a small negative mean — exactly the ledger's real situation.
+    vals = [0.15, -0.13, 0.16, -0.14, 0.10, -0.12, 0.18, -0.20]
+    out = ledger.mean_ci(vals)
+    assert out["lo"] < 0 < out["hi"]
+    assert out["significant"] is False
+
+
+def test_a_real_effect_is_reported_as_significant():
+    vals = [0.05, 0.06, 0.055, 0.048, 0.052, 0.058, 0.051, 0.049] * 4
+    out = ledger.mean_ci(vals)
+    assert out["lo"] > 0
+    assert out["significant"] is True
+
+
+def test_mean_ci_degrades_rather_than_dividing_by_zero():
+    assert ledger.mean_ci([])["n"] == 0
+    assert ledger.mean_ci([])["significant"] is False
+    one = ledger.mean_ci([0.1])
+    assert one["n"] == 1 and one["significant"] is False   # one call proves nothing
+
+
+def test_proportion_z_measures_distance_from_a_coin_flip():
+    assert ledger.proportion_z(115, 282) == pytest.approx(-3.10, abs=0.05)
+    assert ledger.proportion_z(50, 100) == pytest.approx(0.0, abs=0.01)
+    assert ledger.proportion_z(0, 0) is None
+
+
+def test_sample_needed_says_what_it_would_take_to_know():
+    """The number that turns "we cannot tell yet" from an excuse into a plan. At the 18% dispersion
+    actually measured, a 1% per-call edge needs roughly 1,300-1,500 resolved calls."""
+    n = ledger.sample_needed(0.183, 0.01)
+    assert 1200 < n < 1600
+    # A bigger edge is cheaper to prove.
+    assert ledger.sample_needed(0.183, 0.03) < n
+    assert ledger.sample_needed(0, 0.01) is None
+
+
+@needs_db
+def test_the_summary_publishes_the_interval_not_just_the_average():
+    from tradeos import db
+    with db.connect() as conn:
+        o = ledger.summary(conn)["overall"]
+    for key in ("expectancy_ci", "expectancy_significant", "hit_rate_z", "sample_for_1pct_edge"):
+        assert key in o, f"{key} missing — a point estimate alone invites a verdict it cannot support"
+    if o["expectancy_ci"][0] is not None:
+        lo, hi = o["expectancy_ci"]
+        assert lo <= o["expectancy"] <= hi

@@ -263,8 +263,11 @@ So a fresh session knows what it is resuming, not just where the files are.
 consequence rather than the headline, confidence always visible, disagreements surfaced.
 
 **The Ledger** publishes **41% of 282 resolved calls**, misses first, with calibration (said 38% →
-landed 40%) — and, since 2026-07-26, **expectancy: −1.52% per call versus SPY**. Read that number
-before quoting the hit rate. All 282 are the legacy `convergence-v3` signal; **the impact engine has
+landed 40%) — and, since 2026-07-26, **expectancy −1.52% per call with a 95% interval of
+[−3.80%, +0.76%], which spans zero**. On 282 calls the signal shows **no edge in either
+direction**; an earlier note here called it a failure, which the sample does not support. The
+frequency IS below chance (z = −3.1) while the wins exceed the losses, so returns cancel. Detecting
+a 1% per-call edge would take ~1,470 resolved calls. All 282 are the legacy `convergence-v3` signal; **the impact engine has
 80 open claims and zero resolved**, so it has no accuracy figure at all yet and no surface may imply
 otherwise. `open_by_origin` exists so every surface can say whose record it is showing.
 

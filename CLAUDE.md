@@ -243,11 +243,17 @@ fastest:
    showing, and a test asserts the planes are never pooled. **Never quote a hit rate without
    saying which plane produced it.**
 
-0a2. **A hit rate without magnitude is misleading in both directions.** 40% right with winners
-   twice the size of losers is a good record; 60% right with large losers is a bad one. The signal
-   plane is the second kind: 40.8%, +15.9% average on hits, −13.5% on misses, and an expectancy of
-   **−1.52% per call versus SPY** — following it would have trailed simply holding the index.
-   `overall.expectancy` now carries that and both Ledger surfaces show it.
+0a2. **A point estimate without an interval invites a verdict the sample cannot support — in
+   BOTH directions.** The signal plane reads 40.8% with +15.9% average on hits and −13.5% on
+   misses, giving −1.52% expectancy. I reported that as "it does not work". It is not:
+   the 95% interval on that mean is **[−3.80%, +0.76%] and spans zero**, so on 282 calls
+   **no edge is demonstrated either way**. What IS significant is the FREQUENCY — 3.1 standard
+   errors below a coin flip — but the wins are bigger than the losses, so the returns cancel.
+   Those two statistics genuinely disagree and only one of them is conclusive.
+   `ledger.mean_ci`, `proportion_z` and `sample_needed` are pure and tested; both Ledger surfaces
+   publish the interval. **Never quote expectancy or a hit rate from this ledger without the
+   interval beside it.** At the measured 18% dispersion it takes ~1,470 resolved calls to detect a
+   1% per-call edge, and there are 282.
 
 0b2. **A formatter duplicated across files WILL drift, and the drift is silent.** `pct` lived as
    near-identical copies in three surfaces; the fourth copy omitted the ×100 and published a +10%

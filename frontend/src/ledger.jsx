@@ -46,11 +46,29 @@ function Headline({ o }) {
             record; 60% right with small winners is a bad one. Counting calls without weighing
             them is how a record stays true and still misleads. */}
         {o.expectancy != null && (
-          <div className={`lg-count ${o.expectancy >= 0 ? "ok" : "bad"}`}>
+          <div className={`lg-count ${o.expectancy_significant ? (o.expectancy >= 0 ? "ok" : "bad") : ""}`}>
             <b>{signedPct(o.expectancy)}</b><span>average excess per call vs SPY</span>
           </div>
         )}
       </div>
+      {/* The interval, not just the point. A -1.5% average whose 95% band spans zero means "no edge
+          shown on this sample", not "it loses money" — and reporting the first without the second
+          is how a record misleads while every figure in it is true. */}
+      {o.expectancy_ci?.[0] != null && (
+        <div className="lg-signif">
+          <b>95% confidence interval {signedPct(o.expectancy_ci[0])} to {signedPct(o.expectancy_ci[1])}</b>
+          {o.expectancy_significant ? (
+            <> — this is distinguishable from no edge at all.</>
+          ) : (
+            <> — it spans zero, so on {o.n} resolved calls <b>no edge is shown in either direction</b>.
+              {o.hit_rate_z != null && <> The hit rate is {Math.abs(o.hit_rate_z)} standard errors below a
+                coin flip, but the wins are larger than the losses, so the returns cancel.</>}
+              {o.sample_for_1pct_edge && <> It would take about {o.sample_for_1pct_edge.toLocaleString()} resolved
+                calls at this dispersion to detect a 1% per-call edge.</>}
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -184,3 +184,40 @@ def test_every_migration_registers_itself():
         body = path.read_text()
         assert re.search(rf"INSERT INTO schema_migrations \(version\) VALUES \({version}\)", body), \
             f"{path.name} does not register version {version} in schema_migrations"
+
+
+# ------------------------------------------------------------------ EDGAR's two spellings
+#
+# The single most expensive bug found in this codebase: EDGAR names these forms "SC 13D" before the
+# SEC's 2024 modernisation and "SCHEDULE 13D" after it. The adapter matched only the modern
+# spelling, so every backfill before mid-2024 logged "0 Schedule 13D/G filings in index" and exited
+# successfully. Fourteen years of filings were skipped without an error, which capped the signal's
+# scoreable history at ~583 episodes and made its track record unmeasurable.
+
+def test_the_legacy_sc_13d_spelling_is_still_matched():
+    """A 2023 daily index says "SC 13D". If this set stops containing it, history silently
+    truncates again and nothing fails loudly."""
+    for legacy in ("SC 13D", "SC 13G", "SC 13D/A", "SC 13G/A"):
+        assert legacy in schedule13.FORM_TYPES, f"{legacy} dropped — pre-2024 history goes dark"
+
+
+def test_both_spellings_are_still_matched_after_the_changeover():
+    for modern in ("SCHEDULE 13D", "SCHEDULE 13G", "SCHEDULE 13D/A", "SCHEDULE 13G/A"):
+        assert modern in schedule13.FORM_TYPES
+
+
+def test_legacy_spellings_normalise_to_one_vocabulary():
+    """Stored rows and every downstream consumer must see one spelling, or an activist filing from
+    2023 stops counting as activist purely because of how EDGAR wrote it that year."""
+    assert schedule13.canonical_form("SC 13D") == "SCHEDULE 13D"
+    assert schedule13.canonical_form("SC 13G/A") == "SCHEDULE 13G/A"
+    assert schedule13.canonical_form("sc 13d") == "SCHEDULE 13D"
+    # already-canonical passes through, and so does anything unexpected — visible, not relabelled
+    assert schedule13.canonical_form("SCHEDULE 13D") == "SCHEDULE 13D"
+    assert schedule13.canonical_form("SC 14D9") == "SC 14D9"
+
+
+def test_a_legacy_activist_filing_is_classified_as_activist():
+    assert schedule13.canonical_form("SC 13D") in schedule13.ACTIVIST
+    assert schedule13.canonical_form("SC 13D/A") in schedule13.ACTIVIST
+    assert schedule13.canonical_form("SC 13G") not in schedule13.ACTIVIST

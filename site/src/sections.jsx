@@ -279,7 +279,8 @@ export function Ledger() {
                 </div>
                 <p className="plane-p">
                   A separate, older subsystem that scores clusters of insider and institutional
-                  filings. It has a full record, and the record says it did not work.
+                  filings. It has a resolved record, and the record does not yet show an edge in
+                  either direction.
                 </p>
 
                 <div className="ledger-hero">
@@ -303,12 +304,28 @@ export function Ledger() {
                   )}
                 </div>
 
-                <p className="plane-p">
-                  That last figure is the one that matters and the one a hit rate hides. Following
-                  every call would have trailed simply holding SPY. We publish it because a record
-                  you only show when it flatters you is not a record — and because the engine above
-                  will be held to exactly this standard.
-                </p>
+                {o.expectancy_ci && (
+                  <p className="plane-p">
+                    Read the interval, not the average. Following every call came to{" "}
+                    <b>{pct(o.expectancy)}</b> per call against SPY, but the 95% confidence interval
+                    is <b className="mono">{pct(o.expectancy_ci[0])} to {pct(o.expectancy_ci[1])}</b>
+                    {" "}— it <b>spans zero</b>, so on {signal.n} calls this is
+                    {o.expectancy_significant ? " a real effect" : " not distinguishable from no edge at all"}.
+                    What the sample <em>does</em> establish is that these names fell more often than
+                    they rose ({signal.hits} up against {signal.misses} down, {Math.abs(o.hit_rate_z)}{" "}
+                    standard errors below a coin flip) while the rises were larger than the falls,
+                    so the two roughly cancel.
+                  </p>
+                )}
+                {o.sample_for_1pct_edge && (
+                  <p className="plane-p">
+                    At the dispersion actually measured it would take about{" "}
+                    <b className="mono">{o.sample_for_1pct_edge.toLocaleString()}</b> resolved calls
+                    to detect a 1% per-call edge. There are {signal.n}. Publishing “41%” without
+                    that number invites a verdict the evidence cannot support — in either direction,
+                    which is why it is here rather than in a footnote.
+                  </p>
+                )}
               </div>
             )}
 

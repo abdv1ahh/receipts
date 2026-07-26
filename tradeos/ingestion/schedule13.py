@@ -28,10 +28,33 @@ log = logging.getLogger("tradeos.ingest.schedule13")
 SOURCE = "edgar/13dg"
 EASTERN = ZoneInfo("America/New_York")
 
-# The daily master index labels these SCHEDULE 13x (not the "SC 13D" shorthand).
-FORM_TYPES = {"SCHEDULE 13D", "SCHEDULE 13G", "SCHEDULE 13D/A", "SCHEDULE 13G/A"}
+# EDGAR SPELLS THESE TWO DIFFERENT WAYS DEPENDING ON THE YEAR, and only accepting one of them
+# silently truncated the entire history.
+#
+# Measured against the live daily index on 2026-07-26:
+#   master.20230515.idx  ->  "SC 13D", "SC 13G", "SC 13D/A", "SC 13G/A"       (32/28/20/18 filings)
+#   master.20250515.idx  ->  "SCHEDULE 13D", "SCHEDULE 13G", ...              (508 13G alone)
+#
+# The changeover follows the SEC's 2024 Schedule 13D/G modernisation. This module only ever matched
+# the modern spelling, so every backfill before mid-2024 found "0 Schedule 13D/G filings in index"
+# and reported success. That is why `stake_events` began on 2024-07-03 while Form 4 reaches back to
+# 2010, and therefore why the signal had only ~583 scoreable episodes: not because the data was
+# exhausted, but because fourteen years of it were being skipped without an error.
+#
+# Legacy spellings are normalised to the modern one on the way in, so the 51k rows already stored
+# and everything downstream keep a single vocabulary.
+_LEGACY = {"SC 13D": "SCHEDULE 13D", "SC 13G": "SCHEDULE 13G",
+           "SC 13D/A": "SCHEDULE 13D/A", "SC 13G/A": "SCHEDULE 13G/A"}
+CANONICAL = {"SCHEDULE 13D", "SCHEDULE 13G", "SCHEDULE 13D/A", "SCHEDULE 13G/A"}
+FORM_TYPES = CANONICAL | set(_LEGACY)
 ACTIVIST = {"SCHEDULE 13D", "SCHEDULE 13D/A"}
 AMENDMENTS = {"SCHEDULE 13D/A", "SCHEDULE 13G/A"}
+
+
+def canonical_form(form_type: str) -> str:
+    """One spelling for a form EDGAR names two ways. Unknown values pass through unchanged so an
+    unexpected type is visible in the data rather than silently relabelled."""
+    return _LEGACY.get((form_type or "").strip().upper(), (form_type or "").strip().upper())
 
 
 class StakeParseError(ValueError):
@@ -58,6 +81,7 @@ def parse_stake(text: str) -> StakeRecord:
     h = sgml.parse_header(text)
     if h.submission_type not in FORM_TYPES:
         raise StakeParseError(f"unexpected submission type {h.submission_type!r}")
+    form_type = canonical_form(h.submission_type)
     if not h.filers or not h.filers[0].cik:
         raise StakeParseError("no filer CIK in header")
     if not h.subject_companies or not h.subject_companies[0].cik:
@@ -73,7 +97,7 @@ def parse_stake(text: str) -> StakeRecord:
 
     return StakeRecord(
         accession_no=h.accession_no,
-        form_type=h.submission_type,
+        form_type=form_type,
         file_number=h.file_number,
         filer_cik=filer.cik,
         filer_name=filer.name or "",

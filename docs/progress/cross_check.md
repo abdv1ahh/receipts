@@ -309,10 +309,14 @@ Three facts, each verified against the database rather than the docs:
    the impact engine.
 2. **The impact engine, which is what the entire site sells, has 80 open claims and zero resolved.**
    It has no accuracy figure at all.
-3. **The signal genuinely does not work.** 115/282 is 40.8%, which is **3.1 standard deviations
-   below a coin flip** (p ≈ 0.002) on a directional call. Expectancy is **−1.52% excess per call
-   versus SPY**; following every call across the whole sample would have trailed the index by 429
-   percentage points.
+3. **The signal shows no demonstrated edge — which is not the same as "it fails", and I got this
+   wrong the first time.** 115/282 is 40.8%, and the *frequency* is genuinely 3.1 standard errors
+   below a coin flip. But the *return* is not: mean excess is −1.52% per call with a 95% interval
+   of **[−3.80%, +0.76%], which spans zero**. The two statistics disagree because the wins are
+   larger than the losses (+15.9% against −13.5%), so the returns cancel. My first pass reported
+   the point estimate as proof of failure and put that on the marketing site. It was an overclaim,
+   it is corrected below, and it is the same error the page was already making in the other
+   direction: **a number without an interval invites whatever verdict the reader arrives with**.
 
 So the page took one subsystem's failing record, published it under the heading "the accuracy
 record", and placed it beneath a hero describing a different subsystem. It was discouraging *and*
@@ -393,3 +397,73 @@ Checked at 375 / 768 / 1440px at six scroll depths each: no horizontal overflow 
 - The FAQ accordion was already a real `<button>` with `aria-expanded` and `aria-controls`, the
   country picker already carried a role and a label, and `FAQPage` structured data was already
   present and valid. Those needed nothing.
+
+---
+
+# "Make the signal work" — what is and is not possible
+
+The owner's instruction after the above: make it work.
+
+## The correction that came first
+
+Investigating in order to fix it turned up that my own diagnosis was overstated. Setting out the
+three statistics properly, because they do not all say the same thing:
+
+| statistic | value | conclusive? |
+|---|---|---|
+| directional hit rate | 40.8% of 282, z = **−3.10** | **yes** — these names fell more often than they rose |
+| mean excess per call | −1.52%, 95% CI **[−3.80%, +0.76%]** | **no** — the interval spans zero |
+| average win / average loss | +15.9% / −13.5% | this is why the two disagree |
+
+So the sample establishes that the signal picks names that decline more *often*, and simultaneously
+fails to establish that following it loses money, because the rarer wins are bigger. Reporting
+"−1.52% expectancy" as a verdict was wrong of me, and it went onto the marketing site before it was
+caught. Both are fixed.
+
+## Why it cannot be tuned into working right now
+
+The obvious move is to search for a subset that performs. Doing that found one: clusters with 4–6
+independent filers show +1.56% at 30 days against −2.23% for the 3-filer bulk. It is worthless:
+t = 0.76, which is noise, and it was found by trying five subsets on one sample. Shipping a filter
+chosen because it backtests well, on a product whose entire argument is that it does not flatter
+itself, would be the precise dishonesty this codebase exists to avoid.
+
+The confidence buckets look genuinely mis-specified — at 90 days "high" runs −25.8% against
+"medium" at +9.5%, an inversion — but n = 8 in that bucket. It is a suspected defect, recorded as
+one, and not something to refit on eight observations.
+
+## What actually limits it, and what was done
+
+The sample is not small because the data is exhausted. Counted:
+
+- **17,145 signal clusters**, which the backtest collapses to **583 distinct episodes**;
+- of those, 270 are still open at 30 days, 402 at 90, 530 at 180 — most horizons have not closed;
+- **271 distinct tickers, 268 with price history** — price coverage is *not* the constraint;
+- **Form 4 goes back to 2010** (664,923 rows) but **13D/G only to 2024-07** (51,099).
+
+That last line is the binding constraint. The convergence signal needs clustered filings across
+both sources, so the two-year 13D/G window caps the whole history at ~28 episodes per month. To
+reach the ~1,470 resolved calls needed to detect a 1% per-call edge takes roughly four more years
+of filings — which SEC EDGAR has and this database does not.
+
+Measured cost: **~24 seconds per month** of 13D/G backfill. A 2021→2024 backfill is therefore about
+twenty minutes of wall time, not an overnight job, and it was started. Extending to 2018 is another
+half hour. That is the concrete path from "we cannot tell" to "we know".
+
+## The actual product fix
+
+The Ledger now reports whether its own numbers mean anything:
+
+- `mean_ci` — the mean with a 95% interval and a `significant` flag that is False whenever the
+  interval spans zero;
+- `proportion_z` — how many standard errors a hit rate sits from a coin flip;
+- `sample_needed` — how many resolved calls it would take to detect a given edge at the measured
+  dispersion. This is the number that turns "not enough data" from an excuse into a plan.
+
+All three are pure and tested offline. Both Ledger surfaces publish the interval beside the point
+estimate, and the marketing site now states plainly that on this sample nothing is shown either
+way, and how many calls it would take to find out.
+
+That is the honest answer to "make it work": **the signal has not been shown to fail, the record was
+never able to tell the difference, and now it can.** The remaining work is sample, and the sample is
+a backfill away.
