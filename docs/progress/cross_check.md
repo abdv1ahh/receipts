@@ -267,5 +267,20 @@ Both gates were run by me reading the diff directly rather than by fan-out agent
   diffs. Phase 9 §"What is NOT fixed" remains the honest list.
 - **The backup cron line is still not installed.** `scripts/backup.sh` works; nobody schedules it.
 - **The 3D globe is verified on desktop WebGL only** — no real low-power mobile device.
+- **Cluster matching does not scale, and adding a high-volume source made it visible.**
+  `spine.find_cluster` computes `similarity(c.title, ...)` against every cluster in the time window
+  — 821 of them now — for every event, with no trigram index. Measured: 186s for 381 events, 165s
+  for 183. The cost tracks the CLUSTER CORPUS, not the batch, so shrinking the fetch window barely
+  helped and the pass will get slower as the corpus grows. It is comfortably inside its hourly
+  interval today and nothing is broken.
+
+  The fix is known but not safe to do in passing: a GIN trigram index on `event_clusters.title`
+  only helps the `%` operator, and `%` takes its threshold from the `pg_trgm.similarity_threshold`
+  session GUC rather than from the query. Done right it is `title % $1 AND similarity(...) >= $2`
+  with the GUC set at or below WEAK_SIMILARITY, so the index prunes and the explicit check keeps
+  the semantics identical. Done wrong it silently stops matching things, in the one piece of logic
+  this whole product is built on. It needs a before/after comparison of real clustering output,
+  which is a task of its own.
+
 - **Bluesky addresses accounts by handle, not DID**, so a renamed account fails and is logged by
   name. Fine for 16 curated institutions; revisit if the list grows or starts tracking individuals.

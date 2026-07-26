@@ -93,9 +93,19 @@ def _job_gdelt(conn) -> dict:
 
 def _job_social_bluesky(conn) -> dict:
     """The consequential-accounts feed on the one social network with an open read API. Keyless,
-    so unlike Reddit this runs for real out of the box."""
+    so unlike Reddit this runs for real out of the box.
+
+    A smaller window than the adapter's default because this runs hourly and the busiest account
+    here posts about four times an hour, so twelve is ample. Note that this did NOT buy the speedup
+    it looks like it should: measured 186s for 381 events and 165s for 183: the cost is per-event
+    cluster matching, which scales with the CLUSTER CORPUS rather than with the batch. See
+    `spine.find_cluster` — it computes similarity() against every cluster in the window (821 of
+    them) with no trigram index, because `similarity(a,b) >= c` cannot use one; only the `%`
+    operator can, and that reads its threshold from a session GUC. Making it indexable is a real
+    change to the matching path and clustering correctness is load-bearing, so it is written up
+    rather than done in passing. Comfortably inside the hour either way."""
     from .ingestion import social_bluesky
-    return social_bluesky.ingest(conn)
+    return social_bluesky.ingest(conn, limit=12)
 
 
 def _job_spine_news(conn) -> dict:
@@ -167,7 +177,9 @@ JOBS = [
     ("sentiment_hn", 21600, _job_sentiment_hn),  # every 6h
     ("attention_wiki", 86400, _job_attention_wiki),  # pageviews are daily
     ("social_reddit", 3600, _job_social_reddit),  # hourly (no-op until configured)
-    # ~16 accounts at one request each, paced at 1.2s — about 20s of wall time per pass.
+    # 16 accounts, one request each. The requests are the cheap part (~20s paced); the cost is the
+    # spine re-clustering every post fetched, measured at 186s for a 25-post window — hence the
+    # smaller window in the job. Still comfortably inside the hour, so passes never overlap.
     ("social_bluesky", 3600, _job_social_bluesky),  # hourly; keyless, so it runs by default
     ("earnings_cal", 43200, _job_earnings),       # forward earnings -> twice a day
     ("economic_cal", 43200, _job_economic),       # macro calendar -> twice a day
