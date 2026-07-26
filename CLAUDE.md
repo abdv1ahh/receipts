@@ -76,7 +76,7 @@ The app is at <http://localhost:8000>. Demo login: `demo@tradeos.app` / `<genera
 ### Tests
 
 ```bash
-make test     # 621 tests, ~1s. Offline except 17 authz tests that need the local DB
+make test     # 631 tests, ~1s. Offline except 17 authz tests that need the local DB
 make lint     # ruff; zero errors is the standard
 make dev      # reload-in-place stack; then `make web` for a UI change
 make fix      # ruff --fix
