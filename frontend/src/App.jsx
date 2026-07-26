@@ -19,6 +19,7 @@ import { Dashboard } from "./dashboard.jsx";
 import { IntegrationsView } from "./integrations.jsx";
 import { RadarView } from "./radar.jsx";
 import { OnboardingCard } from "./onboarding.jsx";
+import { ResetView, VerifyView } from "./account.jsx";
 import { GlobeView } from "./globe.jsx";
 import { ExposureView } from "./exposure.jsx";
 import { CalendarView } from "./calendar.jsx";
@@ -100,7 +101,10 @@ function CommandPalette({ onGo, onClose }) {
 // Which surfaces are reachable by URL. Anything not listed falls back to the dashboard, so a
 // stale bookmark lands somewhere sensible instead of a blank page.
 const ROUTES = new Set([...Object.keys(NAV_LABELS), "landing", "auth", "pricing", "notifications",
-                        "search", "asset", "profile", "library-entry", "admin"]);
+                        "search", "asset", "profile", "library-entry", "admin",
+                        // Reached from an email. Without these the link fell through to the SPA
+                        // catch-all and landed on the marketing page with the token ignored.
+                        "verify", "reset"]);
 
 export default function App() {
   const route = useRoute();
@@ -273,7 +277,11 @@ export default function App() {
             <OnboardingCard key={user.id} onDone={refreshUser} />
           )}
           <ErrorBoundary key={view} surface={view}>
-          {view === "landing" ? (
+          {view === "verify" ? (
+            <VerifyView onDone={go} />
+          ) : view === "reset" ? (
+            <ResetView onDone={go} />
+          ) : view === "landing" ? (
             <LandingView onGetStarted={() => go("auth")} onExplore={() => go("news")} />
           ) : view === "dashboard" ? (
             <Dashboard user={user} onOpenSymbol={openSymbol} onNav={go} />

@@ -18,7 +18,7 @@ from datetime import UTC, date, datetime, timedelta
 from io import BytesIO
 from pathlib import Path
 
-from fastapi import Cookie, FastAPI, Request, Response
+from fastapi import BackgroundTasks, Cookie, FastAPI, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from psycopg import sql
@@ -43,6 +43,7 @@ from . import (
     insights,
     journal_context,
     ledger,
+    mail,
     oauth,
     onboarding,
     portfolio,
@@ -197,6 +198,19 @@ class ProfileFrameReq(BaseModel):
     risk_appetite: str | None = None
 
 
+class EmailReq(BaseModel):
+    email: str
+
+
+class TokenReq(BaseModel):
+    token: str
+
+
+class ResetConfirmReq(BaseModel):
+    token: str
+    password: str
+
+
 class OnboardingReq(BaseModel):
     """Everything the sixty-second setup collects. Every field optional — finishing with nothing
     chosen is a valid answer, and the flow records that it was asked rather than asking again."""
@@ -326,6 +340,8 @@ _PUBLIC_PREFIXES = ("/api/public/", "/api/ledger")
 # Routes that may spend model quota. Gemini's free daily allowance is shared by every user, so one
 # script exhausting it silences the AI surfaces for everybody until midnight UTC.
 _MODEL_PATHS = ("/api/assistant", "/api/analyze-chart", "/api/extract-tickers")
+# Anything that can cause an email to be sent, or that guesses at a token.
+_AUTH_TOKEN_PATHS = ("/api/auth/verify/", "/api/auth/reset/")
 
 
 def _limit_bucket(path: str) -> str | None:
@@ -333,6 +349,8 @@ def _limit_bucket(path: str) -> str | None:
         return "public"
     if path.startswith(_MODEL_PATHS):
         return "model"
+    if path.startswith(_AUTH_TOKEN_PATHS):
+        return "auth_token"
     if path.endswith("/image") or path.endswith("/chart-analysis"):
         return "upload"
     return None
@@ -411,6 +429,80 @@ def auth_login(req: LoginReq, request: Request, response: Response) -> dict:
         return {"error": str(exc)}
     _set_session_cookie(response, token)
     return {"user": user}
+
+
+# ------------------------------------------ email verification and password reset (post-Phase 9)
+#
+# The two flows the ten-phase brief never asked for and that would have hurt a real user first.
+#
+# ONE RULE GOVERNS BOTH REQUEST ROUTES: the response is identical whether or not the address has an
+# account. Otherwise this endpoint becomes a free membership oracle — point it at a list of
+# addresses and learn which ones are customers. The token is emailed and never returned here; if
+# mail is unconfigured the request still answers the same way, because telling a stranger about the
+# server's mail configuration is also an answer.
+
+_ENUMERATION_SAFE = ("If that address has an account, a message is on its way. "
+                     "The link expires and can be used once.")
+
+# EVERYTHING runs after the response, as a background task — the lookup, the token, the send.
+#
+# Not for latency: for the timing side channel. Both routes answer with identical wording so the
+# response cannot reveal whether the address has an account, and then the response *time* answers
+# it anyway, because only a real address does any work. Measured before this change: 0.06s for a
+# real address against 0.01s for a fake one, and that was already after moving only the SMTP call
+# out. With the whole operation deferred, the handler does the same nothing in both cases.
+#
+# The cost is that a failure in here reaches the logs and not the caller. That was already true by
+# design — these routes are not allowed to report what happened.
+
+
+def _deliver(email: str, kind: str) -> None:
+    """Issue and send, off the request path. Never raises into the server."""
+    try:
+        with db.connect() as conn:
+            if kind == "verify":
+                token = authn.start_email_verification(conn, email)
+                if token:
+                    mail.send(email, mail.VERIFY_SUBJECT, mail.verify_body(token))
+            else:
+                token = authn.start_password_reset(conn, email)
+                if token:
+                    mail.send(email, mail.RESET_SUBJECT, mail.reset_body(token))
+    except Exception as exc:
+        log.warning("%s delivery failed (%s)", kind, type(exc).__name__)
+
+
+@app.post("/api/auth/verify/request")
+def auth_verify_request(req: EmailReq, background: BackgroundTasks) -> dict:
+    background.add_task(_deliver, (req.email or "").strip().lower(), "verify")
+    return {"sent": True, "message": _ENUMERATION_SAFE}
+
+
+@app.post("/api/auth/verify/confirm")
+def auth_verify_confirm(req: TokenReq, response: Response) -> dict:
+    with db.connect() as conn:
+        out = authn.confirm_email(conn, req.token)
+    if not out["ok"]:
+        response.status_code = 400
+    return out
+
+
+@app.post("/api/auth/reset/request")
+def auth_reset_request(req: EmailReq, background: BackgroundTasks) -> dict:
+    background.add_task(_deliver, (req.email or "").strip().lower(), "reset")
+    return {"sent": True, "message": _ENUMERATION_SAFE}
+
+
+@app.post("/api/auth/reset/confirm")
+def auth_reset_confirm(req: ResetConfirmReq, response: Response) -> dict:
+    """Redeeming this signs out every session on the account, including this one."""
+    with db.connect() as conn:
+        out = authn.complete_password_reset(conn, req.token, req.password)
+    if not out["ok"]:
+        response.status_code = 400
+    else:
+        response.delete_cookie(SESSION_COOKIE, path="/")
+    return out
 
 
 # ------------------------------------------------------------------ Sign in with Google (Phase 8)

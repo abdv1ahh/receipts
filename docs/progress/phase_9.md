@@ -168,3 +168,81 @@ The honest list, which the brief asks for explicitly.
 ---
 
 **Status: Phase 9 complete. All ten phases (0–9) are done.**
+
+---
+
+# Follow-up, same day: the gaps Phase 9 listed as not fixed
+
+Three of the nine items above were closed after the report was written. The rest stand.
+
+## Email verification and password reset (item 2) — done
+
+The item most likely to hurt a real user first: an account was usable with an unverified address,
+and a forgotten password was unrecoverable except by an operator editing the database.
+
+Migration 031 (`auth_tokens`, `users.email_verified_at`), `tradeos/mail.py`, the token machinery in
+`authn`, four routes, and two screens. Four properties, each with a test:
+
+- **Hashed at rest, single-use, expiring.** Single use is enforced by the UPDATE itself —
+  `used_at IS NULL` in the WHERE plus `RETURNING` — because a read-then-mark has a window where two
+  concurrent redemptions both win, and for a reset token that is two people setting a password.
+  Issuing a new token invalidates any unused one, so a second "reset my password" click does not
+  leave the first link live.
+- **The request routes cannot be used as a membership oracle.** Identical wording either way, one
+  return statement, no branch on whether a token was issued.
+- **A reset signs out every other session.** A reset is what someone does when they think the
+  account is compromised; leaving the attacker's session alive makes it ceremonial.
+- **A weak password is refused before the token is spent**, so one fat-fingered attempt does not
+  burn the link.
+
+Two things found by reviewing it as an attacker rather than as its author:
+
+**The token was in the URL query string, and uvicorn logged it.** `GET /reset?token=…` in an access
+log is a working password reset in a file that gets shipped to a log aggregator and kept for
+ninety days. It is now in the URL **fragment**, which is never transmitted to the server, read by
+the page and sent in a POST body — and scrubbed from the address bar once read.
+
+**The response time answered the question the wording refused to.** Only a real address did any
+work, so an existing account took 0.06s against 0.01s for a fake one — and that was *after* moving
+the SMTP call to a background task. The whole operation now runs after the response: lookup, token,
+send. Re-measured over five samples each: 0.012s vs 0.008s, which is noise.
+
+A third came out of driving the flow twice in a browser rather than once: opening a second reset
+link while the page is open is a fragment-only navigation, which does not reload the document, so
+the screen kept the first token and rejected a link the user had just clicked. It listens for
+`hashchange` now.
+
+`ForgotPassword` also had to be wired into the login screen — the API existed and nothing pointed
+at it, which would have made the whole feature invisible.
+
+**Still open: SMTP is not configured**, so nothing can actually send. The machinery is built and
+tested; it needs a provider, and `preflight` warns.
+
+## Backups (item 7) — half done
+
+`scripts/backup.sh`: `pg_dump -Fc`, a size floor so a truncated file is never mistaken for a
+backup, retention that only matches its own filenames, and `--verify` restoring into a scratch
+database. Measured on the real database: 5.2 GB, of which `raw_filings` is 4.7 GB — the SEC
+payloads that cannot be refetched quickly — producing a ~2 GB dump, so 14 days of retention wants
+about 30 GB. The dump was taken and its archive verified: 501 TOC entries, all 60 tables present.
+
+**Nobody has installed the cron line.** A backup script that is never run is not a backup.
+
+## GOOG/GOOGL (carried over since Phase 4) — fixed
+
+The attention board keyed on ticker, so Alphabet appeared twice with its attention split between
+the rows — and each half then measured against its own baseline, so a genuine spike could miss the
+mention floor in both. It groups by company now: mentions and baselines add, sentiment merges
+weighted by mentions, the displayed ticker is deterministic (shortest then alphabetical — "whichever
+class has more mentions today" would let a row rename itself between refreshes), the merge is
+disclosed rather than silent, and a ticker with no resolved entity is never merged into anything.
+
+## Verified in the same pass
+
+- **Migrations 001–031 apply cleanly to an EMPTY database** and re-run as a no-op. Never checked
+  before; the whole schema had only ever been built incrementally.
+- **The production image builds, serves, and runs as uid 10001.** `/health`, `/api/ledger` and `/`
+  all answer from a container with no dev mounts.
+- **All 37 CLI commands exist**; six (`ingest-form4`, `ingest-13dg`, `ingest-13f` and their
+  `backfill-*` twins) were real but undocumented, and are now listed.
+- Every count in `CLAUDE.md` and `docs/state.md` re-measured against the database and corrected.

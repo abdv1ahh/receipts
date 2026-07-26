@@ -282,3 +282,126 @@ FREE_DELAY_HOURS = 48
 def delay_hours(tier: str | None) -> int:
     """Free (and unauthenticated) users see signals delayed; paid tiers see them live."""
     return 0 if tier in ("retail", "pro", "admin") else FREE_DELAY_HOURS
+
+
+# ------------------------------------------------ email verification and password reset (post-9)
+#
+# Two capabilities that behave identically and differ only in what redeeming them does. Four
+# properties hold for both, and every one of them is the difference between a feature and a hole:
+#
+#   * the token is stored HASHED, so reading the table grants nothing;
+#   * it is SINGLE-USE, enforced by an UPDATE that only matches an unused row and checking that a
+#     row was actually matched — a read-then-mark has a window where two requests both win;
+#   * it EXPIRES, in hours not days;
+#   * requesting one NEVER reveals whether the address exists.
+
+VERIFY_TTL_HOURS = 24
+RESET_TTL_HOURS = 1
+TOKEN_REQUEST_LIMIT = 5          # per address per window, to stop an inbox being used as a weapon
+
+
+def issue_token(conn: psycopg.Connection, user_id: int, purpose: str, ttl_hours: int) -> str:
+    """Mint a single-use capability and return the RAW token — the only moment it exists in the
+    clear. The caller's one job is to put it in an email and nowhere else.
+
+    Any unused token of the same purpose is invalidated first: a second "reset my password" click
+    should not leave the first link live, or a stolen-then-abandoned email keeps working.
+    """
+    token = secrets.token_urlsafe(32)
+    with conn.cursor() as cur:
+        cur.execute("UPDATE auth_tokens SET used_at = now() "
+                    "WHERE user_id=%s AND purpose=%s AND used_at IS NULL", (user_id, purpose))
+        cur.execute(
+            """INSERT INTO auth_tokens (user_id, purpose, token_hash, expires_at)
+               VALUES (%s, %s, %s, now() + make_interval(hours => %s))""",
+            (user_id, purpose, _hash_token(token), ttl_hours))
+    conn.commit()
+    return token
+
+
+def consume_token(conn: psycopg.Connection, token: str | None, purpose: str) -> int | None:
+    """Redeem a token, returning its user id, or None if it is unknown, expired or already used.
+
+    The single-use guarantee is the `used_at IS NULL` in the WHERE clause plus the RETURNING: two
+    concurrent redemptions cannot both match, because the second sees the row already stamped.
+    """
+    if not token:
+        return None
+    with conn.cursor() as cur:
+        cur.execute(
+            """UPDATE auth_tokens SET used_at = now()
+                WHERE token_hash = %s AND purpose = %s
+                  AND used_at IS NULL AND expires_at > now()
+            RETURNING user_id""",
+            (_hash_token(token), purpose))
+        row = cur.fetchone()
+    conn.commit()
+    return row[0] if row else None
+
+
+def _token_requests_recent(cur, email: str) -> bool:
+    cur.execute(
+        """SELECT count(*) FROM auth_tokens t JOIN users u ON u.id = t.user_id
+            WHERE u.email = %s AND t.created_at > now() - interval '1 hour'""", (email,))
+    return cur.fetchone()[0] >= TOKEN_REQUEST_LIMIT
+
+
+def start_email_verification(conn: psycopg.Connection, email: str) -> str | None:
+    """A verification token for this address, or None if there is nothing to verify.
+
+    None covers both "no such account" and "already verified". The CALLER must answer identically
+    either way — see the note in the route.
+    """
+    email = (email or "").strip().lower()
+    with conn.cursor() as cur:
+        cur.execute("SELECT id, email_verified_at FROM users WHERE email = %s", (email,))
+        row = cur.fetchone()
+        if not row or row[1] is not None or _token_requests_recent(cur, email):
+            return None
+    return issue_token(conn, row[0], "verify_email", VERIFY_TTL_HOURS)
+
+
+def confirm_email(conn: psycopg.Connection, token: str | None) -> dict:
+    uid = consume_token(conn, token, "verify_email")
+    if not uid:
+        return {"ok": False, "error": "that link is invalid, expired, or already used"}
+    with conn.cursor() as cur:
+        cur.execute("UPDATE users SET email_verified_at = now() WHERE id = %s AND email_verified_at IS NULL",
+                    (uid,))
+    conn.commit()
+    audit(conn, None, "email.verified", str(uid))
+    return {"ok": True}
+
+
+def start_password_reset(conn: psycopg.Connection, email: str) -> str | None:
+    """A reset token, or None when there is no account (or the address is being hammered)."""
+    email = (email or "").strip().lower()
+    with conn.cursor() as cur:
+        cur.execute("SELECT id, banned FROM users WHERE email = %s", (email,))
+        row = cur.fetchone()
+        if not row or row[1] or _token_requests_recent(cur, email):
+            return None
+    return issue_token(conn, row[0], "reset_password", RESET_TTL_HOURS)
+
+
+def complete_password_reset(conn: psycopg.Connection, token: str | None, new_password: str) -> dict:
+    """Set a new password and sign out everywhere.
+
+    **Every other session is destroyed.** A reset is what someone does when they believe the
+    account is compromised, and leaving the attacker's session alive would make the reset
+    ceremonial. It also costs the legitimate user one re-login, which is the right trade.
+    """
+    if is_weak_password(new_password):
+        return {"ok": False, "error": "password too short or too common"}
+    uid = consume_token(conn, token, "reset_password")
+    if not uid:
+        return {"ok": False, "error": "that link is invalid, expired, or already used"}
+    with conn.cursor() as cur:
+        cur.execute("UPDATE users SET password_hash = %s WHERE id = %s", (hash_password(new_password), uid))
+        cur.execute("DELETE FROM sessions WHERE user_id = %s", (uid,))
+        # A reset proves control of the mailbox, which is exactly what verification asks for.
+        cur.execute("UPDATE users SET email_verified_at = coalesce(email_verified_at, now()) WHERE id = %s",
+                    (uid,))
+    conn.commit()
+    audit(conn, None, "password.reset", str(uid))
+    return {"ok": True}

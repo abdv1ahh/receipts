@@ -13,7 +13,7 @@ from base64 import urlsafe_b64encode
 
 import pytest
 
-from tradeos import billing, oauth, onboarding
+from tradeos import authn, billing, mail, oauth, onboarding
 
 # ------------------------------------------------------------------ tier gating
 
@@ -245,3 +245,120 @@ def test_the_callback_never_returns_a_raw_error_to_the_browser():
     src = inspect.getsource(app_module.auth_google_callback)
     assert "RedirectResponse" in src
     assert re.search(r"quote\(msg\[:\d+\]\)", src), "error text must be url-encoded and truncated"
+
+
+# ------------------------------------------------------------------ verification + reset (post-9)
+
+def test_a_reset_request_never_reveals_whether_the_account_exists():
+    """Otherwise the endpoint is a free membership oracle: point it at a list of addresses and
+    learn which ones are customers. Both routes must answer identically either way."""
+    from tradeos import app as app_module
+
+    for fn in (app_module.auth_reset_request, app_module.auth_verify_request):
+        src = inspect.getsource(fn)
+        # Exactly one return, and it does not branch on whether a token was issued.
+        assert src.count("return") == 1, f"{fn.__name__} has more than one response shape"
+        assert "_ENUMERATION_SAFE" in src
+        assert "if not token" not in src and "else:" not in src
+
+
+def test_no_route_ever_returns_a_verification_or_reset_token():
+    """The token is a temporary password. Returning it — even 'to help testing' — turns knowing an
+    address into owning the account."""
+    from tradeos import app as app_module
+
+    for fn in (app_module.auth_reset_request, app_module.auth_verify_request,
+               app_module.auth_reset_confirm, app_module.auth_verify_confirm):
+        src = inspect.getsource(fn)
+        assert '"token"' not in src.split("return")[-1], f"{fn.__name__} may return a token"
+
+
+def test_tokens_are_stored_hashed_never_raw():
+    """Reading the table must grant nothing."""
+    src = inspect.getsource(authn.issue_token)
+    assert "_hash_token(token)" in src
+    assert "VALUES (%s, %s, %s," in src and "token)" not in src.split("VALUES")[1][:60]
+
+
+def test_a_token_is_single_use_by_the_update_itself():
+    """`used_at IS NULL` in the WHERE plus RETURNING. A read-then-mark has a window in which two
+    concurrent redemptions both succeed — for a reset token that is two people setting a password."""
+    src = inspect.getsource(authn.consume_token)
+    assert "UPDATE auth_tokens SET used_at = now()" in src
+    assert "used_at IS NULL" in src and "RETURNING user_id" in src
+    assert "expires_at > now()" in src
+    assert "SELECT" not in src.upper().split('"""')[-1]
+
+
+def test_issuing_a_token_invalidates_the_previous_one():
+    """A second 'reset my password' click must not leave the first link live."""
+    src = inspect.getsource(authn.issue_token)
+    invalidate = src.index("UPDATE auth_tokens SET used_at")
+    insert = src.index("INSERT INTO auth_tokens")
+    assert invalidate < insert, "the old token is not invalidated before the new one is minted"
+
+
+def test_a_reset_signs_out_every_other_session():
+    """A reset is what someone does when they think the account is compromised. Leaving the
+    attacker's session alive makes it ceremonial."""
+    src = inspect.getsource(authn.complete_password_reset)
+    assert "DELETE FROM sessions WHERE user_id = %s" in src
+
+
+def test_a_weak_password_is_refused_before_the_token_is_spent():
+    """Otherwise one fat-fingered attempt burns the link and the user has to start over."""
+    src = inspect.getsource(authn.complete_password_reset)
+    assert src.index("is_weak_password") < src.index("consume_token")
+
+
+def test_purposes_do_not_cross():
+    """A verification link must not be redeemable as a password reset."""
+    src = inspect.getsource(authn.consume_token)
+    assert "purpose = %s" in src
+
+
+def test_mail_refuses_to_send_when_unconfigured_unless_dev_echo_is_explicit():
+    """The degraded path writes a capability into the log, so it cannot be the default."""
+    src = inspect.getsource(mail.send)
+    assert "if not configured():" in src
+    assert "if dev_echo():" in src
+    echo = inspect.getsource(mail.dev_echo)
+    assert 'os.environ.get("MAIL_DEV_ECHO", "")' in echo       # absent means off
+
+
+def test_mail_never_travels_unencrypted():
+    """A message carrying a password-reset link does not go in the clear, even on a LAN."""
+    src = inspect.getsource(mail.send)
+    assert "starttls" in src and "SMTP_SSL" in src
+    assert "s.login" in src
+
+
+def test_a_mail_failure_logs_the_exception_type_not_the_envelope():
+    """An SMTP error can echo the envelope, and the envelope is the recipient."""
+    for line in inspect.getsource(mail.send).splitlines():
+        if "log." in line and "exc" in line:
+            assert "type(exc).__name__" in line
+            assert "str(exc)" not in line and "%s\", exc" not in line
+
+
+def test_the_link_puts_the_token_in_a_fragment_not_a_query_string():
+    """A fragment is never transmitted to the server; a query string appears in the access log, in
+    proxy logs, and in Referer headers. Verified before the change — uvicorn logged
+    `GET /reset?token=...`, which is a working password reset sitting in a log file."""
+    from tradeos import mail
+
+    for body in (mail.reset_body("SECRET-TOKEN"), mail.verify_body("SECRET-TOKEN")):
+        assert "#token=SECRET-TOKEN" in body
+        assert "?token=" not in body
+
+
+def test_the_request_routes_do_no_work_before_responding():
+    """Both routes answer with identical wording so the response cannot reveal whether the address
+    has an account — and then the response TIME would answer it anyway if the lookup, the token
+    write and the SMTP round trip happened inline. Measured at 0.06s vs 0.01s before this moved."""
+    from tradeos import app as app_module
+
+    for fn in (app_module.auth_reset_request, app_module.auth_verify_request):
+        src = inspect.getsource(fn)
+        assert "background.add_task" in src, f"{fn.__name__} does work on the request path"
+        assert "db.connect" not in src and "mail.send" not in src

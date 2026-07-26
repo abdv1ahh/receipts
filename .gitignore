@@ -27,3 +27,6 @@ tradeos/site_static/
 # Local scratch
 *.log
 .gstack/
+
+# Local database backups (scripts/backup.sh). Never commit a dump.
+backups/

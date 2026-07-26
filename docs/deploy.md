@@ -191,8 +191,11 @@ Recorded here rather than discovered later:
 2. **No rate limiting on the public endpoints.** `/api/public/*` and `/api/ledger` are
    unauthenticated and uncached. Phase 9 territory.
 3. **Google sign-in is untested against Google.** See above.
-4. **Backups are not configured.** The dataset took hours of rate-limited SEC backfill to build and
-   there is no dump schedule. Whatever host you choose, set one up before it matters.
+4. **Backups: a script exists, a schedule does not.** `scripts/backup.sh` dumps, refuses to call a
+   truncated file a backup, prunes on a retention window, and with `--verify` restores into a
+   scratch database and counts rows. Nobody has installed the cron line. Measured 2026-07-26: the
+   database is 5.2 GB (4.7 GB of it `raw_filings` — the SEC payloads that cannot be refetched
+   quickly), a dump is ~2 GB and takes a few minutes, so 14 days of retention wants ~30 GB.
 5. **This document has not been executed against a real host.** It is derived from the running
    Docker setup and provider documentation. The first person to deploy should correct it in the
    same change that discovers a mistake — a wrong command here is worse than no command.

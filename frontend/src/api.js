@@ -47,6 +47,11 @@ const post = (path, body) => fetch(path, { method: "POST", headers: { "Content-T
 // First-run setup (Phase 8): the reader's FRAME — country, currency, starting watchlist — without
 // which relevance cannot rank. Named for the frame rather than for "onboarding", because
 // `fetchOnboarding` below is the older activation checklist and two of those would shadow.
+// Verification and reset. The token travels in a POST body, never a URL — see mail.py.
+export const requestVerify = (email) => post("/api/auth/verify/request", { email });
+export const confirmEmail = (token) => post("/api/auth/verify/confirm", { token });
+export const requestReset = (email) => post("/api/auth/reset/request", { email });
+export const confirmReset = (token, password) => post("/api/auth/reset/confirm", { token, password });
 export const fetchFrameSetup = () => get("/api/profile/onboarding");
 export const saveFrameSetup = (body) => post("/api/profile/onboarding", body);
 export const snoozeFrameSetup = () => post("/api/profile/onboarding/skip", {});

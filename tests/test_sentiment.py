@@ -2,6 +2,8 @@
 honest provisional score when there's no baseline), mention-weighted sentiment (None when unmeasured),
 manipulation flags (single-source, bot-heavy), and the trending ranker's mention floor + ordering.
 No network, no database."""
+import pytest
+
 from tradeos import sentiment as S
 
 
@@ -76,3 +78,62 @@ def test_no_baseline_anywhere_means_no_velocity_claimed():
     obs = [{"source": "hn", "mentions": 25, "baseline": None, "sentiment": None}]
     out = S.score_symbol("NEW", "New Co", obs)
     assert out["velocity"] is None and out["is_new"] is True
+
+
+# ------------------------------------------------ share classes are one company (post-Phase 9)
+
+def _row(sym, source, mentions, baseline, ent, name="Alphabet Inc.", sent=None):
+    return (sym, source, mentions, baseline, sent, 0, name, ent)
+
+
+def test_dual_class_listings_are_one_board_row():
+    """Alphabet files as one issuer and trades as GOOG and GOOGL. Keyed by ticker it appeared on
+    the attention board twice with its attention split — and each half then measured against its
+    own baseline, so a real spike could miss the mention floor in both."""
+    g = S._group([_row("GOOG", "hn", 5, 10, 3), _row("GOOGL", "hn", 7, 14, 3)])
+    assert list(g) == ["GOOG"]
+    assert g["GOOG"]["share_classes"] == ["GOOG", "GOOGL"]
+
+
+def test_merged_mentions_and_baselines_both_add():
+    """Summing counts against a half baseline would manufacture a spike."""
+    g = S._group([_row("GOOG", "hn", 5, 10, 3), _row("GOOGL", "hn", 7, 14, 3)])
+    hn = next(o for o in g["GOOG"]["obs"] if o["source"] == "hn")
+    assert hn["mentions"] == 12 and hn["baseline"] == 24
+
+
+def test_a_ticker_with_no_entity_is_never_merged_into_another():
+    """An unresolved ticker has no company to belong to. Merging on name or prefix would put
+    unrelated issuers together, which is worse than a duplicate row."""
+    g = S._group([_row("GOOG", "hn", 5, 10, 3), _row("WEIRD", "hn", 3, 1, None, name=None)])
+    assert sorted(g) == ["GOOG", "WEIRD"]
+
+
+def test_the_displayed_ticker_is_deterministic():
+    """"Whichever class has more mentions today" would let a board row rename itself between
+    refreshes, which reads as a bug even when the number is right."""
+    assert S._primary(["GOOGL", "GOOG"]) == "GOOG"
+    assert S._primary(["FOXA", "FOX"]) == "FOX"
+    assert S._primary(["BRK.B", "BRK.A"]) == "BRK.A"
+    assert S._primary(["GOOG", "GOOGL"]) == S._primary(["GOOGL", "GOOG"])
+
+
+def test_the_merge_is_disclosed_rather_than_silent():
+    """A reader who searches GOOGL has to be able to see why the board says GOOG."""
+    g = S._group([_row("GOOG", "hn", 5, 10, 3), _row("GOOGL", "hn", 7, 14, 3)])
+    row = next(r for r in S.trending(g, min_mentions=1))
+    assert row["share_classes"] == ["GOOG", "GOOGL"]
+
+
+def test_a_single_class_name_carries_no_share_class_noise():
+    g = S._group([_row("NVDA", "hn", 9, 4, 77, name="NVIDIA")])
+    row = S.trending(g, min_mentions=1)[0]
+    assert "share_classes" not in row
+
+
+def test_sentiment_merges_weighted_by_mentions():
+    """The class carrying more of the conversation carries more of the mood."""
+    g = S._group([_row("GOOG", "reddit", 10, 5, 3, sent=1.0),
+                          _row("GOOGL", "reddit", 30, 15, 3, sent=0.0)])
+    o = next(x for x in g["GOOG"]["obs"] if x["source"] == "reddit")
+    assert o["sentiment"] == pytest.approx(0.25)     # (1.0*10 + 0.0*30) / 40

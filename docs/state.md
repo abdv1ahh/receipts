@@ -11,16 +11,17 @@ Updated: 2026-07-26. **All ten phases (0–9) are complete.**
 cd /path/to/receipts
 git checkout phase/6-sections          # all work lives here; not yet merged to main
 make dev                               # reload-in-place stack on :8000
-make test                              # 544 pass, <1s (17 need the local DB)
+make test                              # 564 pass, <1s (17 need the local DB)
 make lint                              # ruff, zero errors is the standard
 ```
 
 Demo login `demo@tradeos.app` / `<generated at seed time>`. Surfaces: `/radar` `/globe` `/ledger`
 `/exposure` `/crypto` `/news` `/brief` `/events` `/integrations` `/journal`.
 
-**Verified state at handoff:** 544 tests pass · 0 lint errors · 0 console errors on twelve
-surfaces incl. the marketing site, checked in a headless browser · migrations through 030 · 60
-tables · gitleaks clean over 53 commits · pip-audit and npm audit clean. The marketing site is at
+**Verified state at handoff:** 564 tests pass · 0 lint errors · 0 console errors on twelve
+surfaces incl. the marketing site, checked in a headless browser · migrations through **031**,
+applied cleanly to an EMPTY database and re-run as a no-op · 60 tables · gitleaks clean over 53
+commits · pip-audit and npm audit clean · the Ledger reads 40.8% of 282 (115 hit / 167 miss). The marketing site is at
 <http://localhost:8000/site/> after `cd site && npm install` then `make site`. `docs/deploy.md` is
 the deployment reference; `cli preflight` is its enforcer, and `docs/progress/phase_9.md` §"What is
 NOT fixed" is the honest security list.
@@ -55,16 +56,22 @@ Every phase has a report in `docs/progress/`.
 
 ## NEXT STEPS, in the order I would do them
 
-### 1. Before real users — the security gaps that are actually gaps
+### 1. Before real users
 
-From `docs/progress/phase_9.md` §"What is NOT fixed", in the order I would take them:
-- **Email verification and password reset.** A new account is usable with an unverified address and
-  a forgotten password is unrecoverable. Not in the brief, and the most likely thing to hurt a real
-  user first.
-- **Exercise Google sign-in against Google.** It is untested auth code until someone does.
+- ~~Email verification and password reset~~ **DONE 2026-07-26.** Hashed, single-use, expiring
+  tokens; identical responses so the endpoints cannot be used to test whether an address has an
+  account; the whole operation deferred off the request path so the response *time* cannot answer
+  it either; the token in the URL **fragment**, never a query string, so it cannot reach an access
+  log; a reset signs out every other session. Reachable from the login screen, and both screens
+  driven end to end in a browser.
+- ~~A backup schedule~~ **PARTLY DONE.** `scripts/backup.sh` exists, refuses to call a truncated
+  dump a backup, prunes on retention, and `--verify` restores into a scratch database. **Nobody has
+  installed the cron line**, which is the half that matters.
+- **Exercise Google sign-in against Google.** Still untested auth code until someone does.
+- **SMTP is not configured**, so verification and reset cannot actually send. The machinery is
+  built and tested; it needs a provider (`SMTP_HOST`, `MAIL_FROM`) and `preflight` says so.
 - **Run `/security-review` on the whole branch.** It has found a real vulnerability twice here,
   both times in code I had just written and believed was correct.
-- **A backup schedule**, before the dataset matters.
 
 ### 2. Deploy it
 
@@ -76,16 +83,18 @@ correct it in the same change that discovers a mistake.
 - **Phase 4 remainder**: saved filter sets, in-place threading of developing stories, subscribable
   alerts.
 - ~~GDELT has never been observed ingesting.~~ **RESOLVED 2026-07-25** — it came back after the
-  backoff elapsed. 4 events in the store and gdelt-sourced claims are now on the Radar and in the
-  site's hero. The count is small; watch whether it keeps flowing rather than assuming it will.
+  backoff elapsed and it has kept flowing — **22 events** as of 2026-07-26, up from 4 the day
+  before, with gdelt-sourced claims on the Radar and in the marketing site's hero.
 - **Bluesky** as a real `SocialSource` — the interface exists, the implementation does not.
 - **`/code-review` has never been run** on any phase diff. `/simplify` and `/security-review` were
   run on the Phase 6 diff.
-- **No email verification and no password reset.** A new account is usable immediately with an
-  unverified address. Not in the brief's Phase 8 list, so recorded rather than silently added.
+
 - **Google sign-in has never been exercised against Google** — no credentials. Validation logic is
   tested; the handshake is not.
-- **`GOOG`/`GOOGL` render as two board rows** for one company; needs share-class collapsing.
+- ~~`GOOG`/`GOOGL` render as two board rows~~ **FIXED 2026-07-26.** The attention board groups by
+  company (entity), not ticker: mentions and baselines merge, sentiment merges mention-weighted,
+  the displayed ticker is deterministic (shortest then alphabetical, so GOOG/FOX/BRK.A), the merge
+  is disclosed rather than silent, and an unresolved ticker is never merged into anything.
 
 ---
 

@@ -94,6 +94,17 @@ CATALOG: list[dict] = [
         "note": "Free Data API quota is small; used sparingly.", "feeds": [], "jobs": [],
     },
     {
+        "key": "smtp", "label": "Outbound email (SMTP)", "kind": "auth",
+        "powers": "email verification and password reset — without it a forgotten password is "
+                  "unrecoverable",
+        "state": None, "env": ["SMTP_HOST", "MAIL_FROM"],
+        "signup_url": "https://resend.com",
+        "note": "Any SMTP provider. Two transactional messages is well inside every free tier. "
+                "Unconfigured, the app refuses to send rather than half-working — it will not "
+                "silently drop a reset link.",
+        "feeds": [], "jobs": [],
+    },
+    {
         "key": "google_oauth", "label": "Google Sign-In", "kind": "auth",
         "powers": "signing in without a password",
         "state": None, "env": ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"],

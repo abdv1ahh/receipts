@@ -1,6 +1,7 @@
 // Deep-dive, screener, and profile surfaces. Every figure carries its freshness; a filer is
 // a link into its profile; nothing evaluates a user's position (the advice line).
 import { useEffect, useState } from "react";
+import { ForgotPassword } from "./account.jsx";
 import { addFollow, addWatchlist, analyzeChartImage, authLogin, authRegister, extractTickers, fetchActivity, fetchAsset, fetchExplanation, fetchInsider, fetchInstitution, fetchLibrary, fetchLibraryEntry, fetchScreener, fetchWatchlist, removeWatchlist } from "./api";
 import { Backtested, Disclaimer, Freshness } from "./components.jsx";
 import { Icon } from "./icons.jsx";
@@ -326,6 +327,7 @@ export function WatchlistView({ onOpenSymbol, onLogin }) {
 }
 
 export function AuthPanel({ onAuthed, onBack, initialInvite }) {
+  const [forgot, setForgot] = useState(false);
   const [mode, setMode] = useState(initialInvite ? "register" : "login");
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
@@ -354,6 +356,12 @@ export function AuthPanel({ onAuthed, onBack, initialInvite }) {
         <button className="linkish" onClick={() => { setMode(mode === "login" ? "register" : "login"); setErr(null); }}>
           {mode === "login" ? "have an invite? create an account" : "already have an account? log in"}
         </button>
+        {/* Without this, a forgotten password was unrecoverable from the interface: the reset API
+            existed but nothing on the login screen pointed at it. */}
+        {mode === "login" && !forgot && (
+          <button className="linkish" onClick={() => setForgot(true)}>forgot your password?</button>
+        )}
+        {mode === "login" && forgot && <ForgotPassword onBack={() => setForgot(false)} />}
       </div>
       <Disclaimer />
     </div>

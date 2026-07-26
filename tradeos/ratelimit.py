@@ -37,6 +37,11 @@ LIMITS: dict[str, tuple[int, int]] = {
     "public": (120, 60),      # the whole unauthenticated surface, per client, per minute
     "model": (20, 300),       # any route that may spend model quota, per client, per 5 minutes
     "upload": (30, 3600),     # image uploads, per client, per hour
+    # Verification and reset. Tight, because these send mail to a third party and because a token
+    # guess is cheap: 32 bytes of entropy makes brute force hopeless anyway, but there is no reason
+    # to host the attempt. Per-address limiting also lives in `authn`, which this does not replace
+    # — a client can rotate its IP, and an inbox cannot rotate itself.
+    "auth_token": (10, 900),
 }
 
 _buckets: dict[tuple[str, str], list[float]] = {}

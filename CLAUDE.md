@@ -69,7 +69,7 @@ The app is at <http://localhost:8000>. Demo login: `demo@tradeos.app` / `<genera
 ### Tests
 
 ```bash
-make test     # 544 tests, <1s. Offline except 17 authz tests that need the local DB
+make test     # 564 tests, <1s. Offline except 17 authz tests that need the local DB
 make lint     # ruff; zero errors is the standard
 make dev      # reload-in-place stack; then `make web` for a UI change
 make fix      # ruff --fix
@@ -98,13 +98,17 @@ gitignored.
 docker compose exec -T api python -m tradeos.cli <command>
 ```
 
-Commands: `migrate`, `sync-tickers`, `resolve-entities`, `resolve-cusips`,
-`signals-register`, `compute-signals`, `ingest-prices`, `ingest-short-interest`,
-`ingest-sentiment`, `ingest-news`, `analyze-news`, `ingest-calendar`, `scheduler`,
-`run-backtest`, `calibration`, `sync-library`, `generate-alerts`, `seed-admin`, `seed-demo`,
-`create-invites`, `status`, `preflight`,
-`spine`, `reprocess`, `seed-watchlist`, `seed-exposure`, `interpret`, `measure-claims`,
-`ledger`, `import-signals`, `capture-context`.
+All 37, checked against `--help` rather than remembered:
+
+`migrate`, `preflight`, `status` · **SEC ingestion** `ingest-form4`, `ingest-13dg`, `ingest-13f`
+`backfill-form4`, `backfill-13dg`, `backfill-13f` (`--from`/`--to` over a date range; weekends skipped, holidays 404 and
+are logged past) · **resolution** `sync-tickers`, `resolve-entities`, `resolve-cusips` ·
+**signals** `signals-register`, `compute-signals`, `run-backtest`, `calibration` ·
+**other ingestion** `ingest-prices`, `ingest-short-interest`, `ingest-sentiment`, `ingest-news`,
+`analyze-news`, `ingest-calendar` · **spine and claims** `spine`, `reprocess`, `interpret`,
+`measure-claims`, `ledger`, `import-signals` · **seeds** `seed-admin`, `seed-demo`,
+`seed-watchlist`, `seed-exposure`, `sync-library`, `create-invites` ·
+**operations** `scheduler`, `generate-alerts`, `capture-context`.
 
 `status` prints per-feed freshness. `preflight` checks production config, including every link in
 the `EXPLAIN_PROVIDER` chain.
@@ -125,7 +129,7 @@ docker compose exec -T db psql -U tradeos -d tradeos             # interactive
 
 ```
 tradeos/                  the Python package (all backend code)
-  app.py                  FastAPI app: ~110 routes, ~2700 lines. The one big file.
+  app.py                  FastAPI app: 123 routes, ~3010 lines. The one big file.
   db.py                   psycopg connect() + ordered .sql migration runner
   config.py               env accessors; raises ConfigError rather than defaulting secrets
   llm.py                  ONE transport for every model call: provider CHAIN + per-provider
@@ -147,6 +151,7 @@ tradeos/                  the Python package (all backend code)
   relevance.py            personal ranking + the reader frame + country exposure data. No model.
   public_site.py          the ONLY unauthenticated surface: what a stranger or a crawler can read.
   onboarding.py           first-run frame capture. Gates nothing — a skip costs the reader nothing.
+  mail.py                 the ONE outbound-email path. Refuses to send unconfigured, never half-sends.
   ratelimit.py            sliding-window limits on the public + model paths. IN-PROCESS; see docstring.
   oauth.py                Sign in with Google. Built, config-gated, NEVER RUN against Google.
   journal_context.py      the Radar frozen at trade time; the coach's process patterns. No model.
@@ -156,7 +161,7 @@ tradeos/                  the Python package (all backend code)
   assistant_tools.py      six READ-ONLY tools; a security boundary, not a convenience layer.
   smartmoney_claims.py    convergence signals expressed as scoreable claims.
   watchlist_accounts.py   the consequential-accounts influence list.
-  migrations/             001..030 ordered .sql; NEVER edit an applied migration, and every
+  migrations/             001..031 ordered .sql; NEVER edit an applied migration, and every
                           file MUST insert its own schema_migrations row
   (surface modules)       dashboard, brief, news, social, sentiment, crypto, events,
                           trades, insights, portfolio, community, alerts, admin,

@@ -280,6 +280,15 @@ def cmd_preflight(_args) -> None:
     if os.environ.get("DEV_ORIGINS", "").strip():
         problems.append("DEV_ORIGINS is set — it widens the CSRF origin check and is development-only. "
                         "Clear it in production.")
+    # Mail. Unconfigured means a forgotten password is unrecoverable, which is a warning; the dev
+    # echo being on in production is a capability leak into the logs, which is a problem.
+    if not (os.environ.get("SMTP_HOST") and os.environ.get("MAIL_FROM")):
+        warnings.append("SMTP_HOST/MAIL_FROM are empty — email verification and password reset "
+                        "cannot send, so a forgotten password is unrecoverable.")
+    if os.environ.get("MAIL_DEV_ECHO", "").strip().lower() in ("1", "true", "yes"):
+        problems.append("MAIL_DEV_ECHO is on — verification and password-reset LINKS are written to "
+                        "the server log. Development only; clear it.")
+
     # Half-configured OAuth is worse than none: the button appears and the callback fails.
     gid, gsecret = os.environ.get("GOOGLE_CLIENT_ID"), os.environ.get("GOOGLE_CLIENT_SECRET")
     if bool(gid) != bool(gsecret):

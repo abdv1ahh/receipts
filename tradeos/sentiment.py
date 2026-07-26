@@ -85,7 +85,15 @@ def score_symbol(symbol, name, obs) -> dict:
 def trending(grouped, min_mentions=MIN_MENTIONS, limit=25) -> list[dict]:
     """Rank symbols by attention, keeping only those above the mention floor. `grouped` is
     {symbol: {"name": .., "obs": [..]}} — the pure ranking core the DB layer feeds."""
-    scored = [score_symbol(s, g.get("name"), g["obs"]) for s, g in grouped.items()]
+    scored = []
+    for sym, g in grouped.items():
+        row = score_symbol(sym, g.get("name"), g["obs"])
+        classes = g.get("share_classes") or [sym]
+        if len(classes) > 1:
+            # Named, not hidden: a reader who searches GOOGL must be able to see why the board says
+            # GOOG, and the merged count only makes sense once you know what was merged.
+            row["share_classes"] = classes
+        scored.append(row)
     scored = [x for x in scored if x["mentions"] >= min_mentions]
     scored.sort(key=lambda x: (x["attention"], x["mentions"]), reverse=True)
     return scored[:limit]
@@ -158,12 +166,56 @@ def tracked_symbols(conn: psycopg.Connection, limit=80) -> list[tuple]:
     return rows[:limit]
 
 
+def _primary(symbols: list[str]) -> str:
+    """The ticker to display for a company with several share classes.
+
+    Shortest, then alphabetical: GOOG over GOOGL, FOX over FOXA, BRK.A over BRK.B. Deterministic on
+    purpose — the obvious alternative, "whichever class has more mentions today", would let a board
+    row rename itself between refreshes, which reads as a bug even when the number is right."""
+    return sorted(symbols, key=lambda s: (len(s), s))[0]
+
+
 def _group(rows) -> dict:
+    """Group observations by COMPANY, not by ticker.
+
+    Alphabet files as one issuer and trades as GOOG and GOOGL, so keying on the symbol put it on
+    the attention board twice with its attention split between the rows — each half then measured
+    against its own baseline, so a genuine spike could miss the mention floor in both. Same for
+    FOX/FOXA and every dual-class listing.
+
+    `entity_id` is the company; it is already resolved on the observation. Rows without one (a
+    ticker the resolver has not mapped) fall back to the symbol, which is the old behaviour and
+    correct for them — an unmapped ticker has no company to be merged into.
+    """
+    by_company: dict = {}
+    for symbol, source, mentions, baseline, sentiment, bots, name, entity_id in rows:
+        key = ("e", entity_id) if entity_id is not None else ("s", symbol)
+        g = by_company.setdefault(key, {"name": name, "symbols": [], "by_source": {}})
+        if symbol not in g["symbols"]:
+            g["symbols"].append(symbol)
+        g["name"] = g["name"] or name
+        # Merge per source: attention on Alphabet is attention on Alphabet, whichever class carried
+        # the mention. Baselines add too, or a summed count would be compared against half a base.
+        o = g["by_source"].setdefault(source, {"source": source, "mentions": 0, "baseline": None,
+                                               "sentiment": None, "bots_filtered": 0})
+        o["mentions"] += mentions or 0
+        if baseline is not None:
+            o["baseline"] = (o["baseline"] or 0) + baseline
+        if sentiment is not None:
+            # Mention-weighted, so the bigger class carries proportionally more of the mood.
+            prior_w = o.get("_sw", 0)
+            o["_sw"] = prior_w + (mentions or 0)
+            o["sentiment"] = (((o["sentiment"] or 0) * prior_w) + sentiment * (mentions or 0)) / (o["_sw"] or 1)
+        o["bots_filtered"] = (o["bots_filtered"] or 0) + (bots or 0)
+
     grouped: dict = {}
-    for symbol, source, mentions, baseline, sentiment, bots, name in rows:
-        g = grouped.setdefault(symbol, {"name": name, "obs": []})
-        g["obs"].append({"source": source, "mentions": mentions, "baseline": baseline,
-                         "sentiment": sentiment, "bots_filtered": bots})
+    for g in by_company.values():
+        display = _primary(g["symbols"])
+        obs = [{k: v for k, v in o.items() if not k.startswith("_")} for o in g["by_source"].values()]
+        grouped[display] = {"name": g["name"], "obs": obs,
+                            # Every ticker folded in, so the interface can say so rather than
+                            # silently dropping one.
+                            "share_classes": sorted(g["symbols"])}
     return grouped
 
 
@@ -171,7 +223,8 @@ def _group(rows) -> dict:
 # snapshot of the same measure on every run, so taking more than the latest one double-counts.
 _BOARD_SQL = """
     SELECT DISTINCT ON (o.symbol, o.source)
-           o.symbol, o.source, o.mentions, o.baseline, o.sentiment, o.bots_filtered, e.name
+           o.symbol, o.source, o.mentions, o.baseline, o.sentiment, o.bots_filtered, e.name,
+           o.entity_id
       FROM sentiment_observations o
       LEFT JOIN entities e ON e.id = o.entity_id
      WHERE o.window_end >= now() - make_interval(hours => %s)
@@ -196,4 +249,15 @@ def symbol_sentiment(conn: psycopg.Connection, symbol, hours=168) -> dict | None
     rows = _board_rows(conn, hours, symbol)
     if not rows:
         return None
-    return score_symbol(symbol, rows[0][6], _group(rows)[symbol]["obs"])
+    # `_group` keys by the DISPLAY ticker of the company, which for GOOGL is GOOG — so indexing by
+    # the requested symbol would KeyError on every non-primary share class. Find the group that
+    # actually contains it, and answer under the symbol that was asked for.
+    grouped = _group(rows)
+    g = grouped.get(symbol) or next(
+        (v for v in grouped.values() if symbol in (v.get("share_classes") or [])), None)
+    if not g:
+        return None
+    out = score_symbol(symbol, g.get("name") or rows[0][6], g["obs"])
+    if len(g.get("share_classes") or []) > 1:
+        out["share_classes"] = g["share_classes"]
+    return out
