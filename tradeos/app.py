@@ -21,6 +21,7 @@ from pathlib import Path
 from fastapi import Cookie, FastAPI, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from psycopg import sql
 from psycopg.types.json import Json
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -47,6 +48,7 @@ from . import (
     portfolio,
     presentation,
     public_site,
+    ratelimit,
     relevance,
     search,
     sentiment,
@@ -261,11 +263,30 @@ def _image_path(key: str | None) -> Path | None:
     return UPLOADS_DIR / key if key and _IMG_KEY.fullmatch(key) else None
 
 
+# A chart screenshot is a PNG, a JPEG, a WebP or a GIF. Nothing else needs to be decodable.
+#
+# Pillow ships decoders for PSD, FITS, PCF, BDF and a long tail of others, and several of those
+# have a history of memory-safety bugs — the version this repo pinned until Phase 9 had a
+# known out-of-bounds write and a memory-corruption issue, both reachable by uploading a crafted
+# PSD, because `Image.open` sniffs the format from the bytes and the caller never said which
+# formats it wanted. Upgrading fixes the known ones; refusing to decode formats the product has no
+# use for is what keeps the next one out of reach.
+_ALLOWED_IMAGE_FORMATS = {"PNG", "JPEG", "WEBP", "GIF"}
+
+
 def _store_image(body: bytes) -> str:
     """Re-encode an upload to a normalized PNG under an opaque key: strips EXIF/metadata and
     neutralizes any non-image payload (polyglots); a pixel cap bounds decompression bombs."""
     from PIL import Image
     Image.MAX_IMAGE_PIXELS = 40_000_000
+
+    # Order matters. `Image.open` reads only the header, so the format can be checked BEFORE
+    # anything calls a decoder — `verify()` and `convert()` below both decode. Checking afterwards
+    # would mean the vulnerable path had already run.
+    probe = Image.open(BytesIO(body))
+    if probe.format not in _ALLOWED_IMAGE_FORMATS:
+        raise ValueError(f"unsupported image format: {probe.format}")
+
     Image.open(BytesIO(body)).verify()             # reject truncated / lying files
     im = Image.open(BytesIO(body)).convert("RGB")  # re-open (verify consumed it); drop alpha/EXIF
     im.thumbnail((2000, 2000))
@@ -299,6 +320,24 @@ def _origin_ok(origin: str, host: str | None) -> bool:
     return urlparse(origin).netloc == host or origin in _DEV_ORIGINS
 
 
+# Paths a stranger can reach without a session. Everything else is behind authentication, which
+# is its own limit — an attacker without an account cannot spend an account's allowance.
+_PUBLIC_PREFIXES = ("/api/public/", "/api/ledger")
+# Routes that may spend model quota. Gemini's free daily allowance is shared by every user, so one
+# script exhausting it silences the AI surfaces for everybody until midnight UTC.
+_MODEL_PATHS = ("/api/assistant", "/api/analyze-chart", "/api/extract-tickers")
+
+
+def _limit_bucket(path: str) -> str | None:
+    if path.startswith(_PUBLIC_PREFIXES):
+        return "public"
+    if path.startswith(_MODEL_PATHS):
+        return "model"
+    if path.endswith("/image") or path.endswith("/chart-analysis"):
+        return "upload"
+    return None
+
+
 @app.middleware("http")
 async def harden(request: Request, call_next):
     # CSRF: refuse a cross-origin state-changing request (belt-and-braces with SameSite=Lax)
@@ -306,6 +345,16 @@ async def harden(request: Request, call_next):
         origin = request.headers.get("origin")
         if origin and not _origin_ok(origin, request.headers.get("host")):
             return JSONResponse({"error": "cross-origin request refused"}, status_code=403)
+
+    # Rate limiting, before any work is done. `ratelimit` is in-process and says so — see its
+    # docstring for what that does and does not buy.
+    bucket = _limit_bucket(request.url.path)
+    if bucket:
+        ok, retry = ratelimit.check(bucket, ratelimit.client_key(request))
+        if not ok:
+            return JSONResponse(
+                {"error": "too many requests", "retry_after_seconds": retry},
+                status_code=429, headers={"Retry-After": str(retry)})
     # One id per request, echoed to the client and stamped on every log line for it, so a failure
     # the user reports can be traced end to end. Never derived from user input.
     rid = secrets.token_hex(8)
@@ -1399,6 +1448,11 @@ _TRADE_COLS = ("id", "user_id", "symbol", "entity_id", "asset_class", "direction
                "timeframe", "strategy", "reason_entry", "reason_exit", "confidence",
                "expected_outcome", "opened_on", "closed_on", "image_path", "is_public",
                "created_at", "updated_at")
+# Composed once with psycopg.sql rather than joined into an f-string. The values in _TRADE_COLS
+# are fixed internal identifiers and were never attacker-controlled, but "safe because I read it"
+# is exactly the guarantee that decays — Identifier() makes it structural, and it is what lets
+# ruff's S608 stay ON so a future f-string here is a lint failure rather than a review question.
+_TRADE_COL_SQL = sql.SQL(", ").join(sql.Identifier(c) for c in _TRADE_COLS)
 _ASSET = {"equity", "crypto", "forex", "option", "future", "other"}
 _DIR = {"long", "short"}
 _STATUS = {"planned", "open", "closed"}
@@ -1459,7 +1513,7 @@ def _trade_to_dict(row) -> dict:
 
 
 def _load_trade(cur, tid: int):
-    cur.execute(f"SELECT {', '.join(_TRADE_COLS)} FROM trades WHERE id=%s", (tid,))
+    cur.execute(sql.SQL("SELECT {cols} FROM trades WHERE id=%s").format(cols=_TRADE_COL_SQL), (tid,))
     return cur.fetchone()
 
 
@@ -1476,9 +1530,11 @@ def trade_create(req: TradeReq, response: Response, tos_session: str | None = Co
             response.status_code = 403
             return {"error": f"Your plan allows {max_t} journal entries. Upgrade for more.", "upgrade": True}
         f = _sanitize_trade(req, cur)
-        cols = ", ".join(f.keys())
-        cur.execute(f"INSERT INTO trades (user_id, {cols}) VALUES (%s, {', '.join(['%s'] * len(f))}) RETURNING id",
-                    (user["id"], *f.values()))
+        cur.execute(
+            sql.SQL("INSERT INTO trades (user_id, {cols}) VALUES (%s, {vals}) RETURNING id").format(
+                cols=sql.SQL(", ").join(sql.Identifier(k) for k in f),
+                vals=sql.SQL(", ").join(sql.Placeholder() * len(f))),
+            (user["id"], *f.values()))
         tid = cur.fetchone()[0]
         conn.commit()
 
@@ -1505,13 +1561,15 @@ def trades_list(user_id: int | None = None, tos_session: str | None = Cookie(Non
     with db.connect() as conn, conn.cursor() as cur:
         me = authn.session_user(conn, tos_session)
         if user_id is not None:
-            cur.execute(f"SELECT {', '.join(_TRADE_COLS)} FROM trades WHERE user_id=%s AND is_public "
-                        f"ORDER BY created_at DESC LIMIT 200", (user_id,))
+            cur.execute(sql.SQL("SELECT {cols} FROM trades WHERE user_id=%s AND is_public "
+                                "ORDER BY created_at DESC LIMIT 200").format(cols=_TRADE_COL_SQL),
+                        (user_id,))
             return {"scope": "public", "trades": [_trade_to_dict(r) for r in cur.fetchall()]}
         if not me:
             return {"authenticated": False, "trades": []}
-        cur.execute(f"SELECT {', '.join(_TRADE_COLS)} FROM trades WHERE user_id=%s "
-                    f"ORDER BY created_at DESC LIMIT 500", (me["id"],))
+        cur.execute(sql.SQL("SELECT {cols} FROM trades WHERE user_id=%s "
+                            "ORDER BY created_at DESC LIMIT 500").format(cols=_TRADE_COL_SQL),
+                    (me["id"],))
         return {"authenticated": True, "trades": [_trade_to_dict(r) for r in cur.fetchall()]}
 
 
@@ -1552,8 +1610,11 @@ def trade_update(tid: int, req: TradeReq, response: Response, tos_session: str |
             response.status_code = 404
             return {"error": "trade not found"}
         f = _sanitize_trade(req, cur)
-        cur.execute(f"UPDATE trades SET {', '.join(k + '=%s' for k in f)}, updated_at=now() "
-                    f"WHERE id=%s AND user_id=%s", (*f.values(), tid, user["id"]))
+        cur.execute(
+            sql.SQL("UPDATE trades SET {sets}, updated_at=now() WHERE id=%s AND user_id=%s").format(
+                sets=sql.SQL(", ").join(
+                    sql.SQL("{} = {}").format(sql.Identifier(k), sql.Placeholder()) for k in f)),
+            (*f.values(), tid, user["id"]))
         cur.execute("DELETE FROM trade_analyses WHERE trade_id=%s", (tid,))  # inputs changed -> stale
         conn.commit()
     return {"updated": True}
@@ -1685,7 +1746,8 @@ def performance(tos_session: str | None = Cookie(None)) -> dict:
         user = authn.session_user(conn, tos_session)
         if not user:
             return {"authenticated": False}
-        cur.execute(f"SELECT {', '.join(_TRADE_COLS)} FROM trades WHERE user_id=%s", (user["id"],))
+        cur.execute(sql.SQL("SELECT {cols} FROM trades WHERE user_id=%s").format(cols=_TRADE_COL_SQL),
+                    (user["id"],))
         rows = [_trade_to_dict(r) for r in cur.fetchall()]
     return {"authenticated": True, "summary": trades.summarize_performance(rows), "total": len(rows)}
 
@@ -1866,8 +1928,9 @@ def user_profile(handle: str, tos_session: str | None = Cookie(None)) -> dict:
         prof = community.public_profile(conn, handle.lower(), viewer["id"] if viewer else None)
         if prof.get("found"):
             with conn.cursor() as cur:
-                cur.execute(f"SELECT {', '.join(_TRADE_COLS)} FROM trades WHERE user_id=%s AND is_public "
-                            f"AND hidden=false ORDER BY created_at DESC LIMIT 100", (prof["id"],))
+                cur.execute(sql.SQL("SELECT {cols} FROM trades WHERE user_id=%s AND is_public "
+                                    "AND hidden=false ORDER BY created_at DESC LIMIT 100"
+                                    ).format(cols=_TRADE_COL_SQL), (prof["id"],))
                 prof["trades"] = [_trade_to_dict(r) for r in cur.fetchall()]
     return prof
 

@@ -19,6 +19,8 @@ import logging
 import os
 from datetime import UTC, date, datetime, time, timedelta
 
+from psycopg import sql
+
 from . import alerts, authn, db
 from .backtest import run as backtest
 from .config import sec_user_agent
@@ -519,8 +521,8 @@ def cmd_seed_demo(_args) -> None:
                 print(f"demo account {email} already exists; not modified")
                 return
             uid = row[0]
-            eid = ("(SELECT entity_id FROM security_map WHERE symbol=%s AND source='sec_company_tickers' "
-                   "ORDER BY confidence DESC LIMIT 1)")
+            eid = sql.SQL("(SELECT entity_id FROM security_map WHERE symbol=%s "
+                          "AND source='sec_company_tickers' ORDER BY confidence DESC LIMIT 1)")
             trades = [
                 ("NVDA", "long", "closed", 120, 138, 110, 145, 80, "breakout", True, "2026-06-02", "2026-06-20"),
                 ("MSFT", "long", "open", 410, None, 395, 465, 40, "pullback", True, "2026-06-25", None),
@@ -530,17 +532,19 @@ def cmd_seed_demo(_args) -> None:
             ]
             for (sym, d, st, e, ex, stp, tg, sz, strat, pub, op, cl) in trades:
                 cur.execute(
-                    f"""INSERT INTO trades (user_id, symbol, entity_id, asset_class, direction, status,
-                          entry_price, exit_price, stop_price, target_price, size, size_unit, strategy,
-                          is_public, opened_on, closed_on)
-                        VALUES (%s,%s,{eid},'equity',%s,%s,%s,%s,%s,%s,%s,'shares',%s,%s,%s,%s)""",
+                    sql.SQL("""INSERT INTO trades (user_id, symbol, entity_id, asset_class, direction,
+                                 status, entry_price, exit_price, stop_price, target_price, size,
+                                 size_unit, strategy, is_public, opened_on, closed_on)
+                               VALUES (%s,%s,{eid},'equity',%s,%s,%s,%s,%s,%s,%s,'shares',%s,%s,%s,%s)"""
+                            ).format(eid=eid),
                     (uid, sym, sym, d, st, e, ex, stp, tg, sz, strat, pub, op, cl),
                 )
             cur.execute("INSERT INTO portfolios (user_id, name, kind) VALUES (%s,'My shadows','manual') RETURNING id", (uid,))
             pid = cur.fetchone()[0]
             for sym, op in (("NVDA", "2026-06-02"), ("MSFT", "2026-06-25")):
-                cur.execute(f"INSERT INTO portfolio_positions (portfolio_id, symbol, entity_id, opened_on) "
-                            f"VALUES (%s,%s,{eid},%s)", (pid, sym, sym, op))
+                cur.execute(sql.SQL("INSERT INTO portfolio_positions (portfolio_id, symbol, "
+                                    "entity_id, opened_on) VALUES (%s,%s,{eid},%s)").format(eid=eid),
+                            (pid, sym, sym, op))
             for sym in ("NVDA", "MSFT", "AMD", "TSLA"):
                 cur.execute("INSERT INTO watchlists (user_key, symbol) VALUES ('demo',%s) ON CONFLICT DO NOTHING", (sym,))
             # follow a few names so the Morning Brief's "Your names" section is alive on first login

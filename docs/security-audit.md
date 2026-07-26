@@ -40,3 +40,37 @@ Remaining: **GHSA-67mh-4wv8-2f99** (esbuild ≤0.24.2, transitive via Vite 5).
 - [ ] Egress allowlist verified on the host (sec.gov, openfigi.com, finra.org, api.tiingo.com,
       generativelanguage.googleapis.com) — see README.
 - [ ] External penetration test; findings fixed, not filed (deferred registry).
+
+---
+
+# Re-run: 2026-07-26 (Phase 9)
+
+## Python (`pip-audit`) — CLEAN
+
+**Pillow 10.4.0 → 12.3.0.** Six advisories, and this was the one that mattered: Pillow decodes
+**user-uploaded chart screenshots**, which is the only place in the product where a stranger's bytes
+reach a parser. Two of the six were memory-safety issues in the PSD decoder — an out-of-bounds
+write (PYSEC-2026-2249) and a memory-corruption path (PYSEC-2026-2252) — both reachable by
+uploading a crafted PSD, because `Image.open` sniffs the format from the bytes and nothing said
+which formats the product actually wanted.
+
+Upgrading fixed the known ones. `_store_image` now also **refuses to decode any format outside
+{PNG, JPEG, WebP, GIF}**, checked against the header before anything calls a decoder, so the PSD,
+FITS, PCF and BDF paths are unreachable from an upload regardless of what is found in them next.
+
+**pip 25.0.1 → latest**, upgraded in the Dockerfile. Build-time only, and the container runs as a
+non-root user that never installs anything — but leaving a known-vulnerable tool in the image makes
+every future audit noisy enough to stop being read.
+
+Result: **no known vulnerabilities.**
+
+## Frontend and marketing site (`npm audit --omit=dev`) — CLEAN
+
+Both `frontend/` and `site/` report **0 vulnerabilities**. The esbuild/Vite dev-server advisory
+noted in the 2026-07-17 run no longer appears in the production dependency set.
+
+## Secrets (`gitleaks detect`, full history) — CLEAN
+
+Run for the first time on 2026-07-26 against all **53 commits** (2.44 MB scanned) via
+`zricethezav/gitleaks`. **No leaks found.** It was wired into CI in Phase 1 and had never actually
+been executed; it has now.

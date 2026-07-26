@@ -63,10 +63,13 @@ def _hash_token(token: str) -> str:
 
 def _create_session(cur, user_id: int, ip: str | None, ua: str | None) -> str:
     token = secrets.token_urlsafe(32)
+    # `make_interval` with a bound parameter rather than an interval literal built by f-string.
+    # SESSION_HOURS is a module constant and was never injectable, but a session lifetime is not
+    # somewhere to leave a string-built query, and this removes the question entirely.
     cur.execute(
-        f"""INSERT INTO sessions (user_id, token_hash, expires_at, ip, ua)
-            VALUES (%s, %s, now() + interval '{SESSION_HOURS} hours', %s, %s)""",
-        (user_id, _hash_token(token), ip, ua),
+        """INSERT INTO sessions (user_id, token_hash, expires_at, ip, ua)
+           VALUES (%s, %s, now() + make_interval(hours => %s), %s, %s)""",
+        (user_id, _hash_token(token), SESSION_HOURS, ip, ua),
     )
     return token
 

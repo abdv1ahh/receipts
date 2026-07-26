@@ -20,6 +20,7 @@ import os
 from datetime import date
 
 import psycopg
+from psycopg import sql
 from psycopg.types.json import Json
 
 from . import llm
@@ -208,10 +209,11 @@ def library_links(conn: psycopg.Connection, strategy, asset_class, limit=2):
     terms = [t for t in (strategy or "").lower().replace("/", " ").split() if len(t) > 3]
     if not terms:
         return []
-    where = " OR ".join(["title ILIKE %s"] * len(terms))
+    where = sql.SQL(" OR ").join(sql.SQL("title ILIKE {}").format(sql.Placeholder()) for _ in terms)
     with conn.cursor() as cur:
-        cur.execute(f"SELECT slug, title FROM library_entries WHERE kind='concept' AND ({where}) "
-                    f"ORDER BY created_at LIMIT %s", (*[f"%{t}%" for t in terms], limit))
+        cur.execute(sql.SQL("SELECT slug, title FROM library_entries WHERE kind='concept' "
+                            "AND ({where}) ORDER BY created_at LIMIT %s").format(where=where),
+                    (*[f"%{t}%" for t in terms], limit))
         return [{"slug": s, "title": t} for s, t in cur.fetchall()]
 
 

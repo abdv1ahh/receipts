@@ -17,6 +17,8 @@ from __future__ import annotations
 
 import logging
 
+from psycopg import sql
+
 log = logging.getLogger("tradeos.watchlist_accounts")
 
 # Seeded from institutions whose statements move markets and whose official channels publish
@@ -80,12 +82,12 @@ def seed(conn) -> dict:
 
 
 def listing(conn, active_only: bool = False) -> list[dict]:
-    where = "WHERE active" if active_only else ""
+    where = sql.SQL("WHERE active") if active_only else sql.SQL("")
     with conn.cursor() as cur:
-        cur.execute(f"""SELECT id, platform, handle, display_name, role, domain, country,
-                               influence, feed_url, active, note
-                          FROM watchlist_accounts {where}
-                         ORDER BY influence DESC, display_name""")
+        cur.execute(sql.SQL("""SELECT id, platform, handle, display_name, role, domain, country,
+                                      influence, feed_url, active, note
+                                 FROM watchlist_accounts {where}
+                                ORDER BY influence DESC, display_name""").format(where=where))
         cols = ("id", "platform", "handle", "display_name", "role", "domain", "country",
                 "influence", "feed_url", "active", "note")
         return [dict(zip(cols, r, strict=True)) for r in cur.fetchall()]

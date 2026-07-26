@@ -19,6 +19,7 @@ import os
 import re
 
 import psycopg
+from psycopg import sql
 
 from . import llm, sentiment, trades
 from .explain.guards import allowed_numbers, directive_guard, numbers_guard
@@ -187,9 +188,12 @@ def _library_matches(cur, question, limit=2):
     terms = [t for t in re.sub(r"[^a-z ]", " ", question.lower()).split() if len(t) > 4]
     if not terms:
         return []
-    where = " OR ".join(["title ILIKE %s"] * len(terms))
-    cur.execute(f"SELECT slug, title, body_md FROM library_entries WHERE ({where}) "
-                f"ORDER BY created_at LIMIT %s", (*[f"%{t}%" for t in terms], limit))
+    # One placeholder per term, composed. The terms themselves are still bound values — the only
+    # thing being built is the number of OR branches.
+    where = sql.SQL(" OR ").join(sql.SQL("title ILIKE {}").format(sql.Placeholder()) for _ in terms)
+    cur.execute(sql.SQL("SELECT slug, title, body_md FROM library_entries WHERE ({where}) "
+                        "ORDER BY created_at LIMIT %s").format(where=where),
+                (*[f"%{t}%" for t in terms], limit))
     # include a body excerpt so the assistant can actually explain the concept, not just name it
     return [{"slug": s, "title": t, "excerpt": " ".join((b or "").split())[:600]}
             for s, t, b in cur.fetchall()]

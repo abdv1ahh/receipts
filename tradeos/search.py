@@ -6,6 +6,7 @@ escaped so a stray '%' can't turn into a match-all.
 from __future__ import annotations
 
 import psycopg
+from psycopg import sql
 
 
 def clean_query(q):
@@ -21,12 +22,15 @@ def search(conn: psycopg.Connection, q, limit=6) -> dict:
         return empty
     like, pre = f"%{ql}%", f"{ql}%"
     out: dict = {}
-    _issuer = ("FROM security_map m JOIN entities e ON e.id=m.entity_id "
-               "WHERE e.kind='issuer' AND m.source='sec_company_tickers'")
+    # A composed fragment rather than an interpolated string: identical SQL, but the type now says
+    # "this is SQL", so a value can never be substituted here by mistake.
+    _issuer = sql.SQL("FROM security_map m JOIN entities e ON e.id=m.entity_id "
+                      "WHERE e.kind='issuer' AND m.source='sec_company_tickers'")
     with conn.cursor() as cur:
         # symbol-prefix matches first (NV -> NVDA), shortest ticker first; then fill with name matches
-        cur.execute(f"SELECT DISTINCT ON (m.symbol) m.symbol, e.name, m.entity_id {_issuer} "
-                    f"AND m.symbol ILIKE %s ORDER BY m.symbol LIMIT %s", (pre, limit * 3))
+        cur.execute(sql.SQL("SELECT DISTINCT ON (m.symbol) m.symbol, e.name, m.entity_id {issuer} "
+                            "AND m.symbol ILIKE %s ORDER BY m.symbol LIMIT %s").format(issuer=_issuer),
+                    (pre, limit * 3))
         pref = sorted(cur.fetchall(), key=lambda r: (len(r[0]), r[0]))
         seen, syms = set(), []
         for s, n, e in pref:
@@ -34,8 +38,9 @@ def search(conn: psycopg.Connection, q, limit=6) -> dict:
                 seen.add(s)
                 syms.append({"symbol": s, "name": n, "entity_id": e})
         if len(syms) < limit:
-            cur.execute(f"SELECT DISTINCT ON (m.symbol) m.symbol, e.name, m.entity_id {_issuer} "
-                        f"AND e.name ILIKE %s ORDER BY m.symbol LIMIT %s", (like, limit))
+            cur.execute(sql.SQL("SELECT DISTINCT ON (m.symbol) m.symbol, e.name, m.entity_id "
+                                "{issuer} AND e.name ILIKE %s ORDER BY m.symbol "
+                                "LIMIT %s").format(issuer=_issuer), (like, limit))
             for s, n, e in cur.fetchall():
                 if s not in seen and len(syms) < limit:
                     seen.add(s)

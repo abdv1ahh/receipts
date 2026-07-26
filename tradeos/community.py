@@ -13,6 +13,7 @@ from __future__ import annotations
 import re
 
 import psycopg
+from psycopg import sql
 
 from . import trades
 
@@ -132,12 +133,14 @@ def public_feed(conn: psycopg.Connection, viewer_id=None, scope="public", before
         args.append(before_id)
     with conn.cursor() as cur:
         cur.execute(
-            f"""SELECT t.id, t.symbol, t.direction, t.status, t.entry_price, t.exit_price, t.stop_price,
+            sql.SQL("""SELECT t.id, t.symbol, t.direction, t.status, t.entry_price, t.exit_price, t.stop_price,
                        t.target_price, t.strategy, t.asset_class, t.image_path, t.created_at, u.handle,
                    COALESCE((SELECT count(*) FROM trade_reactions r WHERE r.trade_id=t.id AND r.kind='like'),0),
                    COALESCE((SELECT count(*) FROM trade_comments c WHERE c.trade_id=t.id AND NOT c.hidden),0)
                 FROM trades t JOIN users u ON u.id=t.user_id
-                WHERE {' AND '.join(conds)} ORDER BY t.id DESC LIMIT %s""", (*args, limit))
+                WHERE {conds} ORDER BY t.id DESC LIMIT %s""").format(
+                conds=sql.SQL(" AND ").join(sql.SQL(c) for c in conds)),
+            (*args, limit))
         rows = cur.fetchall()
     out = []
     for (tid, sym, d, status, entry, exit_, stop, target, strat, asset, img, created, handle, likes, comments) in rows:
@@ -248,8 +251,8 @@ def report(conn: psycopg.Connection, reporter_id, target_type, target_id, reason
         n = cur.fetchone()[0]
         hidden = n >= REPORTS_TO_HIDE
         if hidden:                              # auto-hide pending review (Slice K console)
-            tbl = "trades" if target_type == "trade" else "trade_comments"
-            cur.execute(f"UPDATE {tbl} SET hidden=true WHERE id=%s", (target_id,))
+            tbl = sql.Identifier("trades" if target_type == "trade" else "trade_comments")
+            cur.execute(sql.SQL("UPDATE {} SET hidden=true WHERE id=%s").format(tbl), (target_id,))
         conn.commit()
     return {"ok": True, "reports": n, "hidden": hidden}
 

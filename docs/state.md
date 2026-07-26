@@ -1,6 +1,6 @@
 # docs/state.md — where the work stands
 
-Updated: 2026-07-26, **Phases 6, 7 and 8 complete**.
+Updated: 2026-07-26. **All ten phases (0–9) are complete.**
 **Read this after `CLAUDE.md` and before `docs/plan.md` at the start of every session.**
 
 ---
@@ -11,17 +11,19 @@ Updated: 2026-07-26, **Phases 6, 7 and 8 complete**.
 cd /path/to/receipts
 git checkout phase/6-sections          # all work lives here; not yet merged to main
 make dev                               # reload-in-place stack on :8000
-make test                              # 527 pass, ~0.5s, offline
+make test                              # 544 pass, <1s (17 need the local DB)
 make lint                              # ruff, zero errors is the standard
 ```
 
 Demo login `demo@tradeos.app` / `<generated at seed time>`. Surfaces: `/radar` `/globe` `/ledger`
 `/exposure` `/crypto` `/news` `/brief` `/events` `/integrations` `/journal`.
 
-**Verified state at handoff:** 527 tests pass · 0 lint errors · 0 console errors on the app
-surfaces and the marketing site, checked in a headless browser · migrations through 030 · 60
-tables. The marketing site is at <http://localhost:8000/site/> after `cd site && npm install` then
-`make site`. `docs/deploy.md` is the deployment reference; `cli preflight` is its enforcer.
+**Verified state at handoff:** 544 tests pass · 0 lint errors · 0 console errors on twelve
+surfaces incl. the marketing site, checked in a headless browser · migrations through 030 · 60
+tables · gitleaks clean over 53 commits · pip-audit and npm audit clean. The marketing site is at
+<http://localhost:8000/site/> after `cd site && npm install` then `make site`. `docs/deploy.md` is
+the deployment reference; `cli preflight` is its enforcer, and `docs/progress/phase_9.md` §"What is
+NOT fixed" is the honest security list.
 
 **Model prose is genuinely on again.** It was not, silently, for the whole of Phases 3–6 — see
 B-23 in `docs/bugs.md`. If you change anything in the model path, confirm a running instance
@@ -42,7 +44,10 @@ returns `used_template: false` rather than trusting the suite, which runs on `te
 | 6 — Rework sections | complete (all eight) |
 | 7 — Marketing site | complete — `site/`, served at `/site` |
 | 8 — Accounts, limits, deployment | complete (OAuth built but never run against Google) |
-| **9 — Security** | **not started — next, and it closes the build** |
+| 9 — Security | complete — see phase_9.md for what is NOT fixed |
+
+**The ten-phase brief is finished.** What is left is listed below and in `docs/progress/phase_9.md`;
+none of it is a phase.
 
 Every phase has a report in `docs/progress/`.
 
@@ -50,16 +55,23 @@ Every phase has a report in `docs/progress/`.
 
 ## NEXT STEPS, in the order I would do them
 
-### 1. Phase 9 — security
+### 1. Before real users — the security gaps that are actually gaps
 
-Threat model first. `/security-review` has already run twice this project and found a **real
-vulnerability each time**, so budget for findings rather than a clean pass. Known work:
-- Re-enable the `S608` ruff rule and replace f-string SQL with `psycopg.sql` composition
-  (`pyproject.toml` documents exactly why it is off and what the invariant is).
-- gitleaks over full history — wired into CI, never run locally.
-- Adversarial authorization tests across every per-user object.
+From `docs/progress/phase_9.md` §"What is NOT fixed", in the order I would take them:
+- **Email verification and password reset.** A new account is usable with an unverified address and
+  a forgotten password is unrecoverable. Not in the brief, and the most likely thing to hurt a real
+  user first.
+- **Exercise Google sign-in against Google.** It is untested auth code until someone does.
+- **Run `/security-review` on the whole branch.** It has found a real vulnerability twice here,
+  both times in code I had just written and believed was correct.
+- **A backup schedule**, before the dataset matters.
 
-### 2. Carried over, not blocking anything
+### 2. Deploy it
+
+`docs/deploy.md` is written and has never been executed against a real host. First run should
+correct it in the same change that discovers a mistake.
+
+### 3. Carried over, not blocking anything
 
 - **Phase 4 remainder**: saved filter sets, in-place threading of developing stories, subscribable
   alerts.

@@ -24,6 +24,8 @@ from __future__ import annotations
 import logging
 from datetime import timedelta
 
+from psycopg import sql
+
 from .backtest.engine import Series, excess_return
 
 log = logging.getLogger("tradeos.ledger")
@@ -194,21 +196,21 @@ def summary(conn, min_sample: int = 20) -> dict:
         # `origin` falls back to the model version so signal-plane claims stay separable from
         # model-generated ones. A reader has to be able to ask "how does the MODEL do on its own?"
         # — if the two were pooled under one hit rate, neither number would mean anything.
-        for label, expr in (("category", "coalesce(e.category, 'smart-money signal')"),
-                            ("horizon", "c.horizon"),
-                            ("source", "coalesce(e.source, c.model_version)"),
-                            ("origin", "case when c.event_id is null "
-                                       "then 'signal plane (backtested)' "
-                                       "else 'impact engine (model)' end")):
+        for label, expr in (("category", sql.SQL("coalesce(e.category, 'smart-money signal')")),
+                            ("horizon", sql.SQL("c.horizon")),
+                            ("source", sql.SQL("coalesce(e.source, c.model_version)")),
+                            ("origin", sql.SQL("case when c.event_id is null "
+                                               "then 'signal plane (backtested)' "
+                                               "else 'impact engine (model)' end"))):
             cur.execute(
-                f"""SELECT {expr} AS k,
+                sql.SQL("""SELECT {expr} AS k,
                            count(*) FILTER (WHERE o.verdict='hit') AS hits,
                            count(*) FILTER (WHERE o.verdict='miss') AS misses
                       FROM claim_outcomes o
                       JOIN claims c ON c.id = o.claim_id
                       LEFT JOIN events e ON e.id = c.event_id
                      WHERE o.verdict IN ('hit','miss')
-                     GROUP BY 1 ORDER BY 2 DESC NULLS LAST""")
+                     GROUP BY 1 ORDER BY 2 DESC NULLS LAST""").format(expr=expr))
             by[label] = [_rate(k, h, m, min_sample) for k, h, m in cur.fetchall()]
 
         # Calibration: when it says 70%, does it land near 70%? This is the honest question, and

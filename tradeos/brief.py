@@ -16,6 +16,7 @@ import json
 from datetime import UTC, datetime
 
 import psycopg
+from psycopg import sql
 from psycopg.types.json import Json
 
 from . import events, news, presentation, social
@@ -256,19 +257,22 @@ def cached_compose(conn: psycopg.Connection, *, user_id: int | None, as_of, tier
 
 def _store(conn, user_id, today, scope, h, provider, model_id, used_template, result) -> None:
     """Upsert the composed brief into the right partial-unique index (market vs personal)."""
-    cols = "input_hash=EXCLUDED.input_hash, provider=EXCLUDED.provider, model_id=EXCLUDED.model_id, " \
-           "used_template=EXCLUDED.used_template, content=EXCLUDED.content, created_at=now()"
+    cols = sql.SQL("input_hash=EXCLUDED.input_hash, provider=EXCLUDED.provider, "
+                   "model_id=EXCLUDED.model_id, used_template=EXCLUDED.used_template, "
+                   "content=EXCLUDED.content, created_at=now()")
     with conn.cursor() as cur:
         if user_id is None:
             cur.execute(
-                "INSERT INTO daily_briefs (user_id, brief_date, scope, input_hash, provider, model_id, "
-                "used_template, content) VALUES (NULL,%s,%s,%s,%s,%s,%s,%s) "
-                f"ON CONFLICT (brief_date, scope) WHERE user_id IS NULL DO UPDATE SET {cols}",
+                sql.SQL("INSERT INTO daily_briefs (user_id, brief_date, scope, input_hash, provider, "
+                        "model_id, used_template, content) VALUES (NULL,%s,%s,%s,%s,%s,%s,%s) "
+                        "ON CONFLICT (brief_date, scope) WHERE user_id IS NULL "
+                        "DO UPDATE SET {cols}").format(cols=cols),
                 (today, scope, h, provider, model_id, used_template, Json(result)))
         else:
             cur.execute(
-                "INSERT INTO daily_briefs (user_id, brief_date, scope, input_hash, provider, model_id, "
-                "used_template, content) VALUES (%s,%s,%s,%s,%s,%s,%s,%s) "
-                f"ON CONFLICT (user_id, brief_date, scope) WHERE user_id IS NOT NULL DO UPDATE SET {cols}",
+                sql.SQL("INSERT INTO daily_briefs (user_id, brief_date, scope, input_hash, provider, "
+                        "model_id, used_template, content) VALUES (%s,%s,%s,%s,%s,%s,%s,%s) "
+                        "ON CONFLICT (user_id, brief_date, scope) WHERE user_id IS NOT NULL "
+                        "DO UPDATE SET {cols}").format(cols=cols),
                 (user_id, today, scope, h, provider, model_id, used_template, Json(result)))
     conn.commit()

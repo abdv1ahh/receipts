@@ -13,9 +13,9 @@ command.
 
 **Internal codename: TradeOSS. Display name: Rhumb** (`BRAND_NAME`). A world-event interpretation
 engine that explains market consequences. The product brief is
-`docs/tradeoss_veryimportant_prompt.md` — the source of truth for scope. **Phases 0–8 are done;
-Phase 9 (security) is next and closes the build. `docs/state.md` has the resume instructions and
-the ordered next steps.**
+`docs/tradeoss_veryimportant_prompt.md` — the source of truth for scope. **All ten phases (0–9) are done.**
+`docs/state.md` has the resume instructions and what remains; `docs/progress/phase_9.md`
+§"What is NOT fixed" is the honest security list.**
 
 It now has a claim engine (`claims.py`), a self-scoring Ledger (`ledger.py`, publishing 41% of 282
 with the misses shown), an event spine (`spine.py`), personal relevance (`relevance.py`), world
@@ -69,7 +69,7 @@ The app is at <http://localhost:8000>. Demo login: `demo@tradeos.app` / `<genera
 ### Tests
 
 ```bash
-make test     # 527 tests, ~0.5s, fully offline (no network)
+make test     # 544 tests, <1s. Offline except 17 authz tests that need the local DB
 make lint     # ruff; zero errors is the standard
 make dev      # reload-in-place stack; then `make web` for a UI change
 make fix      # ruff --fix
@@ -147,6 +147,7 @@ tradeos/                  the Python package (all backend code)
   relevance.py            personal ranking + the reader frame + country exposure data. No model.
   public_site.py          the ONLY unauthenticated surface: what a stranger or a crawler can read.
   onboarding.py           first-run frame capture. Gates nothing — a skip costs the reader nothing.
+  ratelimit.py            sliding-window limits on the public + model paths. IN-PROCESS; see docstring.
   oauth.py                Sign in with Google. Built, config-gated, NEVER RUN against Google.
   journal_context.py      the Radar frozen at trade time; the coach's process patterns. No model.
   geography.py            places events by what a claim AFFECTS, not who published it.
@@ -184,7 +185,10 @@ when a phase touches it, not as a standalone refactor.
   and, often, which decision or milestone produced it. Match this.
 - **Comments explain why, not what.** Especially why an obvious approach was rejected.
 - `from __future__ import annotations` at the top of every module; modern `X | None` types.
-- **Raw SQL, always parameterised** (`%s` placeholders, never f-strings into queries).
+- **Raw SQL, always parameterised** (`%s` placeholders). Where SQL has to be *composed* — a column
+  list, an optional WHERE, a table name from an allowlist — use `psycopg.sql`
+  (`Identifier`/`Placeholder`/`SQL`), never an f-string. Ruff's `S608` enforces this; it was
+  suppressed for eight phases and re-enabled in Phase 9.
 - **Point-in-time discipline.** Anything derived from filings uses `knowable_time`, never
   the filing date, so backtests cannot see the future. Do not break this.
 - **Honest degradation over fabrication.** When a source is missing, the API returns a state

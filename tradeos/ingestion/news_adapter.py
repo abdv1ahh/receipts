@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import logging
 
+from psycopg import sql
+
 from .. import spine
 
 log = logging.getLogger("tradeos.ingestion.news_adapter")
@@ -75,13 +77,13 @@ def backfill(conn, since_hours: int | None = None, limit: int = 5000) -> dict:
 
     `since_hours=None` does the whole table (the one-time bootstrap); the scheduler passes a small
     window so the recurring job stays cheap."""
-    where, params = "", []
+    where, params = sql.SQL(""), []
     if since_hours is not None:
-        where = "WHERE n.knowable_time >= now() - make_interval(hours => %s)"
+        where = sql.SQL("WHERE n.knowable_time >= now() - make_interval(hours => %s)")
         params.append(since_hours)
     with conn.cursor() as cur:
         cur.execute(
-            f"""SELECT n.id, n.source, n.external_id, n.url, n.headline, n.summary, n.category,
+            sql.SQL("""SELECT n.id, n.source, n.external_id, n.url, n.headline, n.summary, n.category,
                        n.published_at, n.knowable_time, n.meta,
                        coalesce(array_agg(e.symbol) FILTER (WHERE e.symbol IS NOT NULL), '{{}}')
                   FROM news_items n
@@ -89,7 +91,7 @@ def backfill(conn, since_hours: int | None = None, limit: int = 5000) -> dict:
                   {where}
                  GROUP BY n.id
                  ORDER BY n.knowable_time
-                 LIMIT %s""",
+                 LIMIT %s""").format(where=where),
             (*params, limit))
         cols = ("id", "source", "external_id", "url", "headline", "summary", "category",
                 "published_at", "knowable_time", "meta", "symbols")

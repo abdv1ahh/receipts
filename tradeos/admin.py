@@ -18,6 +18,7 @@ Deliberate safety choices:
 from __future__ import annotations
 
 import psycopg
+from psycopg import sql
 
 from . import authn
 
@@ -124,13 +125,18 @@ def resolve(conn: psycopg.Connection, actor: dict, target_type: str, target_id: 
         return {"error": "invalid action"}
     if target_type not in ("trade", "comment"):
         return {"error": "invalid target"}
-    tbl = "trades" if target_type == "trade" else "trade_comments"
+    # Identifier() rather than an f-string. `target_type` is already checked against a two-value
+    # allowlist above, so this was never injectable — but the check and the interpolation are eight
+    # lines apart, and that gap is where this class of bug actually lives. Composed, the guarantee
+    # survives someone moving the check.
+    tbl = sql.Identifier("trades" if target_type == "trade" else "trade_comments")
     with conn.cursor() as cur:
-        cur.execute(f"SELECT 1 FROM {tbl} WHERE id=%s", (target_id,))
+        cur.execute(sql.SQL("SELECT 1 FROM {} WHERE id=%s").format(tbl), (target_id,))
         if not cur.fetchone():
             return {"error": "not found"}
         if action in ("hide", "unhide"):
-            cur.execute(f"UPDATE {tbl} SET hidden=%s WHERE id=%s", (action == "hide", target_id))
+            cur.execute(sql.SQL("UPDATE {} SET hidden=%s WHERE id=%s").format(tbl),
+                        (action == "hide", target_id))
         cur.execute("UPDATE content_reports SET resolved_at=now(), resolved_by=%s, resolution=%s "
                     "WHERE target_type=%s AND target_id=%s AND resolved_at IS NULL",
                     (actor["email"], action, target_type, target_id))
@@ -146,19 +152,20 @@ def resolve(conn: psycopg.Connection, actor: dict, target_type: str, target_id: 
 def list_users(conn: psycopg.Connection, q: str = "", limit: int = 50) -> list[dict]:
     limit = max(1, min(200, limit))
     q = (q or "").strip()[:64]
-    where, args = "", []
+    where, args = sql.SQL(""), []
     if q:
-        where = "WHERE u.email ILIKE %s ESCAPE '\\' OR u.handle ILIKE %s ESCAPE '\\'"
+        where = sql.SQL("WHERE u.email ILIKE %s ESCAPE '\\' OR u.handle ILIKE %s ESCAPE '\\'")
         args = [_like(q), _like(q)]
     with conn.cursor() as cur:
         cur.execute(
-            f"""SELECT u.id, u.email, u.handle, u.tier, u.banned, u.created_at,
+            sql.SQL("""SELECT u.id, u.email, u.handle, u.tier, u.banned, u.created_at,
                        (SELECT count(*) FROM trades t WHERE t.user_id=u.id) AS trades,
                        (SELECT count(*) FROM content_reports r WHERE r.resolved_at IS NULL AND
                           ((r.target_type='trade'   AND r.target_id IN (SELECT id FROM trades         WHERE user_id=u.id))
                         OR (r.target_type='comment' AND r.target_id IN (SELECT id FROM trade_comments WHERE user_id=u.id)))
                        ) AS open_reports
-                FROM users u {where} ORDER BY u.created_at DESC LIMIT %s""", (*args, limit))
+                FROM users u {where} ORDER BY u.created_at DESC LIMIT %s""").format(where=where),
+            (*args, limit))
         rows = cur.fetchall()
     return [{"id": r[0], "email": r[1], "handle": r[2], "tier": r[3], "banned": r[4],
              "joined": r[5].isoformat()[:10], "trades": r[6], "open_reports": r[7]} for r in rows]
@@ -207,13 +214,13 @@ def audit_tail(conn: psycopg.Connection, limit: int = 100, action: str | None = 
     """Read the append-only audit_log, newest first, optionally filtered by action. Read-only — the
     table has a DELETE/UPDATE-forbidding trigger, so this can only ever observe."""
     limit = max(1, min(500, limit))
-    where, args = "", []
+    where, args = sql.SQL(""), []
     if action:
-        where = "WHERE action=%s"
+        where = sql.SQL("WHERE action=%s")
         args = [action.strip()[:64]]
     with conn.cursor() as cur:
-        cur.execute(f"SELECT id, actor, action, object, at, detail FROM audit_log {where} "
-                    f"ORDER BY id DESC LIMIT %s", (*args, limit))
+        cur.execute(sql.SQL("SELECT id, actor, action, object, at, detail FROM audit_log {where} "
+                            "ORDER BY id DESC LIMIT %s").format(where=where), (*args, limit))
         rows = cur.fetchall()
     return [{"id": r[0], "actor": r[1], "action": r[2], "object": r[3],
              "at": r[4].isoformat(), "detail": r[5]} for r in rows]
