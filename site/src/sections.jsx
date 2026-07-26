@@ -11,7 +11,7 @@ import { useLoad, useReveal } from "./hooks";
 import { Rose } from "./rose.jsx";
 import { WorldMap } from "./worldmap.jsx";
 
-const APP = "/";
+const APP = "/radar";        // the Radar itself, not "/" — "/" sends a signed-out visitor here
 const SIGNUP = "/auth";      // the app's auth surface — a real route, not a modal
 const pct = (v, d = 1) => (v == null ? "—" : `${v >= 0 ? "+" : ""}${(v * 100).toFixed(d)}%`);
 const when = (iso) =>

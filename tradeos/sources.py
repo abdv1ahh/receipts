@@ -36,11 +36,25 @@ CATALOG: list[dict] = [
         "jobs": ["news_sec"],
     },
     {
-        "key": "rss", "label": "News RSS (CNBC, Fed, SEC)", "kind": "news",
-        "powers": "News Intelligence and the Morning Brief",
-        "state": CONNECTED, "env": [], "signup_url": None, "note": "Free, keyless, public feeds.",
-        "feeds": ["rss/cnbc-top", "rss/cnbc-markets", "rss/fed", "rss/sec"],
-        "jobs": ["news_rss"],
+        # `feeds` is filled from news_rss.FEEDS at the bottom of this module rather than typed out
+        # here: the hand-kept copy listed four feeds long after the real list had grown to eleven,
+        # so the status page under-reported which outlets this product actually reads.
+        "key": "rss", "label": "News RSS (global)", "kind": "news",
+        "powers": "News Intelligence, the source-comparison view, and the Morning Brief",
+        "state": CONNECTED, "env": [], "signup_url": None,
+        "note": "Free, keyless, public feeds, spanning several countries — the source-comparison "
+                "view needs outlets that can actually disagree.",
+        "feeds": [], "jobs": ["news_rss"],
+    },
+    {
+        "key": "gdelt", "label": "GDELT", "kind": "news",
+        "powers": "worldwide event coverage behind the Radar — the widest geographic net here",
+        "state": CONNECTED, "env": [], "signup_url": None,
+        "note": "Free and keyless. GDELT throttles on the User-Agent rather than the address, so a "
+                "429 is answered by backing off and waiting rather than by rotating identity; a gap "
+                "in coverage is preferable to evading a rate limit. Writes no per-feed health row, "
+                "so freshness here is the scheduler job's own last run.",
+        "feeds": [], "jobs": ["gdelt"],
     },
     {
         "key": "nasdaq_calendar", "label": "Nasdaq calendar", "kind": "calendar",
@@ -81,9 +95,16 @@ CATALOG: list[dict] = [
                   "not just attention",
         "state": None, "env": ["REDDIT_CLIENT_ID", "REDDIT_CLIENT_SECRET"],
         "signup_url": "https://www.reddit.com/prefs/apps",
-        "note": "Two steps: create a free app of type 'script', then copy its client id and secret. "
-                "There is no useful keyless mode — Reddit blocks the public JSON endpoints from "
-                "datacenter addresses, so we ask rather than quietly returning nothing.",
+        "note": "Free, but it has to be created by hand. On the linked page choose 'create another "
+                "app', pick type **script**, and put anything valid in 'redirect uri' "
+                "(http://localhost:8000 works — this app never uses it, but Reddit's form will not "
+                "submit without one). The client id is the string UNDER the app name, not the app "
+                "name itself. Put both in .env at the repository root as REDDIT_CLIENT_ID and "
+                "REDDIT_CLIENT_SECRET, then `docker compose up -d` to restart, and confirm with "
+                "`docker compose exec -T api python -m tradeos.cli check-source reddit`, which "
+                "makes a real call and reports what came back. There is no useful keyless mode — "
+                "Reddit blocks the public JSON endpoints from datacenter addresses, so we ask "
+                "rather than quietly returning nothing.",
         "feeds": [], "jobs": ["social_reddit"],
     },
     {
@@ -124,6 +145,17 @@ CATALOG: list[dict] = [
         "feeds": [], "jobs": [],
     },
     {
+        "key": "bluesky", "label": "Bluesky", "kind": "social",
+        "powers": "posts from consequential accounts — the open-network answer to X being shut",
+        "state": CONNECTED, "env": [], "signup_url": None,
+        "note": "Free and keyless. Reads a curated list of consequential accounts "
+                "(watchlist_accounts, platform 'bluesky') rather than searching the network: "
+                "Bluesky's keyless search endpoint returns 403 as of 2026-07-26, so network-wide "
+                "keyword search is not available without an account. Reposts are skipped — an "
+                "account amplifying someone else is not that account speaking.",
+        "feeds": [], "jobs": ["social_bluesky"],
+    },
+    {
         "key": "stocktwits", "label": "StockTwits", "kind": "social",
         "powers": "retail chatter", "state": UNAVAILABLE, "env": [], "signup_url": None,
         "note": "No free read tier. Left disconnected rather than faked.", "feeds": [], "jobs": [],
@@ -134,11 +166,30 @@ CATALOG: list[dict] = [
         "state": UNAVAILABLE, "env": [], "signup_url": None,
         "note": "X's free API tier does not permit reading timelines and the paid tiers start well "
                 "beyond free-tier scope. Scraping breaks their terms and breaks constantly, so it is "
-                "not shipped. What consequential people say still reaches this product through news "
-                "wires and official feeds, usually within minutes.",
+                "not shipped, and it is not coming back by being wished at. The need it was meant "
+                "to serve — knowing what consequential people are saying — is served instead by "
+                "Bluesky (curated accounts, live above), by the official channels in the "
+                "consequential-accounts list, and by the news wires, which carry a public "
+                "statement within minutes. This entry stays visible so the gap is stated rather "
+                "than quietly dropped.",
         "feeds": [], "jobs": [],
     },
 ]
+
+def _fill_rss_feeds() -> None:
+    """Point the rss entry at the real feed list. Imported lazily and inside a function so this
+    module keeps its "no network, no database, cheap to import" property, and so a failure to import
+    an ingestion module degrades the status page rather than taking the whole app down."""
+    try:
+        from .ingestion.news_rss import FEEDS
+    except Exception:  # pragma: no cover - a broken ingestion import must not break the registry
+        return
+    for src in CATALOG:
+        if src["key"] == "rss":
+            src["feeds"] = [f"rss/{f.key}" for f in FEEDS]
+
+
+_fill_rss_feeds()
 
 # Sources whose state is computed from config rather than fixed.
 _DYNAMIC = {

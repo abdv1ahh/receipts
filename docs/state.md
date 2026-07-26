@@ -1,6 +1,11 @@
 # docs/state.md — where the work stands
 
-Updated: 2026-07-26. **All ten phases (0–9) are complete.**
+Updated: 2026-07-26. **All ten phases (0–9) are complete**, plus a cross-check pass the owner asked
+for after reporting that "the website does not even load, the globe does not even load" and that
+they could not find the marketing site. **That pass is written up in
+`docs/progress/cross_check.md` — read it before trusting any "complete" above it**, because six of
+the things it found were genuinely broken in the reader's face while every test passed.
+
 **Read this after `CLAUDE.md` and before `docs/plan.md` at the start of every session.**
 
 ---
@@ -18,13 +23,20 @@ make lint                              # ruff, zero errors is the standard
 Demo login `demo@tradeos.app` / `<generated at seed time>`. Surfaces: `/radar` `/globe` `/ledger`
 `/exposure` `/crypto` `/news` `/brief` `/events` `/integrations` `/journal`.
 
-**Verified state at handoff:** 598 tests pass · 0 lint errors · 0 console errors on twelve
-surfaces incl. the marketing site, checked in a headless browser · migrations through **032**,
-applied cleanly to an EMPTY database and re-run as a no-op · 61 tables · gitleaks clean over 53
-commits · pip-audit and npm audit clean · the Ledger reads 40.8% of 282 (115 hit / 167 miss). The marketing site is at
-<http://localhost:8000/site/> after `cd site && npm install` then `make site`. `docs/deploy.md` is
-the deployment reference; `cli preflight` is its enforcer, and `docs/progress/phase_9.md` §"What is
-NOT fixed" is the honest security list.
+**Verified state at handoff:** 612 tests pass · 0 lint errors · 0 console errors and **0 horizontal
+overflow on all 21 app surfaces at 375 / 768 / 1280px**, plus the marketing site, checked in a real
+browser · the 3D globe verified **rendering under actual WebGL** in headed Chromium, not merely
+"no errors in headless" (headless has no GPU, which is exactly how the globe stayed broken) ·
+migrations through **032** · 61 tables · the Ledger reads 41% of 282.
+
+**The marketing site is at <http://localhost:8000/site/>, and `/` now redirects there** for anyone
+signed out — it was previously reachable by no link from anywhere, which is why the owner could not
+find it. `docs/deploy.md` is the deployment reference; `cli preflight` is its enforcer, and
+`docs/progress/phase_9.md` §"What is NOT fixed" is the honest security list.
+
+**Bluesky is live** — 16 curated consequential accounts, keyless, ~350 events ingested and already
+producing scored claims on the Radar. This is the brief's answer to X, which remains unavailable and
+is now labelled as such *with the alternative named* rather than as a bare "unavailable".
 
 **Model prose is genuinely on again.** It was not, silently, for the whole of Phases 3–6 — see
 B-23 in `docs/bugs.md`. If you change anything in the model path, confirm a running instance

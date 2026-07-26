@@ -1,0 +1,186 @@
+# Cross-check pass — 2026-07-26
+
+Not a phase. The owner read the ten "complete" markers, opened the app, and reported: the site does
+not load, the globe does not load, they could not find the marketing site, X does not work, and they
+did not know how to connect Reddit. This is what that turned out to be, what was fixed, and what is
+still open.
+
+The uncomfortable summary first: **598 tests passed, lint was clean, and six things were broken in
+the reader's face.** Every finding below was invisible to the suite. That is the lesson worth
+keeping from this pass — the gates that were being run could not see any of it.
+
+---
+
+## What was actually wrong
+
+### 1. The globe was an invisible black sphere — CONFIRMED, FIXED
+
+`globe3d.jsx` set `hexPolygonColor` but never `hexPolygonsData`, and never set `globeImageUrl`.
+globe.gl's own documentation is explicit about that combination: with no image "the globe is
+represented as a black sphere". A black sphere on a `#05060c` page is nothing at all. The
+`globeMaterial={{ color: OCEAN }}` prop was also inert — that prop takes a `THREE.Material`
+instance, not a spec, so it was silently ignored and the ocean stayed pure black.
+
+So the surface was drawing a handful of green markers floating in a void with no world behind them.
+
+**Fixed** by vendoring Natural Earth 110m country geometry (public domain, stripped to
+`iso` + `name` + coordinates and rounded to 2dp — 488KB → 163KB) into
+`frontend/src/world-110m.geo.json` and feeding it to `hexPolygonsData`. It rides inside the
+lazy-loaded globe chunk, so the main bundle is unchanged and nobody who never opens the surface
+pays for it. `globeMaterial` now receives a real `MeshPhongMaterial`, which meant declaring `three`
+as a direct dependency — it was always installed as react-globe.gl's peer, this only stops the
+import being implicit.
+
+Clicking a landmass now selects that country, so a country with no events is selectable too.
+Previously only event markers were clickable, which meant *checking whether a country is quiet* was
+impossible — the exact question the surface exists to answer.
+
+**Verified** in headed Chromium with real WebGL, not headless. This matters: headless Chromium has
+no GPU, the component correctly falls back to the flat map there, and so a headless "no console
+errors" check reports success against a globe that never rendered. That is how this survived a phase
+that claimed to have checked it.
+
+### 2. Every page scrolled sideways on a phone — CONFIRMED, FIXED
+
+All 21 surfaces overflowed at 375px, most by ~190px. This is the bulk of "so many visual glitches".
+
+Causes, in order of blast radius:
+
+- **The top bar.** Eight fixed-width controls in a flex row that stopped fitting below ~720px and
+  pushed every page wider than the viewport. The search field is now replaced by a search *button*
+  below 720px (there is no ⌘K on a phone, so hiding the field outright would have removed search
+  entirely).
+- **`1fr` grid tracks.** A bare `1fr` is `min-width: auto` and refuses to shrink below its content.
+  Fixed to `minmax(0, 1fr)` in the calendar, dashboard, Smart Money and watchlist grids — and in
+  four places on the marketing site.
+- **An unbreakable URL.** One ingested news item whose title was a raw `drive.google.com` link
+  widened its container past the viewport. `.content` now sets `overflow-wrap: anywhere`
+  (`anywhere`, not `break-word` — only `anywhere` also shrinks min-content, which is the half that
+  stops the overflow). Ingested text is arbitrary by definition, so this is handled at the root
+  rather than by guessing which card can receive a URL.
+- **Wide tables** now scroll inside their own panel below 1000px.
+- **`.bt { white-space: nowrap }`** on a 274px badge — correct on desktop, wider than a phone card.
+
+A self-inflicted trap worth recording: the first attempt put the narrow-screen block near the top of
+`styles.css` and it silently lost, because **a media query adds no specificity** and the base rules
+further down the file won on source order. The block now lives at the end of the file under a
+comment saying it must stay there.
+
+**Verified**: 21 surfaces × 375 / 768 / 1280px, zero overflow, plus the marketing site.
+
+### 3. The marketing site was unreachable — CONFIRMED, FIXED
+
+It was built, good, branded, and running on live data at `/site/` the whole time. Nothing linked to
+it, and `/` served the app's own landing page, which still pitched the **pre-rebrand** product
+("TradeOSS — the AI trading terminal", smart-money convergence, a trader community). A stranger
+arriving at the front door got a page describing a product that no longer exists.
+
+`/` now 307s to `/site/` for anyone without a session cookie (cookie *presence*, not validity — no
+database round trip for a routing decision, and an expired cookie lands on the app, which asks you
+to sign in, which is right anyway). Signing out returns to `/site/`. The old `LandingView` is
+deleted along with `ExploreView`, which was imported by nothing and linked to a `community` surface
+that no longer exists.
+
+### 4. The rebrand had only ever reached the nav bar — CONFIRMED, FIXED
+
+`BRAND_NAME` exists and `config.brand_name()` returns "Rhumb", and **almost nothing called it**.
+Fourteen user-facing strings across nine frontend files and twelve backend strings still spelled out
+"TradeOSS" — the disclaimers under every signal, the pricing copy, the AI assistant's model label,
+the journal's analysis footer, the alert emails, and the `<title>` and meta description of the app
+itself (which is what a shared link previews as).
+
+There are now exactly two homes for the name: `config.brand_name()` and `frontend/src/brand.js`.
+
+### 5. X / Twitter — CONFIRMED UNFIXABLE AS ASKED, ANSWERED PROPERLY
+
+X has no free read tier. That has not changed and is not going to. Scraping is against their terms
+and breaks constantly. This is the one thing in the brief that cannot be built as written, and
+Appendix A of the brief says so itself and names the substitute.
+
+**Bluesky is now a real source**, which was listed as an open gap and had never been built:
+
+- 16 curated consequential accounts (wire services, non-Western outlets, and the research
+  institutions that explain mechanisms), each **verified against the live API before seeding** —
+  no handle was guessed, and candidates that turned out to be squatted or non-existent were dropped.
+- Keyless. `~350` events ingested on the first pass, 0 failures, and the hourly `interpret` job has
+  already produced scored claims from them.
+- Reposts are skipped: an account amplifying someone else is not that account speaking, and treating
+  those as identical would put words in a central bank's mouth.
+- `geo` is left empty, because geo means where an event *lands*, not where the publisher sits. A
+  test enforces this on the new source specifically, since it is the most repeated mistake here.
+- 14 offline tests against a real captured payload.
+
+Measured while building it, and worth knowing before anyone tries: `app.bsky.feed.searchPosts`
+returns **403** without authentication now. Network-wide keyword search is closed. `getAuthorFeed`
+and `getProfile` are keyless. So this reads a curated list rather than searching — which is what the
+brief wanted from a social source anyway.
+
+The X entry stays visible on the integration page rather than being quietly dropped, and now names
+what covers the need instead of reading as a dead end.
+
+### 6. Reddit — WORKING AS DESIGNED, THE SETUP PATH WAS THE PROBLEM
+
+The adapter is correct and the degradation panel already linked to the right page. What was missing
+was everything between "I clicked the link" and "it works": Reddit's form demands a redirect URI it
+never uses, the client id is the unlabelled string *under* the app name, and there was no way to
+tell whether a pasted key worked.
+
+New `cli check-source <key>` makes a real call and reports plainly — `OK`, `NOT CONFIGURED` with the
+exact variables and where to get them, or `UNAVAILABLE by design` with the reason. It never echoes
+the credential, because httpx puts the full URL in exception text. The Reddit note now gives the
+exact steps including the two gotchas.
+
+---
+
+## Found along the way
+
+- **GDELT was invisible to the operator.** It has been running hourly and producing events, and it
+  was not in `sources.py`, so it appeared nowhere on the integration status page — which the brief
+  requires for every source, and which is the page that exists precisely so the owner never has to
+  guess why a panel is empty. Now registered.
+- **The RSS entry listed 4 feeds; there are 11.** The hand-kept copy had drifted. It is now derived
+  from `news_rss.FEEDS`, so it cannot drift again.
+- **`spine.upsert_event` never wrote `author_influence`**, despite `watchlist_accounts.py`
+  documenting that module as the place it is stored. No source had ever supplied one, so the
+  documented behaviour had simply never run. Bluesky is the first source that supplies it; now
+  persisted.
+- **A redundant hamburger sat in the desktop top bar**, because `.menu-btn { display: none }` lost
+  to `.icon-btn { display: grid }` declared after it. Same class of bug as the media-query trap.
+- **Dead code removed**: `LandingView`, `ExploreView`, `fetchCommunityFeed`, and 14 lines of
+  orphaned landing CSS. Bundle: JS 376.2 → 373.5 kB, CSS 106.2 → 105.5 kB.
+
+---
+
+## What is still open
+
+Honest list; none of it is newly broken, and none was introduced by this pass.
+
+- **Reddit, YouTube, OpenFIGI, SMTP and Google OAuth still need keys.** Only the owner can create
+  them. `check-source` will now confirm each one the moment it is set.
+- **Google sign-in has still never been run against Google.** The validation logic is tested; the
+  handshake is not.
+- **SMTP is still unconfigured**, so alert digests and password resets queue rather than send. The
+  app refuses to half-send, which is the right failure, but it is still a gap before real users.
+- **`/code-review` has never been run on any phase diff**, including this one.
+- **The `community` backend module is orphaned in the UI.** Its last frontend caller
+  (`ExploreView`) is now deleted, but the module, its API routes and its tables remain. I did not
+  delete a whole feature on my own judgement — **this is a question for the owner**: is the
+  community surface dead, or parked?
+- **The 3D globe is verified on desktop WebGL only.** The flat-map fallback is exercised (that is
+  what headless renders), but no real low-power mobile device has been tested.
+- **`author_influence` is stored but not yet used in ranking.** It reaches the events table; nothing
+  reads it back into relevance scoring yet.
+
+---
+
+## The gate that would have caught all of this
+
+Not "write more tests" — the failures were not test-shaped. Specifically:
+
+1. **Check a running instance at 375px.** Every layout bug here was one browser resize away.
+2. **Check WebGL surfaces in a headed browser.** Headless has no GPU and will report a clean
+   fallback as success.
+3. **Grep the built bundle for the old brand name** before calling a rebrand done.
+4. **A new ingestion module is not finished until it has a `sources.py` entry.**
+
+These are now in `CLAUDE.md` as gotchas 0c, 0d and 0e, and in the sources section.

@@ -10,6 +10,7 @@ import {
   simulateTrade, updateTrade, uploadTradeImage,
 } from "./api";
 import { Icon } from "./icons.jsx";
+import { BRAND } from "./brand.js";
 
 const pct = (v) => (v == null ? "—" : `${v >= 0 ? "+" : ""}${(v * 100).toFixed(1)}%`);
 const cls = (v) => (v == null ? "" : v > 0 ? "pos-pos" : v < 0 ? "pos-neg" : "");
@@ -255,7 +256,7 @@ function CoachStrip({ refreshKey, onOpenPerformance }) {
 
   if (r === undefined) return <div className="coach"><div className="skel" style={{ width: "55%", height: 18 }} /><div className="skel" style={{ width: "85%", height: 14, marginTop: 10 }} /></div>;
   if (!r) return null;
-  const model = r.used_template ? "TradeOSS rules" : r.model_id;
+  const model = r.used_template ? `${BRAND} rules` : r.model_id;
 
   return (
     <div className="coach">
@@ -317,7 +318,7 @@ function AnalysisPanel({ id, onOpenLibrary }) {
   const [a, setA] = useState(null);
   useEffect(() => { setA(null); fetchTradeAnalysis(id).then((d) => setA(d.analysis || null)).catch(() => {}); }, [id]);
   if (!a) return <div className="analysis"><div className="skel" style={{ width: "70%" }} /></div>;
-  const model = a.used_template ? "TradeOSS rules" : a.model_id;
+  const model = a.used_template ? `${BRAND} rules` : a.model_id;
   return (
     <div className="analysis">
       <div className="an-head">🧠 The coach on this trade <span className="name">· educational, not advice</span></div>
@@ -718,7 +719,7 @@ export function JournalView({ user, onLogin, onOpenSymbol, onOpenLibrary }) {
           </>
         )}
 
-      <div className="disc" style={{ marginTop: 18 }}>TradeOSS analyzes trades you log for education and journaling. It describes patterns and risk; it never tells you what to buy, sell, or hold.</div>
+      <div className="disc" style={{ marginTop: 18 }}>{BRAND} analyzes trades you log for education and journaling. It describes patterns and risk; it never tells you what to buy, sell, or hold.</div>
     </div>
   );
 }

@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { fetchNews } from "./api";
 import { CoverageView } from "./coverage.jsx";
+import { BRAND } from "./brand.js";
 
 const IMPACT_BAND = (n) => (n >= 70 ? "high" : n >= 45 ? "medium" : "low");
 const CAT_LABEL = {
@@ -38,7 +39,7 @@ export function NewsCard({ it, onOpenSymbol }) {
             <button key={s} className="tkr" onClick={() => onOpenSymbol && onOpenSymbol(s)}>{s}</button>
           ))}
           <span className="cat-tag">{CAT_LABEL[it.category] || it.category || "News"}</span>
-          {it.has_signal && <span className="sig-badge" title="Smart money is converging on this name in TradeOSS signal data">⚡ smart money</span>}
+          {it.has_signal && <span className="sig-badge" title={`Smart money is converging on this name in ${BRAND} signal data`}>⚡ smart money</span>}
           <span className="spacer" />
           <span className="news-time">{timeAgo(it.knowable_time)}</span>
         </div>
@@ -124,7 +125,7 @@ function StoryCard({ entry, onOpenSymbol }) {
         <div className="news-head">
           {(it.symbols || []).slice(0, 4).map((s) => <button key={s} className="tkr" onClick={() => onOpenSymbol?.(s)}>{s}</button>)}
           <span className="cat-tag">{CAT_LABEL[it.category] || it.category || "News"}</span>
-          {it.has_signal && <span className="sig-badge" title="Smart money is converging on this name in TradeOSS signal data">⚡ smart money</span>}
+          {it.has_signal && <span className="sig-badge" title={`Smart money is converging on this name in ${BRAND} signal data`}>⚡ smart money</span>}
           <span className="spacer" />
           <span className="news-time">{timeAgo(it.knowable_time)}</span>
         </div>

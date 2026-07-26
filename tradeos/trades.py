@@ -23,7 +23,7 @@ import psycopg
 from psycopg import sql
 from psycopg.types.json import Json
 
-from . import llm
+from . import config, llm
 from .explain.guards import allowed_numbers, directive_guard, numbers_guard
 
 log = logging.getLogger("tradeos.trades")
@@ -114,7 +114,7 @@ def analyze_trade(trade, signal_context=None):
         n = signal_context.get("voices")
         voices_txt = f" across {n} independent filers" if n else ""
         near = (signal_context.get("as_of") or "")[:10]
-        context.append(f"Around this window TradeOSS recorded a {signal_context['bucket']}-confidence "
+        context.append(f"Around this window {config.brand_name()} recorded a {signal_context['bucket']}-confidence "
                        f"smart-money convergence in {sym}{voices_txt} (as of {near}) — disclosed "
                        f"third-party activity, shown for context only.")
 
@@ -162,7 +162,7 @@ def summarize_performance(trades, min_sample=PERF_MIN_SAMPLE):
         "win_rate": None, "expectancy": None, "by_strategy": [], "insights": [],
     }
     if n < min_sample:
-        out["note"] = (f"{n} closed trade(s) logged — TradeOSS starts reporting win rate and habits at "
+        out["note"] = (f"{n} closed trade(s) logged — {config.brand_name()} starts reporting win rate and habits at "
                        f"{min_sample} closed trades, so it never calls an edge from a small sample.")
         return out
 

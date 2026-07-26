@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from "react";
 import { askAssistant } from "./api";
 import { Icon } from "./icons.jsx";
+import { BRAND } from "./brand.js";
 
 const GROUNDING = [
   { icon: "journal", label: "Your journal & performance" },
@@ -50,9 +51,9 @@ export function AssistantView({ user, onLogin }) {
     try {
       const r = await askAssistant(question);
       setMsgs((m) => [...m, { role: "ai", text: r.answer, sources: r.sources || [],
-                              model: r.used_template ? "TradeOSS" : r.model_id, grounded: r.grounded }]);
+                              model: r.used_template ? BRAND : r.model_id, grounded: r.grounded }]);
     } catch {
-      setMsgs((m) => [...m, { role: "ai", text: "Something went wrong reaching the mentor. Try again in a moment.", sources: [], model: "TradeOSS" }]);
+      setMsgs((m) => [...m, { role: "ai", text: "Something went wrong reaching the mentor. Try again in a moment.", sources: [], model: BRAND }]);
     }
     setBusy(false);
   };

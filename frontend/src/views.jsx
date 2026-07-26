@@ -333,7 +333,11 @@ export function AuthPanel({ onAuthed, onBack, initialInvite }) {
   const [pw, setPw] = useState("");
   const [invite, setInvite] = useState(initialInvite || "");
   const [totp, setTotp] = useState("");
-  const [err, setErr] = useState(null);
+  // A failed Google sign-in redirects here carrying its reason. Nothing used to read it, so the
+  // handler's promise that a failure "lands the user on a page that says what went wrong" was
+  // false — the reader just saw a blank login form and no explanation.
+  const [err, setErr] = useState(
+    () => new URLSearchParams(window.location.search).get("auth_error") || null);
   const submit = async () => {
     setErr(null);
     const r = mode === "login" ? await authLogin(email, pw, totp) : await authRegister(email, pw, invite);

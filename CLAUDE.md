@@ -22,8 +22,15 @@ with the misses shown), an event spine (`spine.py`), personal relevance (`releva
 context frozen at trade time (`journal_context.py`), and surfaces at `/radar` `/globe` `/ledger`
 `/exposure` `/crypto` `/news` `/brief` `/events` `/journal` `/integrations`.
 
+**`/` is the marketing site for anyone signed out** (307 to `/site/`, decided on the presence of
+the session cookie so no database round trip is needed). The app's own landing page was deleted: it
+still pitched the pre-rebrand product and nothing linked to it. Signing out returns you to `/site/`.
+
 The display name is a config value, not a hardcoded string (see `docs/plan.md` §rebrand).
-Never rename Python modules, database tables, or the `tradeos` package for branding.
+Never rename Python modules, database tables, or the `tradeos` package for branding. It has exactly
+two homes — `config.brand_name()` in Python and `frontend/src/brand.js` in React — and **neither is
+optional**: for eight phases the rebrand reached only the nav bar while fourteen strings across nine
+files still read "TradeOSS" to the reader. If you are typing the product's name in a string, stop.
 
 ---
 
@@ -69,7 +76,7 @@ The app is at <http://localhost:8000>. Demo login: `demo@tradeos.app` / `<genera
 ### Tests
 
 ```bash
-make test     # 598 tests, ~1s. Offline except 17 authz tests that need the local DB
+make test     # 612 tests, ~1s. Offline except 17 authz tests that need the local DB
 make lint     # ruff; zero errors is the standard
 make dev      # reload-in-place stack; then `make web` for a UI change
 make fix      # ruff --fix
@@ -98,17 +105,21 @@ gitignored.
 docker compose exec -T api python -m tradeos.cli <command>
 ```
 
-All 37, checked against `--help` rather than remembered:
+All 39, checked against `--help` rather than remembered:
 
 `migrate`, `preflight`, `status` · **SEC ingestion** `ingest-form4`, `ingest-13dg`, `ingest-13f`
 `backfill-form4`, `backfill-13dg`, `backfill-13f` (`--from`/`--to` over a date range; weekends skipped, holidays 404 and
 are logged past) · **resolution** `sync-tickers`, `resolve-entities`, `resolve-cusips` ·
 **signals** `signals-register`, `compute-signals`, `run-backtest`, `calibration` ·
 **other ingestion** `ingest-prices`, `ingest-short-interest`, `ingest-sentiment`, `ingest-news`,
-`analyze-news`, `ingest-calendar` · **spine and claims** `spine`, `reprocess`, `interpret`,
+`analyze-news`, `ingest-calendar`, `ingest-bluesky` · **spine and claims** `spine`, `reprocess`, `interpret`,
 `measure-claims`, `ledger`, `import-signals` · **seeds** `seed-admin`, `seed-demo`,
 `seed-watchlist`, `seed-exposure`, `sync-library`, `create-invites` ·
-**operations** `scheduler`, `generate-alerts`, `capture-context`.
+**operations** `scheduler`, `generate-alerts`, `capture-context`, `check-source`.
+
+`check-source <key>` makes a REAL call to one source and says whether it worked, which is the
+question `status` (what has been ingested) and `preflight` (what is configured) both leave
+unanswered right after someone pastes a key in.
 
 `status` prints per-feed freshness. `preflight` checks production config, including every link in
 the `EXPLAIN_PROVIDER` chain.
@@ -223,6 +234,29 @@ fastest:
    on `template` by design, so **verify a model change against a running instance**
    (`used_template: false`), never against the tests alone.
 
+0c. **A media query adds NO specificity, so mobile overrides must sit at the END of `styles.css`.**
+   A `@media (max-width: 720px) { .bt { white-space: normal } }` placed at line 190 loses to the
+   base `.bt { white-space: nowrap }` at line 227 — same specificity, later wins. Same trap with
+   compound classes: `.menu-btn { display: none }` lost to `.icon-btn { display: grid }` declared
+   after it, which is why a hamburger sat in the desktop top bar. There is a marked
+   "NARROW SCREENS — must stay LAST" block at the bottom of the file; put narrow-screen rules
+   there, and use a compound selector (`.icon-btn.menu-btn`) when the element carries both classes.
+
+0d. **A grid or flex track written `1fr` is `min-width: auto` and will not shrink below its
+   content.** Every horizontal-overflow bug found in this codebase was this or an unbreakable
+   string: write `minmax(0, 1fr)`. Ingested text also contains bare URLs, which is why `.content`
+   sets `overflow-wrap: anywhere` — `anywhere` rather than `break-word` because only `anywhere`
+   also shrinks the container's min-content, which is the half that stops the overflow.
+   **Check a UI change at 375px, not just at your window width.**
+
+0e. **react-globe.gl draws NOTHING by default.** With no `globeImageUrl` its own docs say the globe
+   "is represented as a black sphere", and a black sphere on this near-black page is invisible —
+   which is what "the globe doesn't load" meant. Land comes from vendored Natural Earth 110m
+   geometry (`frontend/src/world-110m.geo.json`) passed as `hexPolygonsData`. Note that
+   `globeMaterial` takes a THREE.Material INSTANCE; a plain `{ color }` object is silently ignored,
+   and `globeMaterial()` is NOT a method on the React ref (only `pointOfView`, `controls`, `scene`,
+   `camera`, `renderer` and the utilities are).
+
 1. **Frontend changes need `make web`** (0.3s) under `make dev`, or a full image rebuild otherwise.
 2. **`geo` on an event is where the OUTLET sits, not what the story is about.** The single most
    repeated mistake in this project — made three times.
@@ -249,7 +283,9 @@ fastest:
 | Source | Key needed | Powers | State |
 |---|---|---|---|
 | SEC EDGAR (13D/G, 13F, Form 4, 8-K) | `SEC_USER_AGENT` only | Smart Money, news | connected |
-| RSS (CNBC, Fed, SEC) | none | News Intelligence | connected |
+| RSS (11 feeds, 5 countries) | none | News Intelligence, source comparison | connected |
+| GDELT | none | worldwide event coverage on the Radar | connected |
+| Bluesky | none | posts from consequential accounts → the Radar | connected |
 | Nasdaq calendar | none | Calendar | connected |
 | Wikipedia pageviews | none | Attention | connected (noisy — see bugs) |
 | Hacker News | none | Attention | connected |
@@ -257,8 +293,16 @@ fastest:
 | Tiingo | `TIINGO_API_KEY` | EOD prices | connected |
 | Reddit | `REDDIT_CLIENT_ID` + `_SECRET` | Social sentiment | **not connected** |
 | YouTube | `YOUTUBE_API_KEY` | Social sentiment | not connected |
-| X / Twitter | — | — | **no free read tier; do not attempt** |
+| X / Twitter | — | — | **no free read tier; do not attempt — Bluesky covers the need** |
 | LLM | `GEMINI_API_KEY` (+ optional `OPENAI_*`) | All AI prose | connected (Gemini free tier) |
+
+`tradeos/sources.py` is the registry of record and the integration page reads it — a source missing
+from it is invisible to the operator no matter how well it runs. GDELT was exactly that for three
+phases. **Adding an ingestion module is not done until it has a CATALOG entry.**
+
+Bluesky reads a CURATED ACCOUNT LIST (`watchlist_accounts`, `platform = 'bluesky'`), not the
+network: `app.bsky.feed.searchPosts` returns 403 without authentication as of 2026-07-26, while
+`getAuthorFeed` and `getProfile` are keyless. Do not rebuild this around search.
 
 Every external call goes through a module in `tradeos/ingestion/`. **Never call an external
 API from a route handler or a component.**

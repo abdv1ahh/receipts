@@ -21,7 +21,7 @@ from datetime import UTC, date, datetime, time, timedelta
 
 from psycopg import sql
 
-from . import alerts, authn, db
+from . import alerts, authn, config, db
 from .backtest import run as backtest
 from .config import sec_user_agent
 from .ingestion import form13f, schedule13
@@ -188,6 +188,85 @@ def cmd_ingest_sentiment(args) -> None:
         if args.source in ("reddit", "all"):
             totals["reddit"] = social_reddit.ingest(conn)   # honest no-op until REDDIT_CLIENT_ID/SECRET set
     print(f"ingest-sentiment: {totals}")
+
+
+def cmd_check_source(args) -> None:
+    """Make a REAL call to one source and say plainly whether it worked.
+
+    `status` reports what has already been ingested and `preflight` reports what is configured;
+    neither answers the question an operator actually has after pasting a key in, which is "did
+    that work?". This does, and it names the failure rather than leaving a silent empty panel.
+    """
+    from . import sources
+    key = args.source
+    src = sources.by_key(key)
+    if not src:
+        print(f"check-source: unknown source {key!r}. Known: "
+              f"{', '.join(s['key'] for s in sources.catalog())}")
+        raise SystemExit(2)
+    if src["state"] == sources.NEEDS_KEY:
+        print(f"check-source {key}: NOT CONFIGURED — set {' and '.join(src['env'])} in .env, then "
+              f"restart with `docker compose up -d`.")
+        print(f"  where to get it: {src['signup_url']}")
+        raise SystemExit(1)
+    if src["state"] == sources.UNAVAILABLE:
+        print(f"check-source {key}: UNAVAILABLE by design — {src['note']}")
+        raise SystemExit(1)
+
+    ok, detail = _probe(key)
+    print(f"check-source {key}: {'OK' if ok else 'FAILED'} — {detail}")
+    raise SystemExit(0 if ok else 1)
+
+
+def _probe(key: str) -> tuple[bool, str]:
+    """One cheap live call per source. Returns (ok, human-readable detail).
+
+    Exceptions are caught and described rather than raised: an operator running this has just
+    pasted a credential and needs to be told what is wrong, not shown a traceback. The message
+    never echoes the credential — httpx puts the full URL in its exception text, so only the
+    exception TYPE and status code are surfaced.
+    """
+    import httpx
+    try:
+        if key == "reddit":
+            from .ingestion import social_reddit
+            with httpx.Client(timeout=20.0) as client:
+                token = social_reddit._token(client)
+                posts = social_reddit._posts(client, token, "stocks", limit=1)
+            return True, f"authenticated and read {len(posts)} post(s) from r/stocks"
+        if key == "bluesky":
+            from .ingestion import social_bluesky
+            with httpx.Client(timeout=20.0, headers=social_bluesky.UA) as client:
+                did = social_bluesky.resolve_did(client, "reuters.com")
+            return (bool(did), f"resolved reuters.com to {did}" if did
+                    else "could not resolve a known handle")
+        if key == "tiingo":
+            with httpx.Client(timeout=20.0) as client:
+                r = client.get("https://api.tiingo.com/api/test",
+                               headers={"Authorization": f"Token {os.environ['TIINGO_API_KEY']}"})
+            r.raise_for_status()
+            return True, "token accepted by Tiingo's test endpoint"
+        if key == "coingecko":
+            with httpx.Client(timeout=20.0) as client:
+                r = client.get("https://api.coingecko.com/api/v3/ping")
+            return r.status_code == 200, f"ping returned {r.status_code}"
+        if key == "sec_edgar":
+            from . import config
+            return bool(config.sec_user_agent()), "SEC_USER_AGENT is set"
+        return False, "no live probe is defined for this source yet"
+    except httpx.HTTPStatusError as exc:
+        return False, (f"HTTP {exc.response.status_code} — "
+                       f"{'credentials rejected' if exc.response.status_code in (401, 403) else 'request failed'}")
+    except Exception as exc:
+        return False, f"{type(exc).__name__} (no credential is included in this message)"
+
+
+def cmd_ingest_bluesky(args) -> None:
+    """Posts from the consequential accounts on Bluesky. Keyless, so this works out of the box;
+    edit the list with `seed-watchlist` or the accounts API."""
+    from .ingestion import social_bluesky
+    with db.connect() as conn:
+        print(f"ingest-bluesky: {social_bluesky.ingest(conn, limit=args.limit)}")
 
 
 def cmd_ingest_news(args) -> None:
@@ -503,7 +582,7 @@ def cmd_seed_admin(args) -> None:
             print(f"admin {email} already exists; not modified")
             return
         authn.audit(conn, "system", "seed_admin", email)
-    uri = pyotp.TOTP(secret).provisioning_uri(name=email, issuer_name="TradeOSS")
+    uri = pyotp.TOTP(secret).provisioning_uri(name=email, issuer_name=config.brand_name())
     print(f"admin created: {email}")
     print("add this TOTP to your authenticator app (required for admin login):")
     print(f"  secret: {secret}")
@@ -652,6 +731,14 @@ def main() -> None:
     isent.add_argument("--limit", type=int, default=60)
     isent.add_argument("--window", type=int, default=48)
     isent.set_defaults(fn=cmd_ingest_sentiment)
+
+    cs = sub.add_parser("check-source", help="make a real call to one source and report the result")
+    cs.add_argument("source")
+    cs.set_defaults(fn=cmd_check_source)
+
+    ibs = sub.add_parser("ingest-bluesky")
+    ibs.add_argument("--limit", type=int, default=25, help="posts per account")
+    ibs.set_defaults(fn=cmd_ingest_bluesky)
 
     inn = sub.add_parser("ingest-news")
     inn.add_argument("--source", default="all", choices=["sec", "rss", "all"])

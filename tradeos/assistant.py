@@ -21,7 +21,7 @@ import re
 import psycopg
 from psycopg import sql
 
-from . import llm, sentiment, trades
+from . import config, llm, sentiment, trades
 from .explain.guards import allowed_numbers, directive_guard, numbers_guard
 
 log = logging.getLogger("tradeos.assistant")
@@ -121,7 +121,7 @@ def build_answer(question: str, ctx: dict) -> tuple[str, list[str]]:
             parts.append(f"Across your {perf['n_closed']} closed trades, your recorded win rate is "
                          f"{wr}%{rr_txt}. The performance tab breaks this down by strategy.")
         else:
-            parts.append(f"You've logged {perf['n_closed']} closed trade(s); TradeOSS reports a win rate "
+            parts.append(f"You've logged {perf['n_closed']} closed trade(s); {config.brand_name()} reports a win rate "
                          f"and habits once there are at least 10, so it never calls an edge from a small "
                          f"sample.")
         sources.append("your_performance")

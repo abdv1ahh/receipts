@@ -58,6 +58,53 @@ SEED: list[dict] = [
     {"platform": "official", "handle": "imf.org/news",
      "display_name": "IMF", "role": "institution", "domain": "macro", "country": None,
      "influence": 0.75, "feed_url": "https://www.imf.org/en/News/RSS"},
+
+    # ---- Bluesky: the one social network with a genuinely open read API.
+    #
+    # X has no free read tier, so the brief's answer (Appendix A) is to serve the same need from a
+    # network that is actually open. Every handle below was resolved against
+    # app.bsky.actor.getProfile on 2026-07-26 and is a live, posting account — none is guessed, and
+    # a handle that could not be verified was left out rather than seeded hopefully. Squatted or
+    # zero-post namesakes were rejected for the same reason.
+    #
+    # `influence` is a STATED EDITORIAL WEIGHT, not a measurement of reach, and it is labelled that
+    # way wherever it surfaces. Wire services outrank commentary; research institutions that explain
+    # mechanisms are weighted above outlets that only report the headline, because a mechanism is
+    # what this product is trying to build.
+    {"platform": "bluesky", "handle": "reuters.com", "display_name": "Reuters",
+     "role": "wire", "domain": "general", "country": None, "influence": 0.85},
+    {"platform": "bluesky", "handle": "apnews.com", "display_name": "Associated Press",
+     "role": "wire", "domain": "general", "country": None, "influence": 0.85},
+    {"platform": "bluesky", "handle": "piie.com", "display_name": "Peterson Institute (PIIE)",
+     "role": "research", "domain": "trade_policy", "country": None, "influence": 0.7},
+    {"platform": "bluesky", "handle": "nytimes.com", "display_name": "The New York Times",
+     "role": "outlet", "domain": "general", "country": "US", "influence": 0.65},
+    {"platform": "bluesky", "handle": "washingtonpost.com", "display_name": "The Washington Post",
+     "role": "outlet", "domain": "general", "country": "US", "influence": 0.65},
+    # Not decoration: the product's premise is that an event reads differently from different
+    # places, and a list of US outlets cannot demonstrate that.
+    {"platform": "bluesky", "handle": "aljazeera.com", "display_name": "Al Jazeera English",
+     "role": "outlet", "domain": "general", "country": "QA", "influence": 0.65},
+    {"platform": "bluesky", "handle": "france24.com", "display_name": "FRANCE 24",
+     "role": "outlet", "domain": "general", "country": "FR", "influence": 0.55},
+    {"platform": "bluesky", "handle": "cfr.org", "display_name": "Council on Foreign Relations",
+     "role": "research", "domain": "geopolitics", "country": None, "influence": 0.6},
+    {"platform": "bluesky", "handle": "chathamhouse.org", "display_name": "Chatham House",
+     "role": "research", "domain": "geopolitics", "country": None, "influence": 0.55},
+    {"platform": "bluesky", "handle": "brookings.edu", "display_name": "Brookings Institution",
+     "role": "research", "domain": "macro", "country": None, "influence": 0.55},
+    {"platform": "bluesky", "handle": "politico.com", "display_name": "Politico",
+     "role": "outlet", "domain": "regulation", "country": "US", "influence": 0.55},
+    {"platform": "bluesky", "handle": "axios.com", "display_name": "Axios",
+     "role": "outlet", "domain": "general", "country": "US", "influence": 0.5},
+    {"platform": "bluesky", "handle": "marketwatch.com", "display_name": "MarketWatch",
+     "role": "outlet", "domain": "markets", "country": "US", "influence": 0.5},
+    {"platform": "bluesky", "handle": "businessinsider.com", "display_name": "Business Insider",
+     "role": "outlet", "domain": "markets", "country": "US", "influence": 0.45},
+    {"platform": "bluesky", "handle": "semafor.com", "display_name": "Semafor",
+     "role": "outlet", "domain": "general", "country": "US", "influence": 0.45},
+    {"platform": "bluesky", "handle": "propublica.org", "display_name": "ProPublica",
+     "role": "outlet", "domain": "regulation", "country": "US", "influence": 0.45},
 ]
 
 

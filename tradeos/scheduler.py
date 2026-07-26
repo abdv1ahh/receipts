@@ -91,6 +91,13 @@ def _job_gdelt(conn) -> dict:
     return gdelt.ingest(conn, timespan="2h")
 
 
+def _job_social_bluesky(conn) -> dict:
+    """The consequential-accounts feed on the one social network with an open read API. Keyless,
+    so unlike Reddit this runs for real out of the box."""
+    from .ingestion import social_bluesky
+    return social_bluesky.ingest(conn)
+
+
 def _job_spine_news(conn) -> dict:
     """Project newly-arrived news_items into the event spine, so a story reported by both CNBC and
     GDELT clusters as one happening. Small window — the bootstrap backfill is a CLI command."""
@@ -160,6 +167,8 @@ JOBS = [
     ("sentiment_hn", 21600, _job_sentiment_hn),  # every 6h
     ("attention_wiki", 86400, _job_attention_wiki),  # pageviews are daily
     ("social_reddit", 3600, _job_social_reddit),  # hourly (no-op until configured)
+    # ~16 accounts at one request each, paced at 1.2s — about 20s of wall time per pass.
+    ("social_bluesky", 3600, _job_social_bluesky),  # hourly; keyless, so it runs by default
     ("earnings_cal", 43200, _job_earnings),       # forward earnings -> twice a day
     ("economic_cal", 43200, _job_economic),       # macro calendar -> twice a day
     ("warm_brief", 3600, _job_warm_brief),        # keep the shared brief hot (runs after the news jobs)

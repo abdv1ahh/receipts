@@ -122,7 +122,6 @@ export const askAssistant = (message) => post("/api/assistant", { message });
 export const fetchTrending = (hours = 48) => get(`/api/trending?hours=${hours}`);
 export const fetchSymbolSentiment = (symbol) => get(`/api/sentiment/${encodeURIComponent(symbol)}`);
 // Community (Slice F)
-export const fetchCommunityFeed = (scope = "public", beforeId) => get(`/api/community/feed?scope=${scope}${beforeId ? `&before_id=${beforeId}` : ""}`);
 export const fetchProfile = (handle) => get(`/api/u/${encodeURIComponent(handle)}`);
 export const setProfile = (handle, bio) => fetch("/api/profile", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ handle, bio }) }).then((r) => r.json());
 export const followUser = (handle) => post("/api/users/follow", { handle });

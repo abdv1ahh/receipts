@@ -148,7 +148,11 @@ body::before {
   background: rgba(8,10,16,.72); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--border);
 }
-.menu-btn { display: none; }
+/* Compound selectors so these beat `.icon-btn { display: grid }` regardless of source order. Both
+   buttons carry .icon-btn too, and a plain `.menu-btn { display: none }` lost to it — which is why
+   a hamburger has been sitting in the top bar on desktop next to an already-visible sidebar. */
+.icon-btn.menu-btn { display: none; }
+.icon-btn.search-btn { display: none; }
 .search-wrap { display: flex; align-items: center; gap: 8px; flex: 1; max-width: 440px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 0 12px; height: 38px; color: var(--muted); transition: border-color .13s, box-shadow .13s; }
 .search-wrap:focus-within { border-color: var(--accent); box-shadow: var(--ring); color: var(--text); }
 .topsearch { flex: 1; min-width: 0; background: none; border: 0; color: var(--text); font: inherit; font-size: 13.5px; outline: none; }
@@ -162,7 +166,13 @@ body::before {
 .account-meta b { display: block; font-weight: 600; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .account-meta span { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; }
 
-.content { flex: 1; max-width: 1200px; width: 100%; margin: 0 auto; padding: 22px 26px 72px; }
+/* overflow-wrap:anywhere because almost everything in here is INGESTED text, and ingested text
+   contains bare URLs — a single unbreakable token that forces its container past the viewport and
+   scrolls the whole page sideways. Found exactly that way: one news item whose title was a raw
+   drive.google.com link. `anywhere` rather than `break-word` because only `anywhere` also lets the
+   container's min-content shrink, which is the half that stops the overflow. It never breaks a word
+   that would otherwise fit, so ordinary prose is unaffected. */
+.content { flex: 1; max-width: 1200px; width: 100%; margin: 0 auto; padding: 22px 26px 72px; overflow-wrap: anywhere; }
 .scrim { display: none; }
 
 /* page header (title + subtitle) used atop primary views */
@@ -174,11 +184,15 @@ body::before {
   .sidebar { transform: translateX(-100%); transition: transform .22s ease; box-shadow: var(--shadow-lg); }
   .sidebar.open { transform: none; }
   .main { margin-left: 0; }
-  .menu-btn { display: grid; }
+  .icon-btn.menu-btn { display: grid; }
   .scrim { display: block; position: fixed; inset: 0; z-index: 35; background: rgba(0,0,0,.55); }
   .account-meta { display: none; }
   .content { padding: 16px 15px 60px; }
 }
+
+/* Narrow-screen corrections live at the END of this file, deliberately. A media query adds no
+   specificity, so a mobile override placed here would lose to any same-specificity base rule
+   declared further down — which is exactly what happened to `.bt` on the first attempt. */
 
 .linkish { background: none; border: 0; color: var(--accent); cursor: pointer; font: inherit; font-size: inherit; padding: 0; text-align: left; }
 .linkish:hover { text-decoration: underline; }
@@ -310,8 +324,8 @@ table.clusters { width: 100%; border-collapse: collapse; }
 }
 
 /* ============================================================= CONSUMER HOME */
-.home { display: grid; grid-template-columns: 1fr 300px; gap: 22px; margin-top: 18px; align-items: start; }
-@media (max-width: 900px) { .home { grid-template-columns: 1fr; } .rail { order: -1; } }
+.home { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 22px; margin-top: 18px; align-items: start; }
+@media (max-width: 900px) { .home { grid-template-columns: minmax(0, 1fr); } .rail { order: -1; } }
 
 .feed-head { display: flex; align-items: baseline; gap: 12px; margin: 4px 0 14px; flex-wrap: wrap; }
 .feed-head h2 { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
@@ -558,20 +572,6 @@ table.clusters { width: 100%; border-collapse: collapse; }
 .nav-group { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .nav-div { width: 1px; height: 15px; background: var(--border); margin: 0 3px; display: inline-block; }
 
-.landing { max-width: 1000px; margin: 0 auto; }
-.landing-hero { text-align: center; padding: 22px 0 6px; }
-.eyebrow { font-size: 12px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--accent); font-weight: 700; }
-.landing-h1 { font-size: 40px; line-height: 1.1; margin: 12px 0; font-weight: 800; letter-spacing: -0.02em; }
-.landing-sub { font-size: 16px; line-height: 1.6; color: var(--text); max-width: 680px; margin: 0 auto; }
-.landing-cta { display: flex; gap: 12px; justify-content: center; margin: 22px 0 10px; flex-wrap: wrap; }
-.landing-btn { font-size: 14px; padding: 10px 20px; border-radius: 10px; }
-.landing-trust { font-size: 12px; color: var(--muted); max-width: 620px; margin: 8px auto 0; line-height: 1.5; }
-.landing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(258px, 1fr)); gap: 14px; margin-top: 26px; }
-.landing-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px; }
-.landing-icon { font-size: 24px; }
-.landing-card-title { font-weight: 700; font-size: 15px; margin: 8px 0 4px; }
-.landing-card-body { font-size: 13px; color: var(--muted); line-height: 1.55; }
-.landing-foot { text-align: center; font-size: 12px; color: var(--muted); margin: 28px auto 0; max-width: 640px; line-height: 1.5; }
 
 .search-group { margin-top: 14px; }
 .search-row { display: block; width: 100%; text-align: left; background: var(--panel-2); border: 1px solid var(--border); border-radius: 9px; padding: 9px 12px; margin-top: 6px; color: var(--text); font: inherit; font-size: 13.5px; cursor: pointer; }
@@ -845,7 +845,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 .pulse-inputs-note { font-size: 11px; color: var(--faint); border-top: 1px solid var(--hairline); padding-top: 9px; line-height: 1.5; }
 
 /* section scaffolding */
-.dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s4); margin-top: var(--s4); align-items: start; }
+.dash-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--s4); margin-top: var(--s4); align-items: start; }
 .sec { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--s4) var(--s4) 10px; }
 .sec.span-2 { grid-column: 1 / -1; }
 .sec-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
@@ -920,8 +920,8 @@ button:disabled { opacity: 0.5; cursor: default; }
 }
 
 @media (max-width: 900px) {
-  .dash-grid { grid-template-columns: 1fr; }
-  .opp-grid { grid-template-columns: 1fr; }
+  .dash-grid { grid-template-columns: minmax(0, 1fr); }
+  .opp-grid { grid-template-columns: minmax(0, 1fr); }
   .pulse { grid-template-columns: 1fr; gap: var(--s4); }
   .pulse-l { border-right: 0; border-bottom: 1px solid var(--hairline); padding-right: 0; padding-bottom: var(--s4); }
 }
@@ -1231,8 +1231,12 @@ button:disabled { opacity: 0.5; cursor: default; }
 .watch-analyzer-btn:hover { border-color: var(--accent); color: var(--text); }
 .watch-analyzer-btn svg { color: var(--accent-2); }
 
-.watch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; margin-top: 12px; }
-.watch-card { display: flex; gap: 13px; background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 13px 14px; }
+/* min(320px,100%) so the track collapses to the viewport on a phone instead of holding 320px and
+   overflowing whatever padding sits outside it. */
+.watch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr)); gap: 12px; margin-top: 12px; }
+/* min-width:0 because a grid ITEM is min-width:auto by default, so the card refused to shrink
+   below its widest score row and spilled out of its own track. */
+.watch-card { display: flex; gap: 13px; background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 13px 14px; min-width: 0; }
 .watch-card:hover { border-color: var(--border-2); }
 .watch-body { flex: 1; min-width: 0; }
 .watch-head { display: flex; align-items: baseline; gap: 8px; }
@@ -1487,7 +1491,9 @@ div.intg-warn { margin-top: 8px; border: 0; border-radius: 8px; padding: 7px 10p
 /* ---- Calendar: a calendar ---------------------------------------------------------------------- */
 .cal-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
 .cal-anchor { font-size: 15px; font-weight: 600; margin-left: 6px; }
-.cal-month { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-top: 14px; }
+/* minmax(0,…) rather than 1fr: a bare 1fr track is min-width:auto, so a cell holding a long ticker
+   pill refuses to shrink and pushes the whole seven-column grid past the viewport. */
+.cal-month { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; margin-top: 14px; }
 .cal-wd { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted);
   text-align: center; padding-bottom: 3px; }
 .cal-cell { min-height: 92px; border: 1px solid var(--border-2); border-radius: 9px; padding: 5px;
@@ -1656,3 +1662,52 @@ div.intg-warn { margin-top: 8px; border: 0; border-radius: 8px; padding: 7px 10p
 .rd-thread-when, .rd-thread-conf { font-family: var(--mono); font-size: 11px; color: var(--faint); margin-right: 10px; }
 .rd-thread-list p { margin: 5px 0 3px; color: var(--muted); line-height: 1.55; }
 .rd-thread-note { font-size: 11px; color: var(--faint); font-style: italic; }
+
+/* =====================================================================================================
+   NARROW SCREENS — must stay LAST in this file
+   -----------------------------------------------------------------------------------------------------
+   A media query carries no extra specificity, so these only reliably win from the bottom of the
+   sheet. Every rule below was written against a measured horizontal overflow, not a guess: before
+   this block every surface in the app scrolled sideways on a phone, which is most of what "visual
+   glitches everywhere" turned out to be.
+   ===================================================================================================== */
+
+/* Data tables are the one thing that genuinely cannot fit a narrow screen — the widest here is
+   ~940px, so this has to cover tablets too, not just phones. Give each table its own scroll
+   container (:has(> table) matches only a table's direct parent) so the wide content scrolls inside
+   its panel and the PAGE never does. Above this width every table fits the content column. */
+@media (max-width: 1000px) {
+  .content :has(> table) { overflow-x: auto; }
+}
+
+/* The top bar carries eight controls. Below ~720px they stop fitting side by side, and because the
+   header is a flex row of fixed-width buttons the surplus pushed the page ~190px wider than the
+   viewport on EVERY surface. Drop the search field for its button, and tighten the spacing. */
+@media (max-width: 720px) {
+  .topbar { padding: 0 10px; gap: 6px; }
+  .search-wrap { display: none; }
+  .icon-btn.search-btn { display: grid; }
+  .topbar-right { gap: 6px; }
+  .upgrade-btn { padding: 0 9px; }
+
+  /* Seven columns on a 375px screen leaves ~45px each; the desktop cell is built for 92px. */
+  .cal-cell { min-height: 64px; padding: 3px; }
+  .cal-month { gap: 3px; }
+
+  /* "Backtested · insufficient sample (n=10)" is 274px and nowrap — correct on a desktop card, and
+     wider than a phone card's entire content box. Let it take two lines instead. */
+  .bt { white-space: normal; }
+}
+
+/* ---- Social: the consequential-accounts coverage panel ------------------------------------------
+   Separate from the attention source strip on purpose: those sources score a ticker's discussion,
+   these carry statements, and the brief requires the panel to NAME the networks it covers rather
+   than leaving an unexplained "N/A" against X forever. */
+.voices { margin-top: 12px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
+.voices-head { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.voices-head svg { color: var(--accent); }
+.voices-rows { margin-top: 9px; display: flex; flex-direction: column; gap: 7px; }
+.voices-row { display: flex; align-items: baseline; gap: 10px; font-size: 12px; }
+.voices-row .src-dot { flex: none; }
+.voices-note { color: var(--muted); line-height: 1.5; }
+.voices-row.unavailable .voices-note { color: var(--faint); }

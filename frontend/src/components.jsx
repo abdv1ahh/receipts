@@ -1,5 +1,6 @@
 // Presentational components. Staleness is a first-class visual system: never render a
 // signal figure without a <Freshness> beside it.
+import { BRAND } from "./brand.js";
 
 export function Freshness({ iso, quarterly }) {
   if (!iso) return <span className="fresh s">—</span>;
@@ -95,7 +96,7 @@ export function StatusStrip({ feeds }) {
 export function Disclaimer() {
   return (
     <div className="disclaimer">
-      TradeOSS is an analytics and education platform. Nothing here is investment advice.
+      {BRAND} is an analytics and education platform. Nothing here is investment advice.
       Signals describe disclosed activity by third parties, with delays as labeled.
       Confidence buckets show a backtested hit rate wherever the resolved-episode sample is
       sufficient, and read “insufficient sample” otherwise. Higher-conviction buckets remain

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import {
   cancelSub, checkout, createKey, fetchKeys, fetchPlans, fetchReferral, revokeKey, testActivate,
 } from "./api";
+import { BRAND } from "./brand.js";
 
 function ReferralCard() {
   const [d, setD] = useState(null);
@@ -115,7 +116,7 @@ export function PricingView({ user, onUpgraded, onLogin }) {
       {user && <ReferralCard />}
       {user && <ApiKeys />}
       <div className="disclaimer" style={{ marginTop: 20 }}>
-        Payments are handled by Stripe; card data never touches TradeOSS servers. TradeOSS is analytics and
+        Payments are handled by Stripe; card data never touches {BRAND} servers. {BRAND} is analytics and
         education, not investment advice.
       </div>
     </div>

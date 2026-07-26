@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { addFollow, addWatchlist, fetchAsset, fetchHome, fetchLeaderboards, shadowSymbol } from "./api";
 import { Backtested, Freshness } from "./components.jsx";
 import { Icon } from "./icons.jsx";
+import { BRAND } from "./brand.js";
 
 const BAND = { high: "band-high", medium: "band-med", low: "band-low" };
 const money = (v) => {
@@ -387,7 +388,7 @@ export function IssuerDetail({ detail, onBack, calibration, horizon, explanation
       </div>
 
       <div className="disclaimer">
-        TradeOSS is an analytics and education platform. Nothing here is investment advice. Signals describe disclosed
+        {BRAND} is an analytics and education platform. Nothing here is investment advice. Signals describe disclosed
         activity by third parties, with delays as labeled. Backtested rates read “insufficient sample” wherever the
         resolved-episode count is too low to claim a number.
       </div>

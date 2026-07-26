@@ -204,7 +204,7 @@ section { padding: clamp(80px, 12vh, 160px) 0; position: relative; }
 /* ---- hero ----------------------------------------------------------------------------------- */
 .hero { position: relative; padding: clamp(70px, 11vh, 130px) 0 clamp(60px, 9vh, 110px); overflow: hidden; }
 .hero-grid { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: clamp(30px, 5vw, 70px); align-items: center; }
-@media (max-width: 940px) { .hero-grid { grid-template-columns: 1fr; } }
+@media (max-width: 940px) { .hero-grid { grid-template-columns: minmax(0, 1fr); } }
 
 .hero h1 em { font-style: italic; color: var(--magenta); }
 .hero .lede { margin-top: var(--s5); }
@@ -283,7 +283,7 @@ section { padding: clamp(80px, 12vh, 160px) 0; position: relative; }
 
 /* ---- walkthrough ---------------------------------------------------------------------------- */
 .walk { display: grid; grid-template-columns: 260px 1fr; gap: clamp(24px, 4vw, 60px); align-items: start; }
-@media (max-width: 860px) { .walk { grid-template-columns: 1fr; } }
+@media (max-width: 860px) { .walk { grid-template-columns: minmax(0, 1fr); } }
 
 .walk-rail { position: sticky; top: 100px; }
 @media (max-width: 860px) { .walk-rail { position: static; } }
@@ -326,7 +326,7 @@ section { padding: clamp(80px, 12vh, 160px) 0; position: relative; }
 .miss-row .sym { font-family: var(--mono); color: var(--paper); }
 .miss-row .delta { font-family: var(--mono); color: var(--miss); }
 .miss-row .what { color: var(--paper-dim); line-height: 1.45; }
-@media (max-width: 640px) { .miss-row { grid-template-columns: 1fr; gap: 4px; } }
+@media (max-width: 640px) { .miss-row { grid-template-columns: minmax(0, 1fr); gap: 4px; } }
 
 /* Calibration: the honest question a hit rate cannot answer. A plain two-bar comparison per band,
    because a scatter plot here would be showing off. */
@@ -340,8 +340,8 @@ section { padding: clamp(80px, 12vh, 160px) 0; position: relative; }
 .cal-key { font-family: var(--mono); font-size: 10.5px; color: var(--paper-faint); }
 
 /* ---- personalisation ------------------------------------------------------------------------ */
-.pers { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(24px, 4vw, 56px); align-items: start; }
-@media (max-width: 900px) { .pers { grid-template-columns: 1fr; } }
+.pers { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(24px, 4vw, 56px); align-items: start; }
+@media (max-width: 900px) { .pers { grid-template-columns: minmax(0, 1fr); } }
 
 .map-card { border: 1px solid var(--rule); border-radius: var(--radius-lg); background: var(--ink-2); padding: 10px; }
 .map-card svg { display: block; width: 100%; height: auto; }
@@ -362,7 +362,10 @@ section { padding: clamp(80px, 12vh, 160px) 0; position: relative; }
 .faq { border-top: 1px solid var(--rule); }
 .faq-item { border-bottom: 1px solid var(--rule); }
 .faq-q {
+  /* min-width:0 on the text so a long question wraps instead of widening the accordion; the +/-
+     marker stays flex:none because it must never be the thing that shrinks. */
   width: 100%; display: flex; gap: 16px; align-items: center; justify-content: space-between;
+  min-width: 0;
   background: none; border: 0; color: var(--paper); font: inherit; font-size: clamp(15px, 2vw, 18px);
   padding: 22px 0; text-align: left; cursor: pointer;
 }
@@ -381,3 +384,8 @@ section { padding: clamp(80px, 12vh, 160px) 0; position: relative; }
 }
 
 .err { font-size: 13.5px; color: var(--paper-dim); font-family: var(--mono); }
+
+
+/* Live claim text on this page comes from the same ingested sources as the app, and ingested text
+   contains bare URLs — one unbreakable token is enough to push the page wider than a phone. */
+.wrap, .faq-q, .faq-a { overflow-wrap: anywhere; }

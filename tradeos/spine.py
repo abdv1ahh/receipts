@@ -133,23 +133,30 @@ def upsert_event(conn, ev: dict) -> int | None:
     """Write one normalised event, idempotent on (source, external_id). Returns its id.
 
     `ev` is what an adapter produces: source, external_id, source_url, title, knowable_time, and
-    optionally published_at, body, language, author, entities, geo, category, raw_payload. The
-    raw payload is always kept, because that is what makes reprocessing possible."""
+    optionally published_at, body, language, author, author_influence, entities, geo, category,
+    raw_payload. The raw payload is always kept, because that is what makes reprocessing possible.
+
+    `author_influence` is a STATED EDITORIAL WEIGHT supplied by the adapter from the
+    consequential-accounts list — never a measurement of reach. It went unwritten until Bluesky
+    became the first source that actually supplies one, even though watchlist_accounts.py has always
+    described this as the place it is stored."""
     if not ev.get("title") or not ev.get("knowable_time"):
         return None                                  # never store a shapeless row
     with conn.cursor() as cur:
         cur.execute(
-            """INSERT INTO events (source, external_id, source_url, author, published_at,
-                                   knowable_time, title, body, language, entities, geo, category,
-                                   raw_payload)
-               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            """INSERT INTO events (source, external_id, source_url, author, author_influence,
+                                   published_at, knowable_time, title, body, language, entities,
+                                   geo, category, raw_payload)
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                ON CONFLICT (source, external_id) DO UPDATE SET
                    title = EXCLUDED.title, body = EXCLUDED.body, geo = EXCLUDED.geo,
                    entities = EXCLUDED.entities, category = EXCLUDED.category,
+                   author_influence = EXCLUDED.author_influence,
                    raw_payload = EXCLUDED.raw_payload
                RETURNING id""",
             (ev["source"], str(ev["external_id"])[:400], ev.get("source_url") or "",
-             ev.get("author"), ev.get("published_at"), ev["knowable_time"],
+             ev.get("author"), ev.get("author_influence"),
+             ev.get("published_at"), ev["knowable_time"],
              ev["title"][:1000], (ev.get("body") or None), ev.get("language"),
              Json(ev.get("entities") or []), ev.get("geo") or [],
              ev.get("category") or classify(ev["title"], ev.get("body")),

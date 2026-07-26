@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { BRAND } from "./brand.js";
 import { authLogout, authMe, fetchCalibration, fetchClusters, fetchClusterDetail, fetchDefinitions, fetchExplanation, fetchFeeds, fetchNotifications } from "./api";
 import { Methodology } from "./components.jsx";
 import { AssetView, AuthPanel, LibraryEntry, LibraryView, ProfileView, Screener, WatchlistView } from "./views.jsx";
@@ -13,7 +14,7 @@ import { EventsView } from "./events.jsx";
 import { PortfoliosView } from "./portfolios.jsx";
 import { PricingView } from "./pricing.jsx";
 import { CryptoView } from "./crypto.jsx";
-import { LandingView, SearchView } from "./discover.jsx";
+import { SearchView } from "./discover.jsx";
 import { AdminView } from "./admin.jsx";
 import { Dashboard } from "./dashboard.jsx";
 import { IntegrationsView } from "./integrations.jsx";
@@ -27,7 +28,6 @@ import { LedgerView } from "./ledger.jsx";
 import { ErrorBoundary, useRoute } from "./shell.jsx";
 import { Icon } from "./icons.jsx";
 
-const BRAND = "Rhumb";
 const NAV_LABELS = { radar: "Radar", globe: "The World", ledger: "Ledger", dashboard: "Dashboard", brief: "Morning Brief", news: "News", events: "Calendar", home: "Smart Money", trending: "Social", crypto: "Crypto", journal: "Journal", exposure: "Exposure", watchlist: "Watchlist", alerts: "Alerts", assistant: "AI Assistant", screener: "Screener", library: "Library", methodology: "Methodology", integrations: "Integrations" };
 const NAV_ICONS = { radar: "radar", globe: "layers", ledger: "target", dashboard: "grid", brief: "sparkles", news: "news", events: "calendar", home: "signal", trending: "trending", crypto: "crypto", journal: "journal", exposure: "briefcase", watchlist: "star", alerts: "bell", assistant: "compass", screener: "filter", library: "book", methodology: "target", integrations: "plug" };
 // A calmer rail: the essentials up front, utilities tucked into a collapsible "More".
@@ -100,7 +100,7 @@ function CommandPalette({ onGo, onClose }) {
 
 // Which surfaces are reachable by URL. Anything not listed falls back to the dashboard, so a
 // stale bookmark lands somewhere sensible instead of a blank page.
-const ROUTES = new Set([...Object.keys(NAV_LABELS), "landing", "auth", "pricing", "notifications",
+const ROUTES = new Set([...Object.keys(NAV_LABELS), "auth", "pricing", "notifications",
                         "search", "asset", "profile", "library-entry", "admin",
                         // Reached from an email. Without these the link fell through to the SPA
                         // catch-all and landed on the marketing page with the token ignored.
@@ -110,7 +110,10 @@ export default function App() {
   const route = useRoute();
   const [minC, setMinC] = useState("medium");
   const [horizon, setHorizon] = useState(90);
-  const [view, setViewState] = useState(() => (ROUTES.has(route.path) ? route.path : "landing"));
+  // Radar is the product's primary surface, so an unrecognised path lands there. A signed-out
+  // stranger never reaches this: the server redirects "/" to the marketing site before the
+  // bundle is served.
+  const [view, setViewState] = useState(() => (ROUTES.has(route.path) ? route.path : "radar"));
   const [clusters, setClusters] = useState(null);
   const [asOf, setAsOf] = useState(null);
   const [defVer, setDefVer] = useState(null);
@@ -141,7 +144,7 @@ export default function App() {
     fetchFeeds().then(setFeeds).catch(() => setFeeds(null));
     fetchCalibration().then(setCalibration).catch(() => setCalibration(null));
     fetchDefinitions().then(setDefinitions).catch(() => setDefinitions(null));
-    authMe().then((d) => { setUser(d.user); if (d.user) setViewState((v) => (v === "landing" ? "radar" : v)); }).catch(() => {});
+    authMe().then((d) => setUser(d.user)).catch(() => {});
     const params = route.query;
     if (params.get("symbol")) { setAssetSymbol(params.get("symbol").toUpperCase()); setViewState("asset"); }
     if (params.get("upgraded")) setViewState("pricing");   // returned from Stripe Checkout
@@ -151,12 +154,10 @@ export default function App() {
   // Browser back/forward: the URL is the source of truth, so a popstate re-selects the surface.
   useEffect(() => {
     if (ROUTES.has(route.path) && route.path !== view) setViewState(route.path);
-    else if (!route.path && view !== "landing" && !user) setViewState("landing");
   }, [route.path]);
 
   useEffect(() => {
-    document.title = view === "landing" ? `${BRAND} — world events, and what they mean for you`
-                                        : `${NAV_LABELS[view] || BRAND} · ${BRAND}`;
+    document.title = `${NAV_LABELS[view] || BRAND} · ${BRAND}`;
   }, [view]);
 
   useEffect(() => { if (user) refreshUnread(); else setUnread(0); }, [user]);
@@ -184,7 +185,7 @@ export default function App() {
   }, [minC, user]);
 
   // One place that changes the surface, so the URL and the rendered view can never disagree.
-  const setView = (v, query) => { setViewState(v); route.go(v === "landing" ? "" : v, query); };
+  const setView = (v, query) => { setViewState(v); route.go(v, query); };
   const go = (v) => { setView(v); setDetail(null); setNavOpen(false); };
   const openDetail = (id) => {
     setDetail("loading");
@@ -196,7 +197,7 @@ export default function App() {
   const openProfile = (kind, id) => { setProfile({ kind, id }); setDetail(null); setView("profile", { kind, id }); };
   const openLibrary = (slug) => { setLibrarySlug(slug); setDetail(null); setView("library-entry", { slug }); };
   const onAuthed = (u) => { setUser(u); setView("radar"); };
-  const doLogout = async () => { await authLogout(); setUser(null); setView("landing"); };
+  const doLogout = async () => { await authLogout(); setUser(null); window.location.assign("/site/"); };
   const submitSearch = () => { if (search.trim()) { setView("search", { q: search.trim() }); setDetail(null); setNavOpen(false); } };
 
   const navBtn = (v) => (
@@ -208,7 +209,7 @@ export default function App() {
   return (
     <div className="shell">
       <aside className={`sidebar ${navOpen ? "open" : ""}`}>
-        <div className="brand" onClick={() => go(user ? "dashboard" : "landing")}>
+        <div className="brand" onClick={() => (user ? go("dashboard") : window.location.assign("/site/"))}>
           <span className="brand-mark">◆</span><span className="brand-name">{BRAND}</span>
         </div>
         <nav className="side-nav">
@@ -247,6 +248,10 @@ export default function App() {
               onChange={(e) => setSearch(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") submitSearch(); }} />
             <span className="kbd">⌘K</span>
           </div>
+          {/* Narrow screens have no room for the search field and no ⌘K to reach the palette with,
+              so search would be unreachable rather than merely cramped. This button replaces the
+              field below 720px and is hidden above it. */}
+          <button className="icon-btn search-btn" onClick={() => go("search")} title="search"><Icon name="search" /></button>
           <div className="topbar-right">
             <button className="ask-ai" onClick={() => go("assistant")} title="Ask the AI mentor"><Icon name="compass" size={16} /><span>Ask AI</span></button>
             <button className="upgrade-btn" onClick={() => go("pricing")}>⚡ {user && user.tier !== "free" ? user.tier : "Upgrade"}</button>
@@ -273,7 +278,7 @@ export default function App() {
           {/* First-run frame setup. Renders nothing unless the server says this reader is due, so
               it costs one request and never blocks a surface. Keyed by user so signing in as
               someone else re-asks the question for them. */}
-          {user && view !== "landing" && view !== "auth" && (
+          {user && view !== "auth" && (
             <OnboardingCard key={user.id} onDone={refreshUser} />
           )}
           <ErrorBoundary key={view} surface={view}>
@@ -281,8 +286,6 @@ export default function App() {
             <VerifyView onDone={go} />
           ) : view === "reset" ? (
             <ResetView onDone={go} />
-          ) : view === "landing" ? (
-            <LandingView onGetStarted={() => go("auth")} onExplore={() => go("news")} />
           ) : view === "dashboard" ? (
             <Dashboard user={user} onOpenSymbol={openSymbol} onNav={go} />
           ) : view === "search" ? (
@@ -319,7 +322,7 @@ export default function App() {
           ) : view === "assistant" ? (
             <AssistantView user={user} onLogin={() => go("auth")} />
           ) : view === "trending" ? (
-            <SocialView onOpenSymbol={openSymbol} />
+            <SocialView onOpenSymbol={openSymbol} onNav={go} />
           ) : view === "pricing" ? (
             <PricingView user={user} onUpgraded={refreshUser} onLogin={() => go("auth")} />
           ) : view === "notifications" ? (
@@ -336,7 +339,7 @@ export default function App() {
           ) : view === "watchlist" ? (
             <WatchlistView onOpenSymbol={openSymbol} onLogin={() => go("auth")} />
           ) : view === "auth" ? (
-            <AuthPanel onAuthed={onAuthed} onBack={() => go(user ? "home" : "landing")} initialInvite={refCode} />
+            <AuthPanel onAuthed={onAuthed} onBack={() => (user ? go("home") : window.location.assign("/site/"))} initialInvite={refCode} />
           ) : view === "library" ? (
             <LibraryView onOpenEntry={openLibrary} />
           ) : view === "library-entry" ? (

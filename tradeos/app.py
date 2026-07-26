@@ -19,7 +19,7 @@ from io import BytesIO
 from pathlib import Path
 
 from fastapi import BackgroundTasks, Cookie, FastAPI, Request, Response
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from psycopg import sql
 from psycopg.types.json import Json
@@ -543,7 +543,7 @@ def auth_google_callback(request: Request, response: Response, code: str | None 
     went wrong rather than on a JSON blob — this is a browser navigation, not an API call."""
     def _fail(msg: str):
         from urllib.parse import quote
-        return RedirectResponse(f"/?auth_error={quote(msg[:160])}", status_code=302)
+        return RedirectResponse(f"/auth?auth_error={quote(msg[:160])}", status_code=302)
 
     if error:
         return _fail("Google sign-in was cancelled.")
@@ -2052,6 +2052,12 @@ def trending_endpoint(hours: int = 72) -> dict:
     for r in board:
         r["has_signal"] = r.get("symbol") in sig
     return {"sources": sentiment.sources_status(), "hours": hours, "board": board,
+            # Separate from `sources` on purpose. Those feed the attention BOARD (per-ticker volume
+            # and mood). These are the networks the product reads for what consequential ACCOUNTS
+            # are saying, which lands on the Radar as events rather than here as a ticker score.
+            # The brief is explicit that this panel must name the networks it covers instead of
+            # showing an unexplained "N/A" for X forever.
+            "voices": [sources.gate(k) for k in ("bluesky", "x")],
             "note": None if board else ("No attention data yet — run `ingest-sentiment` (Wikipedia + "
                                         "Hacker News need no key), or connect Reddit for discussion sentiment.")}
 
@@ -3013,7 +3019,8 @@ def share_page(symbol: str) -> str:
     with db.connect() as conn, conn.cursor() as cur:
         d = _card_data(cur, sym) or {"symbol": sym, "name": "", "score": None, "headline": "Not a resolved issuer"}
     e = presentation._xml_escape
-    title = f"{sym} · Smart Money Score {d['score']}" if d.get("score") is not None else f"{sym} · TradeOSS"
+    brand = config.brand_name()
+    title = f"{sym} · Smart Money Score {d['score']}" if d.get("score") is not None else f"{sym} · {brand}"
     card = f"/api/card/{sym}.svg"
     return f'''<!doctype html><html lang="en"><head><meta charset="utf-8">
 <title>{e(title)}</title>
@@ -3025,8 +3032,8 @@ def share_page(symbol: str) -> str:
 <style>body{{background:#090b11;color:#d7e0ee;font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:flex;flex-direction:column;align-items:center;gap:22px;padding:44px 16px}}img{{max-width:100%;width:640px;border-radius:16px;border:1px solid #222b3a}}a{{color:#5b8cff;text-decoration:none;font-weight:600;font-size:18px}}p{{color:#7a8699;font-size:13px;max-width:560px;text-align:center;line-height:1.5}}</style>
 </head><body>
 <img src="{card}" alt="{e(title)}">
-<a href="/?symbol={e(sym)}">Open {e(sym)} on TradeOSS &#8594;</a>
-<p>TradeOSS shows what the smartest money is quietly doing, with backtested, probability-framed context. Not investment advice.</p>
+<a href="/asset?symbol={e(sym)}">Open {e(sym)} on {e(brand)} &#8594;</a>
+<p>{e(brand)} shows what the smartest money is quietly doing, with backtested, probability-framed context. Not investment advice.</p>
 </body></html>'''
 
 
@@ -3048,6 +3055,25 @@ if (_SITE_DIR / "index.html").exists():
 # ------------------------------------------------------------------- frontend (SPA)
 
 _STATIC_DIR = Path(__file__).parent / "static"
+
+# The front door. A signed-out visitor arriving at "/" is a STRANGER, and the thing built to explain
+# this product to a stranger is the marketing site — so send them there rather than to the app's own
+# landing screen, which still pitched the pre-rebrand product and which nothing else links to.
+#
+# The test is "is there a session cookie", not "is the session valid": deciding a redirect does not
+# need a database round trip, and the only case it gets wrong — an expired cookie — lands on the app,
+# which asks the reader to sign in. That is the right destination for an expired session anyway.
+# Authorization is unaffected; every API route still checks the session itself.
+#
+# Registered BEFORE the "/" mount below, because that mount is a catch-all and swallows anything
+# registered after it.
+if (_SITE_DIR / "index.html").exists() and (_STATIC_DIR / "index.html").exists():
+    @app.get("/", include_in_schema=False)
+    def root(request: Request):
+        if request.cookies.get(SESSION_COOKIE):
+            return FileResponse(_STATIC_DIR / "index.html")
+        return RedirectResponse("/site/", status_code=307)
+
 if (_STATIC_DIR / "index.html").exists():
     class _SpaFiles(StaticFiles):
         """Serve the built bundle, and hand any unmatched path back to index.html so client routes
@@ -3071,7 +3097,7 @@ if (_STATIC_DIR / "index.html").exists():
 else:
     @app.get("/", response_class=HTMLResponse)
     def _no_build() -> str:
-        return ("<h1>TradeOSS API</h1><p>The dashboard bundle is not built. Run the multi-stage "
+        return (f"<h1>{config.brand_name()} API</h1><p>The dashboard bundle is not built. Run the multi-stage "
                 "Docker build, or <code>cd frontend && npm install && npm run build</code>. "
                 "API is live at <code>/api/clusters</code>, <code>/api/feeds</code>, "
                 "<code>/api/definitions</code>.</p>")

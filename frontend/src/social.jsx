@@ -38,6 +38,35 @@ function SourceStatus({ sources }) {
   );
 }
 
+/** Which networks this product reads for what CONSEQUENTIAL ACCOUNTS are saying.
+ *
+ *  Deliberately separate from the attention board above: those sources score a ticker's discussion
+ *  volume, these carry statements, and a statement lands on the Radar as an event rather than here
+ *  as a score. The brief asks for this panel by name — a permanent unexplained "N/A" against X is
+ *  worse than a line saying which networks ARE covered and where their output goes. */
+function Voices({ voices, onNav }) {
+  if (!voices || !voices.length) return null;
+  return (
+    <div className="voices">
+      <div className="voices-head">
+        <Icon name="users" size={15} />
+        <b>What consequential accounts are saying</b>
+        <button className="linkish" style={{ marginLeft: "auto" }} onClick={() => onNav?.("radar")}>
+          read them on the Radar →
+        </button>
+      </div>
+      <div className="voices-rows">
+        {voices.map((v) => (
+          <div key={v.key} className={`voices-row ${v.state}`}>
+            <span className={`src-dot ${v.state === "connected" ? "on" : "off"}`}><i /> {v.label}</span>
+            <span className="voices-note">{v.state === "connected" ? v.powers : v.note}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** Shown once, above the board, when nothing connected measures mood. Explains the gap and how to
  *  close it — the board itself keeps working on the attention sources that ARE live. */
 function MoodGate({ sources }) {
@@ -82,7 +111,7 @@ function AttentionCard({ r, rank, onOpenSymbol }) {
   );
 }
 
-export function SocialView({ onOpenSymbol }) {
+export function SocialView({ onOpenSymbol, onNav }) {
   const [data, setData] = useState(null);
   const [failed, setFailed] = useState(false);
   const [hours, setHours] = useState(96);
@@ -151,6 +180,7 @@ export function SocialView({ onOpenSymbol }) {
       )}
 
       {data && <SourceStatus sources={data.sources} />}
+      {data && <Voices voices={data.voices} onNav={onNav} />}
       {data && m.measured === 0 && <MoodGate sources={data.sources} />}
 
       {data && board.length > 0 && (
