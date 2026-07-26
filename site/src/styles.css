@@ -354,6 +354,10 @@ section { padding: clamp(80px, 12vh, 160px) 0; position: relative; }
 .pers-rank { font-family: var(--mono); font-size: 11px; color: var(--magenta); }
 .pers-why { font-size: 12.5px; color: var(--paper-faint); margin-top: 6px; font-family: var(--mono); }
 
+/* ---- closing conversion band ---- */
+.close { border-top: 1px solid var(--rule); }
+.close .hero-cta { margin-top: var(--s6); }
+
 /* ---- faq ------------------------------------------------------------------------------------ */
 .faq { border-top: 1px solid var(--rule); }
 .faq-item { border-bottom: 1px solid var(--rule); }

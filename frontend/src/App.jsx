@@ -18,6 +18,7 @@ import { AdminView } from "./admin.jsx";
 import { Dashboard } from "./dashboard.jsx";
 import { IntegrationsView } from "./integrations.jsx";
 import { RadarView } from "./radar.jsx";
+import { OnboardingCard } from "./onboarding.jsx";
 import { GlobeView } from "./globe.jsx";
 import { ExposureView } from "./exposure.jsx";
 import { CalendarView } from "./calendar.jsx";
@@ -265,6 +266,12 @@ export default function App() {
         {/* One boundary per surface, keyed by view: a throw inside a surface shows a contained
             failure panel with the chrome intact, and switching surfaces resets it. */}
         <main className="content">
+          {/* First-run frame setup. Renders nothing unless the server says this reader is due, so
+              it costs one request and never blocks a surface. Keyed by user so signing in as
+              someone else re-asks the question for them. */}
+          {user && view !== "landing" && view !== "auth" && (
+            <OnboardingCard key={user.id} onDone={refreshUser} />
+          )}
           <ErrorBoundary key={view} surface={view}>
           {view === "landing" ? (
             <LandingView onGetStarted={() => go("auth")} onExplore={() => go("news")} />

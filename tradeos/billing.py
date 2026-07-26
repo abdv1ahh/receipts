@@ -28,11 +28,19 @@ PLANS = {
 
 # Server-side entitlements per tier. live_signals maps to the 48h delay (decision #36); the limits
 # are enforced in the write paths so a free user editing a request can never exceed them.
+#
+# `exposure` was added in Phase 8 to match the split the brief specifies — free gets the Radar with
+# delayed data and limited alerts, paid gets live data, unlimited alerts, the full Exposure surface
+# and API access. It is a boolean here and checked in the READ path, unlike the others which cap
+# writes, because Exposure is a view rather than a thing you accumulate.
+#
+# What is deliberately NOT gated, at any tier: the Ledger and the marketing site's public
+# endpoints. An accuracy record behind a paywall is not an accuracy record.
 ENTITLEMENTS = {
-    "free":   {"live_signals": False, "max_follows": 5,      "max_portfolios": 1,    "max_trades": 50,     "realtime_alerts": False, "api": False},
-    "retail": {"live_signals": True,  "max_follows": 1000,   "max_portfolios": 50,   "max_trades": 5000,   "realtime_alerts": True,  "api": False},
-    "pro":    {"live_signals": True,  "max_follows": 100000, "max_portfolios": 1000, "max_trades": 100000, "realtime_alerts": True,  "api": True},
-    "admin":  {"live_signals": True,  "max_follows": 100000, "max_portfolios": 1000, "max_trades": 100000, "realtime_alerts": True,  "api": True},
+    "free":   {"live_signals": False, "max_follows": 5,      "max_portfolios": 1,    "max_trades": 50,     "realtime_alerts": False, "api": False, "exposure": False},
+    "retail": {"live_signals": True,  "max_follows": 1000,   "max_portfolios": 50,   "max_trades": 5000,   "realtime_alerts": True,  "api": False, "exposure": True},
+    "pro":    {"live_signals": True,  "max_follows": 100000, "max_portfolios": 1000, "max_trades": 100000, "realtime_alerts": True,  "api": True,  "exposure": True},
+    "admin":  {"live_signals": True,  "max_follows": 100000, "max_portfolios": 1000, "max_trades": 100000, "realtime_alerts": True,  "api": True,  "exposure": True},
 }
 
 

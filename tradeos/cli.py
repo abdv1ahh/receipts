@@ -272,6 +272,27 @@ def cmd_preflight(_args) -> None:
                         "AI surface.")
     if os.environ.get("COOKIE_SECURE", "false").lower() != "true":
         warnings.append("COOKIE_SECURE is not 'true' — set it in production so session cookies require HTTPS (also enables HSTS).")
+
+    # Phase 8. DEV_ORIGINS widens the CSRF origin check and exists only for the Vite dev server;
+    # left set in production it is a real hole, so it is a PROBLEM rather than a warning.
+    if os.environ.get("DEV_ORIGINS", "").strip():
+        problems.append("DEV_ORIGINS is set — it widens the CSRF origin check and is development-only. "
+                        "Clear it in production.")
+    # Half-configured OAuth is worse than none: the button appears and the callback fails.
+    gid, gsecret = os.environ.get("GOOGLE_CLIENT_ID"), os.environ.get("GOOGLE_CLIENT_SECRET")
+    if bool(gid) != bool(gsecret):
+        problems.append("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must both be set or both empty.")
+    if gid and gsecret:
+        base = os.environ.get("PUBLIC_BASE_URL", "")
+        if not base:
+            problems.append("Google sign-in is configured but PUBLIC_BASE_URL is empty — the redirect "
+                            "URI would be built against localhost and Google would reject it.")
+        elif base.startswith("http://") and "localhost" not in base:
+            problems.append(f"PUBLIC_BASE_URL is plain http ({base}) — an OAuth redirect over http "
+                            "leaks the authorization code.")
+        warnings.append("Google sign-in is configured, but its live handshake has never been "
+                        "exercised against Google (see tradeos/oauth.py). Test a real sign-in before "
+                        "relying on it.")
     for w in warnings:
         print(f"  ⚠ {w}")
     for p in problems:

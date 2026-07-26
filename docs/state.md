@@ -1,6 +1,6 @@
 # docs/state.md — where the work stands
 
-Updated: 2026-07-26, **Phases 6 and 7 complete**.
+Updated: 2026-07-26, **Phases 6, 7 and 8 complete**.
 **Read this after `CLAUDE.md` and before `docs/plan.md` at the start of every session.**
 
 ---
@@ -11,17 +11,17 @@ Updated: 2026-07-26, **Phases 6 and 7 complete**.
 cd /path/to/receipts
 git checkout phase/6-sections          # all work lives here; not yet merged to main
 make dev                               # reload-in-place stack on :8000
-make test                              # 498 pass, ~0.5s, offline
+make test                              # 527 pass, ~0.5s, offline
 make lint                              # ruff, zero errors is the standard
 ```
 
 Demo login `demo@tradeos.app` / `<generated at seed time>`. Surfaces: `/radar` `/globe` `/ledger`
 `/exposure` `/crypto` `/news` `/brief` `/events` `/integrations` `/journal`.
 
-**Verified state at handoff:** 498 tests pass · 0 lint errors · 0 console errors on eleven app
-surfaces and the marketing site, checked in a headless browser · migrations through 028 · 57
+**Verified state at handoff:** 527 tests pass · 0 lint errors · 0 console errors on the app
+surfaces and the marketing site, checked in a headless browser · migrations through 030 · 60
 tables. The marketing site is at <http://localhost:8000/site/> after `cd site && npm install` then
-`make site`.
+`make site`. `docs/deploy.md` is the deployment reference; `cli preflight` is its enforcer.
 
 **Model prose is genuinely on again.** It was not, silently, for the whole of Phases 3–6 — see
 B-23 in `docs/bugs.md`. If you change anything in the model path, confirm a running instance
@@ -41,8 +41,8 @@ returns `used_template: false` rather than trusting the suite, which runs on `te
 | 5 — Globe | complete |
 | 6 — Rework sections | complete (all eight) |
 | 7 — Marketing site | complete — `site/`, served at `/site` |
-| **8 — Accounts, limits, deployment** | **not started — next** |
-| 9 — Security | not started |
+| 8 — Accounts, limits, deployment | complete (OAuth built but never run against Google) |
+| **9 — Security** | **not started — next, and it closes the build** |
 
 Every phase has a report in `docs/progress/`.
 
@@ -50,13 +50,7 @@ Every phase has a report in `docs/progress/`.
 
 ## NEXT STEPS, in the order I would do them
 
-### 1. Phase 8 — accounts, limits, deployment
-
-Email + OAuth, sub-minute onboarding capturing country/currency/watchlist (the `user_profiles`
-table and `PUT /api/profile/frame` already exist — onboarding just has to fill them), server-side
-tier gating, and `docs/deploy.md`.
-
-### 2. Phase 9 — security
+### 1. Phase 9 — security
 
 Threat model first. `/security-review` has already run twice this project and found a **real
 vulnerability each time**, so budget for findings rather than a clean pass. Known work:
@@ -65,7 +59,7 @@ vulnerability each time**, so budget for findings rather than a clean pass. Know
 - gitleaks over full history — wired into CI, never run locally.
 - Adversarial authorization tests across every per-user object.
 
-### 3. Carried over, not blocking anything
+### 2. Carried over, not blocking anything
 
 - **Phase 4 remainder**: saved filter sets, in-place threading of developing stories, subscribable
   alerts.
@@ -73,7 +67,12 @@ vulnerability each time**, so budget for findings rather than a clean pass. Know
   backoff elapsed. 4 events in the store and gdelt-sourced claims are now on the Radar and in the
   site's hero. The count is small; watch whether it keeps flowing rather than assuming it will.
 - **Bluesky** as a real `SocialSource` — the interface exists, the implementation does not.
-- **`/simplify` and `/code-review` have never been run** on any phase diff.
+- **`/code-review` has never been run** on any phase diff. `/simplify` and `/security-review` were
+  run on the Phase 6 diff.
+- **No email verification and no password reset.** A new account is usable immediately with an
+  unverified address. Not in the brief's Phase 8 list, so recorded rather than silently added.
+- **Google sign-in has never been exercised against Google** — no credentials. Validation logic is
+  tested; the handshake is not.
 - **`GOOG`/`GOOGL` render as two board rows** for one company; needs share-class collapsing.
 
 ---
@@ -111,6 +110,13 @@ Ordered roughly by how much time they would cost to rediscover.
    path actually ran — ask a running instance, not the suite. Second, a config value with a
    documented parser has exactly one place it may be parsed; `llm.wants_model()` now exists so the
    gate and the call cannot disagree about what is configured.
+
+0b. **A module and a route handler can share a name, and Python will not warn you.** `def
+   onboarding(...)` as a FastAPI handler shadowed the `onboarding` module the moment Phase 8
+   imported one, turning every `onboarding.state(...)` into an AttributeError on a function. The
+   identical mistake then happened in JavaScript, where `fetchOnboarding` already existed. Name
+   handlers for what they DO, not for their route path — and note that no test caught either one;
+   both surfaced within a minute of using the feature.
 
 1. **The "AI never sees my screenshot" bug was not a transport bug.** `directive_guard` banned
    "target price" — which the prompt itself asks the model to discuss — and one tripped field

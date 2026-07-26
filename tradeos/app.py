@@ -19,7 +19,7 @@ from io import BytesIO
 from pathlib import Path
 
 from fastapi import Cookie, FastAPI, Request, Response
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from psycopg.types.json import Json
 from pydantic import BaseModel
@@ -42,6 +42,8 @@ from . import (
     insights,
     journal_context,
     ledger,
+    oauth,
+    onboarding,
     portfolio,
     presentation,
     public_site,
@@ -191,6 +193,14 @@ class ProfileFrameReq(BaseModel):
     base_currency: str | None = None
     sectors: list[str] = []
     risk_appetite: str | None = None
+
+
+class OnboardingReq(BaseModel):
+    """Everything the sixty-second setup collects. Every field optional — finishing with nothing
+    chosen is a valid answer, and the flow records that it was asked rather than asking again."""
+    country: str | None = None
+    base_currency: str | None = None
+    symbols: list[str] = []
 
 
 class WatchlistAccountReq(BaseModel):
@@ -354,6 +364,55 @@ def auth_login(req: LoginReq, request: Request, response: Response) -> dict:
     return {"user": user}
 
 
+# ------------------------------------------------------------------ Sign in with Google (Phase 8)
+#
+# Config-gated and NEVER EXERCISED against Google — no credentials were available while building
+# it. See the module docstring in `oauth.py`; the validation logic is tested offline, the live
+# handshake is not.
+
+@app.get("/api/auth/google/start")
+def auth_google_start(response: Response, redirect_to: str | None = None):
+    with db.connect() as conn:
+        try:
+            url = oauth.begin(conn, redirect_to)
+        except oauth.OAuthError as exc:
+            response.status_code = 503
+            return {"error": str(exc), "configured": oauth.configured()}
+    return RedirectResponse(url, status_code=302)
+
+
+@app.get("/api/auth/google/callback")
+def auth_google_callback(request: Request, response: Response, code: str | None = None,
+                         state: str | None = None, error: str | None = None):
+    """Where Google sends the browser back. Every failure lands the user on a page that says what
+    went wrong rather than on a JSON blob — this is a browser navigation, not an API call."""
+    def _fail(msg: str):
+        from urllib.parse import quote
+        return RedirectResponse(f"/?auth_error={quote(msg[:160])}", status_code=302)
+
+    if error:
+        return _fail("Google sign-in was cancelled.")
+    if not code:
+        return _fail("Google sign-in returned no authorization code.")
+
+    with db.connect() as conn:
+        try:
+            destination = oauth.consume_state(conn, state)       # one-time; this is the CSRF check
+            tokens = oauth.exchange_code(code)
+            claims = oauth.decode_id_token(tokens.get("id_token") or "")
+            identity = oauth.validate_claims(claims, os.environ.get("GOOGLE_CLIENT_ID", ""))
+            token, _user = oauth.link_or_create(
+                conn, identity,
+                ip=request.client.host if request.client else None,
+                ua=request.headers.get("user-agent"))
+        except oauth.OAuthError as exc:
+            return _fail(str(exc))
+
+    redirect = RedirectResponse(destination, status_code=302)
+    _set_session_cookie(redirect, token)
+    return redirect
+
+
 @app.post("/api/auth/logout")
 def auth_logout(response: Response, tos_session: str | None = Cookie(None)) -> dict:
     with db.connect() as conn:
@@ -369,8 +428,12 @@ def auth_me(tos_session: str | None = Cookie(None)) -> dict:
 
 
 @app.get("/api/onboarding")
-def onboarding(tos_session: str | None = Cookie(None)) -> dict:
-    """Per-user activation progress, so a new account gets a short 'get value fast' checklist."""
+def activation_checklist(tos_session: str | None = Cookie(None)) -> dict:
+    """Per-user activation progress, so a new account gets a short 'get value fast' checklist.
+
+    Named for what it is rather than for its path: as a plain `onboarding` it shadowed the module
+    of the same name the moment Phase 8 imported one, and every call to `onboarding.state` became
+    an AttributeError on a function. The route is unchanged."""
     with db.connect() as conn, conn.cursor() as cur:
         user = authn.session_user(conn, tos_session)
         if not user:
@@ -387,6 +450,47 @@ def onboarding(tos_session: str | None = Cookie(None)) -> dict:
     alerts_on = has_prefs or notifs > 0
     return {"authenticated": True, "follows": follows, "portfolios": portfolios,
             "alerts_configured": alerts_on, "complete": follows > 0 and portfolios > 0 and alerts_on}
+
+
+# ------------------------------------------------------------- first-run onboarding (Phase 8)
+#
+# Separate from `/api/onboarding` above, which is the older activation checklist (follows,
+# portfolios, alerts). This one fills the reader's FRAME, without which relevance cannot rank.
+
+@app.get("/api/profile/onboarding")
+def profile_onboarding(tos_session: str | None = Cookie(None)) -> dict:
+    """Whether this reader still needs asking, plus the countries that can be chosen."""
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            return {"authenticated": False}
+        return {"authenticated": True, **onboarding.state(conn, user["id"]),
+                "countries": onboarding.countries(conn)}
+
+
+@app.post("/api/profile/onboarding")
+def profile_onboarding_save(req: OnboardingReq, response: Response,
+                            tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "log in first"}
+        out = onboarding.complete(conn, user["id"], req.country, req.base_currency, req.symbols)
+        if out.get("error"):
+            response.status_code = 400
+        return out
+
+
+@app.post("/api/profile/onboarding/skip")
+def profile_onboarding_skip(response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    """Dismiss for a few days. Never permanently — see the note in `onboarding.snooze`."""
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "log in first"}
+        return onboarding.snooze(conn, user["id"])
 
 
 @app.get("/api/referral")
@@ -561,6 +665,14 @@ def exposure_view(tos_session: str | None = Cookie(None)) -> dict:
         user = authn.session_user(conn, tos_session)
         if not user:
             return {"authenticated": False}
+        # Tier gate, enforced here rather than in the client (Phase 8, brief §14). The response
+        # says plainly what the surface would show and what unlocks it — a locked feature that
+        # does not explain itself is indistinguishable from a broken one.
+        if not billing.entitlements(user["tier"])["exposure"]:
+            return {"authenticated": True, "locked": True, "tier": user["tier"],
+                    "what": "Exposure maps live interpretations onto what you hold — which event "
+                            "reaches which holding, through what mechanism.",
+                    "upgrade": True}
         profile, _exp, watchlist = relevance.reader_frame(cur, user["id"])
 
         # Holdings = the watchlist plus anything held in a portfolio. Both are things the reader

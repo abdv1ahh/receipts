@@ -13,9 +13,9 @@ command.
 
 **Internal codename: TradeOSS. Display name: Rhumb** (`BRAND_NAME`). A world-event interpretation
 engine that explains market consequences. The product brief is
-`docs/tradeoss_veryimportant_prompt.md` — the source of truth for scope. **Phases 0–7 are done;
-Phase 8 (accounts, limits, deployment) is next. `docs/state.md` has the resume instructions and the
-ordered next steps.**
+`docs/tradeoss_veryimportant_prompt.md` — the source of truth for scope. **Phases 0–8 are done;
+Phase 9 (security) is next and closes the build. `docs/state.md` has the resume instructions and
+the ordered next steps.**
 
 It now has a claim engine (`claims.py`), a self-scoring Ledger (`ledger.py`, publishing 41% of 282
 with the misses shown), an event spine (`spine.py`), personal relevance (`relevance.py`), world
@@ -69,7 +69,7 @@ The app is at <http://localhost:8000>. Demo login: `demo@tradeos.app` / `<genera
 ### Tests
 
 ```bash
-make test     # 498 tests, ~0.5s, fully offline (no network)
+make test     # 527 tests, ~0.5s, fully offline (no network)
 make lint     # ruff; zero errors is the standard
 make dev      # reload-in-place stack; then `make web` for a UI change
 make fix      # ruff --fix
@@ -115,7 +115,7 @@ overnight calibration backfill.
 ### Database
 
 ```bash
-docker compose exec -T db psql -U tradeos -d tradeos -c '\dt'    # 57 tables
+docker compose exec -T db psql -U tradeos -d tradeos -c '\dt'    # 60 tables
 docker compose exec -T db psql -U tradeos -d tradeos             # interactive
 ```
 
@@ -146,6 +146,8 @@ tradeos/                  the Python package (all backend code)
   ledger.py               outcome measurement vs SPY; the self-scoring record.
   relevance.py            personal ranking + the reader frame + country exposure data. No model.
   public_site.py          the ONLY unauthenticated surface: what a stranger or a crawler can read.
+  onboarding.py           first-run frame capture. Gates nothing — a skip costs the reader nothing.
+  oauth.py                Sign in with Google. Built, config-gated, NEVER RUN against Google.
   journal_context.py      the Radar frozen at trade time; the coach's process patterns. No model.
   geography.py            places events by what a claim AFFECTS, not who published it.
   exposure.py             what holdings are exposed to (replaced the position tracker).
@@ -153,7 +155,7 @@ tradeos/                  the Python package (all backend code)
   assistant_tools.py      six READ-ONLY tools; a security boundary, not a convenience layer.
   smartmoney_claims.py    convergence signals expressed as scoreable claims.
   watchlist_accounts.py   the consequential-accounts influence list.
-  migrations/             001..028 ordered .sql; NEVER edit an applied migration, and every
+  migrations/             001..030 ordered .sql; NEVER edit an applied migration, and every
                           file MUST insert its own schema_migrations row
   (surface modules)       dashboard, brief, news, social, sentiment, crypto, events,
                           trades, insights, portfolio, community, alerts, admin,

@@ -1,6 +1,6 @@
 // The page. Five bands in the order the brief sets, plus the structured data a search engine reads.
 import { useEffect } from "react";
-import { Faq, FAQS, Hero, Ledger, Personalisation, Walkthrough } from "./sections.jsx";
+import { Close, Faq, FAQS, Hero, Ledger, Personalisation, Walkthrough } from "./sections.jsx";
 
 const APP = "/";
 
@@ -55,7 +55,7 @@ export function App() {
           <a href="#you">Personalisation</a>
           <a href="#faq">FAQ</a>
         </div>
-        <a className="btn" href={APP} style={{ padding: "9px 18px", fontSize: 14 }}>Open the app</a>
+        <a className="btn" href="/auth" style={{ padding: "9px 18px", fontSize: 14 }}>Start free</a>
       </nav>
 
       <main>
@@ -64,6 +64,7 @@ export function App() {
         <Ledger />
         <Personalisation />
         <Faq />
+        <Close />
       </main>
 
       <footer className="foot">

@@ -43,6 +43,13 @@ export async function extractTickers(file) {
   return res.json();
 }
 const post = (path, body) => fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then((r) => r.json());
+
+// First-run setup (Phase 8): the reader's FRAME — country, currency, starting watchlist — without
+// which relevance cannot rank. Named for the frame rather than for "onboarding", because
+// `fetchOnboarding` below is the older activation checklist and two of those would shadow.
+export const fetchFrameSetup = () => get("/api/profile/onboarding");
+export const saveFrameSetup = (body) => post("/api/profile/onboarding", body);
+export const snoozeFrameSetup = () => post("/api/profile/onboarding/skip", {});
 export const fetchFollows = () => get("/api/follows");
 export const addFollow = (kind, ref, label) => post("/api/follows", { kind, ref, label });
 export const removeFollow = (id) => fetch(`/api/follows/${id}`, { method: "DELETE" }).then((r) => r.json());

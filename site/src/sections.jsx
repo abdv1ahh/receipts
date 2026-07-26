@@ -12,6 +12,7 @@ import { Rose } from "./rose.jsx";
 import { WorldMap } from "./worldmap.jsx";
 
 const APP = "/";
+const SIGNUP = "/auth";      // the app's auth surface — a real route, not a modal
 const pct = (v, d = 1) => (v == null ? "—" : `${v >= 0 ? "+" : ""}${(v * 100).toFixed(d)}%`);
 const when = (iso) =>
   new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -63,8 +64,8 @@ export function Hero() {
             misses first.
           </p>
           <div className="hero-cta">
-            <a className="btn" href={APP}>Open the live Radar</a>
-            <a className="btn btn-ghost" href="#ledger">See the accuracy record</a>
+            <a className="btn" href={SIGNUP}>Start free</a>
+            <a className="btn btn-ghost" href={APP}>Open the live Radar</a>
           </div>
         </div>
 
@@ -380,6 +381,27 @@ export const FAQS = [
     a: "Your journal, your holdings and the country you read from are yours and are never used to rank anyone else's feed. Personal relevance is computed on the server so the ranking cannot be gamed, and the world context attached to a logged trade is visible only to its owner — publishing a trade to your profile does not publish the frame you read the world through.",
   },
 ];
+
+export function Close() {
+  const ref = useReveal();
+  return (
+    <section className="reveal close" ref={ref}>
+      <div className="wrap">
+        <div className="eyebrow">what happens next</div>
+        <h2>Sixty seconds to a feed that reads from where you are.</h2>
+        <p className="lede">
+          Pick your country and currency and it starts ranking for you — a tariff story reads
+          differently in Sharjah than in São Paulo, and only one of those is the default everywhere
+          else. Free tier includes the Radar, the world map, the Morning Brief and the whole Ledger.
+        </p>
+        <div className="hero-cta">
+          <a className="btn" href={SIGNUP}>Start free</a>
+          <a className="btn btn-ghost" href="#ledger">Read the record first</a>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 export function Faq() {
   const [open, setOpen] = useState(0);

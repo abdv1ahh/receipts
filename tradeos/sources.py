@@ -94,6 +94,18 @@ CATALOG: list[dict] = [
         "note": "Free Data API quota is small; used sparingly.", "feeds": [], "jobs": [],
     },
     {
+        "key": "google_oauth", "label": "Google Sign-In", "kind": "auth",
+        "powers": "signing in without a password",
+        "state": None, "env": ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"],
+        "signup_url": "https://console.cloud.google.com/apis/credentials",
+        "note": "Create an OAuth 2.0 Client ID of type 'Web application' and register the redirect "
+                "URI <PUBLIC_BASE_URL>/api/auth/google/callback exactly. Listed here because it is "
+                "an external dependency with a key like any other — but note it is the one entry "
+                "on this page whose live handshake has never been exercised, only its parsing and "
+                "validation logic. Email and password signup is unaffected either way.",
+        "feeds": [], "jobs": [],
+    },
+    {
         "key": "openfigi", "label": "OpenFIGI", "kind": "reference",
         "powers": "mapping 13F CUSIPs to tickers — unmapped holdings are invisible everywhere",
         "state": None, "env": ["OPENFIGI_API_KEY"], "signup_url": "https://www.openfigi.com/api",
