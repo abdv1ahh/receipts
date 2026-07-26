@@ -137,6 +137,34 @@ def seed(conn) -> dict:
     return {"countries": len(COUNTRIES)}
 
 
+def reader_frame(cur, user_id: int | None):
+    """(profile, country exposure, watchlist) for one reader, or empty frames when signed out.
+
+    This lives here rather than beside the Radar route because it is not the Radar's frame — it is
+    the input `score()` needs, and the Journal now snapshots the same ranking at trade time. Two
+    copies of "who is this reader" would drift, and the second one to drift would be the one
+    quietly writing a permanent record.
+    """
+    if not user_id:
+        return None, None, set()
+    cur.execute("SELECT country, base_currency, sectors, risk_appetite FROM user_profiles "
+                "WHERE user_id = %s", (user_id,))
+    row = cur.fetchone()
+    profile = ({"country": row[0], "base_currency": row[1], "sectors": row[2],
+                "risk_appetite": row[3]} if row else None)
+    exposure = None
+    if profile and profile["country"]:
+        cur.execute("""SELECT currency, currency_regime, pegged_to, export_partners,
+                              import_partners, commodity_exposure
+                         FROM country_exposure WHERE country = %s""", (profile["country"],))
+        e = cur.fetchone()
+        if e:
+            exposure = {"currency": e[0], "currency_regime": e[1], "pegged_to": e[2],
+                        "export_partners": e[3], "import_partners": e[4], "commodity_exposure": e[5]}
+    cur.execute("SELECT symbol FROM watchlists WHERE user_id = %s", (user_id,))
+    return profile, exposure, {r[0].upper() for r in cur.fetchall()}
+
+
 def geo_weight(profile_country: str | None, exposure: dict | None, event_geo: list[str]) -> float:
     """0..1 — how much a country's reader should care about where this happened.
 

@@ -99,6 +99,8 @@ export const analyzeChartImage = (file) => fetch("/api/analyze-chart", { method:
 export const fetchSimilarTrades = (id) => get(`/api/trades/${id}/similar`);
 export const simulateTrade = (params) => post("/api/simulate", params);
 export const fetchJournalReport = () => get("/api/journal/report");
+// World context frozen at trade time (Phase 6). Owner-only — the ranking exposes the owner's frame.
+export const fetchTradeContext = (id) => get(`/api/trades/${id}/context`);
 export const askAssistant = (message) => post("/api/assistant", { message });
 export const fetchTrending = (hours = 48) => get(`/api/trending?hours=${hours}`);
 export const fetchSymbolSentiment = (symbol) => get(`/api/sentiment/${encodeURIComponent(symbol)}`);

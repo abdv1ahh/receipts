@@ -370,6 +370,19 @@ def cmd_import_signals(args) -> None:
           f"({out['model_version']}), {out['skipped']} skipped")
 
 
+def cmd_capture_context(args) -> None:
+    """Reconstruct world context for trades logged before capture existed (Phase 6).
+
+    A one-shot repair, not a scheduled job. New trades snapshot themselves at creation; this only
+    fills the gap behind them, and it marks every row it writes `reconstructed` rather than passing
+    it off as a live capture."""
+    from . import journal_context
+    with db.connect() as conn:
+        out = journal_context.backfill(conn, limit=args.limit)
+    print(f"capture-context: {out['trades']} trade(s) marked {out['basis']} — "
+          f"{out['with_live_claims']} had live interpretations, {out['empty']} had none")
+
+
 def cmd_ledger(_args) -> None:
     from . import ledger
     with db.connect() as conn:
@@ -655,6 +668,11 @@ def main() -> None:
     isig.add_argument("--horizon", type=int, default=30, choices=[30, 90])
     isig.add_argument("--since", default=None, help="only clusters on/after this date")
     isig.set_defaults(fn=cmd_import_signals)
+
+    cc = sub.add_parser("capture-context",
+                        help="reconstruct world context for trades logged before capture existed")
+    cc.add_argument("--limit", type=int, default=500)
+    cc.set_defaults(fn=cmd_capture_context)
 
     lg = sub.add_parser("ledger", help="print the accuracy record, including its misses")
     lg.set_defaults(fn=cmd_ledger)

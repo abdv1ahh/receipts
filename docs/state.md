@@ -1,6 +1,6 @@
 # docs/state.md — where the work stands
 
-Updated: 2026-07-25, end of Phase 6 (Journal outstanding).
+Updated: 2026-07-26, **Phase 6 complete**.
 **Read this after `CLAUDE.md` and before `docs/plan.md` at the start of every session.**
 
 ---
@@ -9,17 +9,22 @@ Updated: 2026-07-25, end of Phase 6 (Journal outstanding).
 
 ```bash
 cd /path/to/receipts
-git checkout phase/6-sections          # 43 commits ahead of main; all work lives here
+git checkout phase/6-sections          # all work lives here; not yet merged to main
 make dev                               # reload-in-place stack on :8000
-make test                              # 440 pass, ~0.5s, offline
+make test                              # 486 pass, ~0.5s, offline
 make lint                              # ruff, zero errors is the standard
 ```
 
 Demo login `demo@tradeos.app` / `<generated at seed time>`. Surfaces: `/radar` `/globe` `/ledger`
 `/exposure` `/crypto` `/news` `/brief` `/events` `/integrations` `/journal`.
 
-**Verified state at handoff:** 440 tests pass · 0 lint errors · 0 console errors on every surface ·
-601 events · 556 clusters · 336 claims · 323 scored outcomes · migrations through 027.
+**Verified state at handoff:** 486 tests pass · 0 lint errors · 0 console errors on eleven surfaces
+checked in a headless browser · 601 events · 556 clusters · 357 claims · 323 scored outcomes ·
+migrations through 028 · 57 tables.
+
+**Model prose is genuinely on again.** It was not, silently, for the whole of Phases 3–6 — see
+B-23 in `docs/bugs.md`. If you change anything in the model path, confirm a running instance
+returns `used_template: false` rather than trusting the suite, which runs on `template` by design.
 
 ---
 
@@ -33,8 +38,8 @@ Demo login `demo@tradeos.app` / `<generated at seed time>`. Surfaces: `/radar` `
 | 3 — Impact engine + Ledger | complete |
 | 4 — Radar | core complete (threading, saved filters, alerts outstanding) |
 | 5 — Globe | complete |
-| **6 — Rework sections** | **7 of 8 done — Journal outstanding** |
-| 7 — Marketing site | not started |
+| 6 — Rework sections | complete (all eight) |
+| **7 — Marketing site** | **not started — next** |
 | 8 — Accounts, limits, deployment | not started |
 | 9 — Security | not started |
 
@@ -44,23 +49,7 @@ Every phase has a report in `docs/progress/`.
 
 ## NEXT STEPS, in the order I would do them
 
-### 1. Finish Phase 6 — the Journal (the only section left)
-
-The brief: *"When a trade is logged, attach the world context at that moment: what the Radar was
-showing, which claims were live. Over time the coach can identify genuine behavioural patterns,
-because it knows both what the user did and what was happening. Track process quality rather than
-outcomes alone, and keep the coaching constructive rather than punishing."*
-
-Concretely:
-- Migration 028: `trade_context` (trade_id, captured_at, live_claim_ids, radar_snapshot jsonb).
-- On `POST /api/trades`, snapshot the top relevance-ranked claims live at that moment.
-- Surface it on the trade detail: *"When you entered, the Radar was showing…"*.
-- Extend the coach in `insights.journal_report` to read context across trades — e.g. "you tend to
-  enter on days with high novelty scores", a behavioural pattern no journal alone can see.
-- **Keep it constructive.** A coach that makes someone feel worse after a loss is one they stop
-  opening. Hold that line.
-
-### 2. Phase 7 — the marketing site
+### 1. Phase 7 — the marketing site
 
 `site/` as a **sibling Vite project** to `frontend/`, sharing `shared/tokens.css`. Not npm
 workspaces — decided in `docs/plan.md` §6 and the reason still holds.
@@ -74,13 +63,13 @@ personalisation globe demo, then FAQ with `FAQPage` structured data.
 near-black + one acid accent; broadsheet grid) and asks for a cartographic/instrumental vocabulary.
 Present the token system for review **before** building.
 
-### 3. Phase 8 — accounts, limits, deployment
+### 2. Phase 8 — accounts, limits, deployment
 
 Email + OAuth, sub-minute onboarding capturing country/currency/watchlist (the `user_profiles`
 table and `PUT /api/profile/frame` already exist — onboarding just has to fill them), server-side
 tier gating, and `docs/deploy.md`.
 
-### 4. Phase 9 — security
+### 3. Phase 9 — security
 
 Threat model first. `/security-review` has already run twice this project and found a **real
 vulnerability each time**, so budget for findings rather than a clean pass. Known work:
@@ -89,7 +78,7 @@ vulnerability each time**, so budget for findings rather than a clean pass. Know
 - gitleaks over full history — wired into CI, never run locally.
 - Adversarial authorization tests across every per-user object.
 
-### 5. Carried over, not blocking anything
+### 4. Carried over, not blocking anything
 
 - **Phase 4 remainder**: saved filter sets, in-place threading of developing stories, subscribable
   alerts.
@@ -126,9 +115,20 @@ vulnerability each time**, so budget for findings rather than a clean pass. Know
 
 Ordered roughly by how much time they would cost to rediscover.
 
+0. **A fallback indistinguishable from success is an outage with good manners.** Six call sites
+   gated their model call on `provider in ("gemini", "openai")` — False for the chain form
+   `gemini,openai` that production runs — so every AI prose surface served its deterministic
+   template for three phases while reporting the model had been tried (B-23). Nothing crashed and
+   no test failed: the suite runs on `template` by design, and a template *is* a legitimate
+   output. Two lessons. First, wherever a path can degrade silently, something must assert which
+   path actually ran — ask a running instance, not the suite. Second, a config value with a
+   documented parser has exactly one place it may be parsed; `llm.wants_model()` now exists so the
+   gate and the call cannot disagree about what is configured.
+
 1. **The "AI never sees my screenshot" bug was not a transport bug.** `directive_guard` banned
    "target price" — which the prompt itself asks the model to discuss — and one tripped field
-   discarded the whole read. The fallback then blamed a missing provider.
+   discarded the whole read. The fallback then blamed a missing provider. (Same family as #0: the
+   guard was right to fire and the *message* was the lie.)
 
 2. **My Phase 0 root cause for the attention board was wrong.** I blamed Wikipedia title
    resolution; the titles are correct. The real causes were a fuzzy Algolia query and a
@@ -229,3 +229,9 @@ every reading.
 
 **The Assistant** has six read-only tools and answers "how often are you right?" by reading the
 Ledger.
+
+**The Journal** freezes the Radar at the moment a trade is logged — which interpretations were
+live, and whether any named the same instrument pointing the other way. The coach reads that
+across trades, so it can speak to *process* ("1 of 6 entries went against a live interpretation")
+rather than only to outcome. Every disagreement it reports carries the Ledger's own 41% beside it,
+because the system is not the benchmark.

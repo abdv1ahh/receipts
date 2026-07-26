@@ -158,6 +158,21 @@ def measure_due(conn, limit: int = 200) -> dict:
 
 # ------------------------------------------------------------------ the Ledger read
 
+def published_rate(conn, min_sample: int = 20) -> float | None:
+    """The one headline number — hits over scoreable calls — or None below the sample floor.
+
+    A one-query alternative to reading `summary()["overall"]` for callers that want only the rate.
+    It exists because the Journal coach cites this number when it reports a disagreement between
+    the trader and a live claim, and the coach must not be able to state a rate the Ledger itself
+    would refuse to publish."""
+    with conn.cursor() as cur:
+        cur.execute("""SELECT count(*) FILTER (WHERE verdict='hit'),
+                              count(*) FILTER (WHERE verdict='miss') FROM claim_outcomes""")
+        hit, miss = cur.fetchone()
+    n = (hit or 0) + (miss or 0)
+    return round(hit / n, 3) if n >= min_sample else None
+
+
 def summary(conn, min_sample: int = 20) -> dict:
     """The whole record: overall, and broken down by category, horizon, source and confidence.
 

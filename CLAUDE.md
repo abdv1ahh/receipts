@@ -13,13 +13,14 @@ command.
 
 **Internal codename: TradeOSS. Display name: Rhumb** (`BRAND_NAME`). A world-event interpretation
 engine that explains market consequences. The product brief is
-`docs/tradeoss_veryimportant_prompt.md` — the source of truth for scope. **Phases 0–5 are done and
-Phase 6 is 7 of 8; `docs/state.md` has the resume instructions and the ordered next steps.**
+`docs/tradeoss_veryimportant_prompt.md` — the source of truth for scope. **Phases 0–6 are done;
+Phase 7 (marketing site) is next. `docs/state.md` has the resume instructions and the ordered
+next steps.**
 
 It now has a claim engine (`claims.py`), a self-scoring Ledger (`ledger.py`, publishing 41% of 282
-with the misses shown), an event spine (`spine.py`), personal relevance (`relevance.py`), and
-surfaces at `/radar` `/globe` `/ledger` `/exposure` `/crypto` `/news` `/brief` `/events`
-`/integrations`.
+with the misses shown), an event spine (`spine.py`), personal relevance (`relevance.py`), world
+context frozen at trade time (`journal_context.py`), and surfaces at `/radar` `/globe` `/ledger`
+`/exposure` `/crypto` `/news` `/brief` `/events` `/journal` `/integrations`.
 
 The display name is a config value, not a hardcoded string (see `docs/plan.md` §rebrand).
 Never rename Python modules, database tables, or the `tradeos` package for branding.
@@ -68,7 +69,7 @@ The app is at <http://localhost:8000>. Demo login: `demo@tradeos.app` / `<genera
 ### Tests
 
 ```bash
-make test     # 440 tests, ~0.5s, fully offline (no network)
+make test     # 486 tests, ~0.5s, fully offline (no network)
 make lint     # ruff; zero errors is the standard
 make dev      # reload-in-place stack; then `make web` for a UI change
 make fix      # ruff --fix
@@ -102,7 +103,7 @@ Commands: `migrate`, `sync-tickers`, `resolve-entities`, `resolve-cusips`,
 `run-backtest`, `calibration`, `sync-library`, `generate-alerts`, `seed-admin`, `seed-demo`,
 `create-invites`, `status`, `preflight`,
 `spine`, `reprocess`, `seed-watchlist`, `seed-exposure`, `interpret`, `measure-claims`,
-`ledger`, `import-signals`.
+`ledger`, `import-signals`, `capture-context`.
 
 `status` prints per-feed freshness. `preflight` checks production config, including every link in
 the `EXPLAIN_PROVIDER` chain.
@@ -113,7 +114,7 @@ overnight calibration backfill.
 ### Database
 
 ```bash
-docker compose exec -T db psql -U tradeos -d tradeos -c '\dt'    # 48 tables
+docker compose exec -T db psql -U tradeos -d tradeos -c '\dt'    # 57 tables
 docker compose exec -T db psql -U tradeos -d tradeos             # interactive
 ```
 
@@ -123,7 +124,7 @@ docker compose exec -T db psql -U tradeos -d tradeos             # interactive
 
 ```
 tradeos/                  the Python package (all backend code)
-  app.py                  FastAPI app: 99 routes, ~2250 lines. The one big file.
+  app.py                  FastAPI app: ~110 routes, ~2700 lines. The one big file.
   db.py                   psycopg connect() + ordered .sql migration runner
   config.py               env accessors; raises ConfigError rather than defaulting secrets
   llm.py                  ONE transport for every model call: provider CHAIN + per-provider
@@ -142,14 +143,15 @@ tradeos/                  the Python package (all backend code)
   spine.py                normalise -> cluster -> score. The substrate everything hangs off.
   claims.py               the impact engine. Mechanism rule + the prompt-injection boundary.
   ledger.py               outcome measurement vs SPY; the self-scoring record.
-  relevance.py            personal ranking + country exposure reference data. No model.
+  relevance.py            personal ranking + the reader frame + country exposure data. No model.
+  journal_context.py      the Radar frozen at trade time; the coach's process patterns. No model.
   geography.py            places events by what a claim AFFECTS, not who published it.
   exposure.py             what holdings are exposed to (replaced the position tracker).
   crypto_intel.py         positioning readings, each with an invalidation condition.
   assistant_tools.py      six READ-ONLY tools; a security boundary, not a convenience layer.
   smartmoney_claims.py    convergence signals expressed as scoreable claims.
   watchlist_accounts.py   the consequential-accounts influence list.
-  migrations/             001..027 ordered .sql; NEVER edit an applied migration, and every
+  migrations/             001..028 ordered .sql; NEVER edit an applied migration, and every
                           file MUST insert its own schema_migrations row
   (surface modules)       dashboard, brief, news, social, sentiment, crypto, events,
                           trades, insights, portfolio, community, alerts, admin,
@@ -196,6 +198,14 @@ when a phase touches it, not as a standalone refactor.
 
 The full list, with the reasoning, is in `docs/state.md` §"Things learned". The ones that bite
 fastest:
+
+0. **`EXPLAIN_PROVIDER` is a comma-separated CHAIN, and only `llm.py` may parse it.** Production
+   runs `gemini,openai`. Six call sites once gated their model call on
+   `provider in ("gemini", "openai")` — False for the chain form — so every AI prose surface
+   served its template for three phases while reporting the model had been tried (B-23). Gate on
+   **`llm.wants_model(provider)`**; a test forbids the old pattern. More generally: the suite runs
+   on `template` by design, so **verify a model change against a running instance**
+   (`used_template: false`), never against the tests alone.
 
 1. **Frontend changes need `make web`** (0.3s) under `make dev`, or a full image rebuild otherwise.
 2. **`geo` on an event is where the OUTLET sits, not what the story is about.** The single most

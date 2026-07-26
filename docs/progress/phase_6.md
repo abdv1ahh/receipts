@@ -1,8 +1,8 @@
 # Phase 6 — rework the existing sections · progress report
 
-Date: 2026-07-25 · Branch: `phase/6-sections` · 440 tests pass · 0 lint errors
+Date: 2026-07-26 · Branch: `phase/6-sections` · 486 tests pass · 0 lint errors
 
-**Seven of eight sections done. Journal outstanding.**
+**All eight sections done.**
 
 ---
 
@@ -112,10 +112,55 @@ The result is the demonstration the brief was describing:
 
 ---
 
-## Not done
+## Journal — the coach gets to see what the trader saw
 
-**Journal.** The remaining section — attach world context at trade time so the coach can identify
-behavioural patterns. Specified concretely in `docs/state.md` §"Next steps".
+A journal records what the trader did. It has no idea what was happening while they did it, so the
+only thing it can coach on is the outcome — and coaching on outcomes teaches a trader to feel good
+about lucky wins and bad about disciplined losses.
+
+So `POST /api/trades` now freezes the Radar as it stood at that moment (migration 028,
+`trade_context`): which interpretations were live, ranked by that reader's own relevance, and
+whether any named the same instrument, pointing which way. Written once and **never rewritten** —
+if a later edit could move the context, the record would drift toward what the trader now
+remembers believing, which is the exact bias it exists to counter.
+
+That turns the coach from an outcome scorer into a **process** observer. It can now say *"1 of 6
+entries went against a live interpretation"* — a statement about how someone decides, available
+long before enough closed trades exist to say whether they are any good.
+
+Three lines held:
+
+**The system is not the benchmark.** The Ledger publishes 41%. Framing "you traded against a live
+claim" as a mistake would quietly promote a 41%-accurate machine to the arbiter of a human's
+decision, so every pattern mentioning disagreement carries the Ledger's own number beside it — and
+states no rate at all when the Ledger is below its own sample floor and has none to publish.
+
+**Sample floors, from both sides.** No pattern below five trades with context; no contrast between
+two cohorts unless *both* closed samples clear the floor. Trades without context never enter the
+denominator, so six trades of which two carry context is a two-trade sample.
+
+**Constructive, or it does not ship.** A test asserts no pattern is phrased as a verdict — the one
+licensed use of "mistake" in the whole module is the denial *"that is a disagreement, not a
+mistake"*.
+
+Two things the live data taught, neither guessable from the schema:
+
+- The impact engine does not always write a bare ticker. Real rows read `AMC Entertainment
+  Holdings Inc. (AMC)` and `$TSLA`. Exact matching alone silently misses genuine disagreements —
+  and a missed match makes the coach report agreement that was never there, which is the failure
+  mode that matters. Matching now extracts the ticker; `Treasury bonds` correctly matches nothing.
+- Only `kind == "asset"` counts. A claim about semiconductors bears on an NVDA trade but never
+  committed to a direction on NVDA, and counting it would invent a disagreement.
+
+Verified live: a short on AMC logged against a 70%-confidence claim saying AMC up records
+`alignment: against`, and the trade detail shows the claim that disagreed, by name, with its
+confidence and horizon.
+
+Trades logged before capture existed get `capture-context`, which reconstructs from claims whose
+timestamps *prove* they were live then — labelled `reconstructed` everywhere it surfaces, because
+it is ranked against the reader's frame today rather than the one they had at the time. On the
+demo journal it honestly finds nothing: all 8 predate the oldest still-live claim, and the panel
+says so rather than manufacturing a connection.
 
 ---
 
@@ -127,7 +172,14 @@ behavioural patterns. Specified concretely in `docs/state.md` §"Next steps".
 - An internal marker `[convergence:43684:30]` leaked into user-facing Ledger prose (migration 027).
 - A missing `Icon` import passed 435 tests and threw on the page — the argument for running the
   browser check as well as the suite.
+- **Every model-prose surface was switched off in production and reporting success** (B-23). Six
+  call sites gated their model call on `provider in ("gemini", "openai")`, which is False for the
+  chain form `gemini,openai` that production actually runs. The signal explanation, the trade
+  coach, the journal report and the assistant had all been serving deterministic templates while
+  reporting the model had been tried. Found only by asking a running instance what produced its
+  prose — no test failed, because the suite runs on `template` by design. Fixed with
+  `llm.wants_model()`; a static test now forbids the pattern anywhere in the package.
 
 ---
 
-**Status: Phase 6 is 7 of 8.** Journal next, then the marketing site.
+**Status: Phase 6 complete, all eight sections.** The marketing site (Phase 7) is next.

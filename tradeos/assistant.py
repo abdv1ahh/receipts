@@ -372,7 +372,7 @@ def answer(conn: psycopg.Connection, question: str, user, as_of, provider=None) 
         if out:
             log.warning("assistant tool answer tripped the advice guard; using deterministic answer")
 
-    if provider in ("gemini", "openai"):
+    if llm.wants_model(provider):
         try:
             from .explain import gemini
             phrased = gemini.answer_question(question, ctx)
@@ -382,8 +382,7 @@ def answer(conn: psycopg.Connection, question: str, user, as_of, provider=None) 
         if phrased:
             allowed = allowed_numbers(ctx, {"_const": [1, 5, 10, 100]})
             if directive_guard(phrased) and numbers_guard(phrased, allowed):
-                text, model_id, used_template = phrased, (os.environ.get("OPENAI_MODEL", "openai")
-                    if provider == "openai" else os.environ.get("GEMINI_MODEL", "gemini")), False
+                text, model_id, used_template = phrased, llm.model_id(provider), False
             else:
                 log.warning("assistant guard tripped; using deterministic answer")
 

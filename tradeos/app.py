@@ -40,6 +40,7 @@ from . import (
     flags,
     geography,
     insights,
+    journal_context,
     ledger,
     portfolio,
     presentation,
@@ -467,7 +468,7 @@ def claims_list(hours: int = 72, limit: int = 40, tos_session: str | None = Cook
     hours, limit = max(1, min(720, hours)), max(1, min(100, limit))
     with db.connect() as conn, conn.cursor() as cur:
         user = authn.session_user(conn, tos_session)
-        profile, exposure, watchlist = _reader_frame(cur, user)
+        profile, exposure, watchlist = relevance.reader_frame(cur, (user or {}).get("id"))
         cur.execute(
             """SELECT c.id, c.created_at, c.mechanism, c.affected, c.horizon, c.confidence,
                       c.analogs, c.reasoning_trace, c.contradicts, c.status, c.model_version,
@@ -494,29 +495,6 @@ def claims_list(hours: int = 72, limit: int = 40, tos_session: str | None = Cook
             "disclaimer": "Informational analysis of public information, not personalised "
                           "investment advice. Every interpretation carries its confidence and is "
                           "scored in the Ledger once its horizon elapses."}
-
-
-def _reader_frame(cur, user: dict | None):
-    """(profile, country exposure, watchlist) for the signed-in reader, or empty frames."""
-    if not user:
-        return None, None, set()
-    cur.execute("SELECT country, base_currency, sectors, risk_appetite FROM user_profiles "
-                "WHERE user_id = %s", (user["id"],))
-    row = cur.fetchone()
-    profile = ({"country": row[0], "base_currency": row[1], "sectors": row[2],
-                "risk_appetite": row[3]} if row else None)
-    exposure = None
-    if profile and profile["country"]:
-        cur.execute("""SELECT currency, currency_regime, pegged_to, export_partners,
-                              import_partners, commodity_exposure
-                         FROM country_exposure WHERE country = %s""", (profile["country"],))
-        e = cur.fetchone()
-        if e:
-            exposure = {"currency": e[0], "currency_regime": e[1], "pegged_to": e[2],
-                        "export_partners": e[3], "import_partners": e[4], "commodity_exposure": e[5]}
-    cur.execute("SELECT symbol FROM watchlists WHERE user_id = %s", (user["id"],))
-    watchlist = {r[0].upper() for r in cur.fetchall()}
-    return profile, exposure, watchlist
 
 
 @app.put("/api/profile/frame")
@@ -556,7 +534,7 @@ def exposure_view(tos_session: str | None = Cookie(None)) -> dict:
         user = authn.session_user(conn, tos_session)
         if not user:
             return {"authenticated": False}
-        profile, _exp, watchlist = _reader_frame(cur, user)
+        profile, _exp, watchlist = relevance.reader_frame(cur, user["id"])
 
         # Holdings = the watchlist plus anything held in a portfolio. Both are things the reader
         # told us they care about; neither is a claim about what they actually own.
@@ -1364,7 +1342,22 @@ def trade_create(req: TradeReq, response: Response, tos_session: str | None = Co
                     (user["id"], *f.values()))
         tid = cur.fetchone()[0]
         conn.commit()
-    return {"created": True, "id": tid}
+
+        # Freeze what the world was showing at this moment (Phase 6). Deliberately after the
+        # commit and inside its own try: a journal entry the trader just wrote must never be lost
+        # because the spine was empty, slow, or broken. Missing context degrades to "none
+        # captured", which the interface states honestly.
+        captured = None
+        try:
+            captured = journal_context.capture(
+                conn, user["id"],
+                {"id": tid, "symbol": f["symbol"], "direction": f["direction"]},
+                datetime.now(UTC))
+        except Exception as exc:
+            log.warning("world context capture failed for trade %s (%s)", tid, type(exc).__name__)
+    return {"created": True, "id": tid,
+            "context": {"n_live": captured["n_live"], "n_on_symbol": captured["n_on_symbol"],
+                        "alignment": captured["alignment"]} if captured else None}
 
 
 @app.get("/api/trades")
@@ -1459,6 +1452,29 @@ def trade_analysis(tid: int, tos_session: str | None = Cookie(None)) -> dict:
         provider = flags.effective_provider(conn, "ai_trade_analysis")
         analysis = trades.cached_analysis(conn, m, provider=provider)
     return {"found": True, "analysis": analysis}
+
+
+@app.get("/api/trades/{tid}/context")
+def trade_context(tid: int, tos_session: str | None = Cookie(None)) -> dict:
+    """What the Radar was showing when this trade was logged. Owner-only.
+
+    Stricter than the analysis route, which a published trade exposes to viewers: this snapshot is
+    ranked by the OWNER's personal relevance, so it leaks their country, currency and watchlist.
+    Publishing a trade is not consent to publish the frame you read the world through.
+    """
+    with db.connect() as conn, conn.cursor() as cur:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            return {"found": False}
+        cur.execute("SELECT 1 FROM trades WHERE id=%s AND user_id=%s", (tid, user["id"]))
+        if not cur.fetchone():
+            return {"found": False}
+        ctx = journal_context.for_trade(conn, tid)
+    if not ctx:
+        return {"found": True, "context": None,
+                "note": "No world context was captured for this trade — it was logged before the "
+                        "journal started recording what the Radar was showing."}
+    return {"found": True, "context": ctx}
 
 
 @app.get("/api/trades/{tid}/chart-analysis")

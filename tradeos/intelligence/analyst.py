@@ -277,6 +277,6 @@ def analyze_recent(conn, hours: int = 48, limit: int = 12, provider: str | None 
     for i, it in enumerate(todo):
         analyze_item(conn, it, provider)
         done += 1
-        if provider in ("gemini", "openai") and i < len(todo) - 1:
+        if llm.wants_model(provider) and i < len(todo) - 1:
             time.sleep(throttle_s)
     return {"analyzed": done, "candidates_recent": len(items)}

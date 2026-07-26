@@ -9,9 +9,12 @@ the right side of the same line the rest of the product holds:
     the user names (target, stop, fixed moves). It never assigns a probability to an outcome or says
     what will happen; a signal base-rate overlay, when present, is labelled a historical base rate for
     that signal bucket, explicitly "not a forecast for this trade".
-  * The auto journal report AGGREGATES real journal facts (performance + recurring risk-management
-    habits) and, optionally, has the model phrase them — held to the SAME directive + numbers guards as
-    every other model path, with a deterministic fallback, so it can teach but never advise.
+  * The auto journal report AGGREGATES real journal facts (performance, recurring risk-management
+    habits, and — since Phase 6 — behavioural patterns read from the world context frozen at each
+    entry, see `journal_context.py`) and, optionally, has the model phrase them — held to the SAME
+    directive + numbers guards as every other model path, with a deterministic fallback, so it can
+    teach but never advise. The context patterns are what let it coach on PROCESS rather than only
+    on outcome, which is the difference between a coach and a scoreboard.
 
 Pure functions first (similarity, cohort summary, simulation, habit aggregation, deterministic report
 prose); the guarded/DB layer (model rephrasing, calibration overlay, cached report) follows.
@@ -26,7 +29,7 @@ import os
 import psycopg
 from psycopg.types.json import Json
 
-from . import trades
+from . import journal_context, ledger, llm, trades
 from .explain.guards import allowed_numbers, directive_guard, numbers_guard
 
 log = logging.getLogger("tradeos.insights")
@@ -184,12 +187,16 @@ def aggregate_habits(analyses: list[dict]) -> list[dict]:
     return out
 
 
-def build_report(perf: dict, habits: list[dict], n_total: int) -> dict:
+def build_report(perf: dict, habits: list[dict], n_total: int,
+                 patterns: list[dict] | None = None, n_with_context: int = 0) -> dict:
     """Structured, all-real-numbers journal report payload the prose is rendered from."""
     return {"n_total": n_total, "n_closed": perf.get("n_closed", 0), "sufficient": perf.get("sufficient"),
             "win_rate": perf.get("win_rate"), "expectancy": perf.get("expectancy"),
             "avg_reward_risk": perf.get("avg_reward_risk"), "by_strategy": perf.get("by_strategy", []),
             "performance_insights": perf.get("insights", []), "habits": habits,
+            # Process patterns, from what the world was showing at each entry. These are the only
+            # thing here that speaks to HOW the trader decides rather than how it turned out.
+            "context_patterns": patterns or [], "n_with_context": n_with_context,
             "min_sample": trades.PERF_MIN_SAMPLE}   # the floor is a real figure the prose may cite
 
 
@@ -209,6 +216,8 @@ def render_report(report: dict) -> str:
                      f"rather than an edge.")
     for h in report.get("habits", []):
         parts.append(f"{h['count']} of {h['of']} — {h['label']}.")
+    for p in report.get("context_patterns", []):
+        parts.append(f"{p['headline']}. {p['detail']}")
     parts.append("This is an educational summary of trades you logged — patterns and risk framing, "
                  "not advice about any position.")
     return " ".join(parts)
@@ -219,18 +228,17 @@ def render_report(report: dict) -> str:
 def _report_prose(report: dict, provider: str):
     """Return (prose, model_id, used_template). Optional model rephrasing held to the SAME directive
     and numbers guards as every other model path, with deterministic fallback (mirrors trades._prose)."""
-    if provider in ("gemini", "openai"):
+    if llm.wants_model(provider):
         try:
             from .explain import gemini
-            llm = gemini.generate_journal_report(report)
+            prose = gemini.generate_journal_report(report)
         except Exception as exc:
             log.warning("journal report provider unavailable (%s)", type(exc).__name__)
-            llm = None
-        if llm:
+            prose = None
+        if prose:
             allowed = allowed_numbers(report, {"_const": [1, 2, 5, 100]})
-            if directive_guard(llm) and numbers_guard(llm, allowed):
-                return llm, (os.environ.get("OPENAI_MODEL", "openai") if provider == "openai"
-                             else os.environ.get("GEMINI_MODEL", "gemini")), False
+            if directive_guard(prose) and numbers_guard(prose, allowed):
+                return prose, llm.model_id(provider), False
             log.warning("journal report guard tripped; using deterministic prose")
     return render_report(report), "template", True
 
@@ -289,11 +297,15 @@ def simulate_with_context(conn: psycopg.Connection, trade: dict, account_size, e
     return sim
 
 
-def _journal_hash(rows, provider):
+def _journal_hash(rows, provider, n_context: int = 0):
     """Inputs-hash over the journal's (id, updated_at) pairs + provider, so the cached report
-    regenerates exactly when a trade is added/edited/removed or the provider changes."""
+    regenerates exactly when a trade is added/edited/removed or the provider changes.
+
+    `n_context` is in the hash because a backfill attaches world context to trades without touching
+    `updated_at` — without it, a report generated before the backfill would be served forever with
+    its behavioural patterns permanently missing."""
     material = sorted((r[0], r[1].isoformat() if r[1] else None) for r in rows)
-    return hashlib.sha256((provider + "|" + json.dumps(material)).encode()).hexdigest()
+    return hashlib.sha256((f"{provider}|{n_context}|" + json.dumps(material)).encode()).hexdigest()
 
 
 def journal_report(conn: psycopg.Connection, user_id: int, provider: str | None = None) -> dict:
@@ -301,10 +313,11 @@ def journal_report(conn: psycopg.Connection, user_id: int, provider: str | None 
     it — guarded, with a deterministic fallback, cached by an inputs-hash so it doesn't re-spend the
     LLM quota until the journal changes."""
     provider = (provider or os.environ.get("EXPLAIN_PROVIDER", "template")).lower()
+    ctx_rows = journal_context.across_trades(conn, user_id)
     with conn.cursor() as cur:
         cur.execute("SELECT id, updated_at FROM trades WHERE user_id=%s", (user_id,))
         idrows = cur.fetchall()
-    h = _journal_hash(idrows, provider)
+    h = _journal_hash(idrows, provider, len(ctx_rows))
     with conn.cursor() as cur:
         cur.execute("SELECT content, input_hash FROM journal_reports WHERE user_id=%s", (user_id,))
         cached = cur.fetchone()
@@ -325,7 +338,8 @@ def journal_report(conn: psycopg.Connection, user_id: int, provider: str | None 
              "target_price": tg, "strategy": strat, "symbol": sym, "size": size, "size_unit": unit,
              "confidence": conf, "timeframe": tf, "opened_on": opened, "closed_on": closed}))
     perf = trades.summarize_performance(perf_rows)
-    report = build_report(perf, aggregate_habits(analyses), len(raw))
+    patterns = journal_context.behavioural_patterns(ctx_rows, ledger.published_rate(conn))
+    report = build_report(perf, aggregate_habits(analyses), len(raw), patterns, len(ctx_rows))
     prose, model_id, used_template = _report_prose(report, provider)
     report.update({"prose": prose, "model_id": model_id, "used_template": used_template})
 

@@ -66,6 +66,40 @@ def test_chain_parses_a_comma_list(monkeypatch):
     assert llm.chain("template") == ["template"]              # caller override beats the env
 
 
+def test_wants_model_accepts_the_chain_form_not_just_a_single_name(monkeypatch):
+    """The bug this exists to prevent, found in Phase 6 and live in production at the time.
+
+    Four callers that own their own prompt — the signal explainer, the trade analyst, the journal
+    coach and the assistant — each gated their model call on `provider in ("gemini", "openai")`.
+    That is correct for one name and silently False for `gemini,openai`, which is the documented
+    chain form and the value actually configured. All four served their deterministic template
+    while reporting the model had been tried: not a crash, not a visible failure, just every AI
+    surface quietly switched off. The gate now parses the chain exactly as the transport does."""
+    monkeypatch.setenv("EXPLAIN_PROVIDER", "gemini,openai")
+    assert llm.wants_model() is True
+    assert llm.wants_model("gemini,openai") is True
+    assert llm.wants_model("gemini") is True
+    assert llm.wants_model("template") is False
+    assert llm.wants_model("template,gemini") is True         # any real link means try the chain
+    assert llm.wants_model("nonsense") is False
+
+
+def test_no_caller_gates_a_model_call_on_a_bare_provider_name():
+    """A static check, because the failure is silent and reappears by copy-paste. Any call site
+    testing membership against a literal provider tuple is the bug above, rewritten."""
+    import pathlib
+    import re
+
+    root = pathlib.Path(llm.__file__).parent
+    bad = []
+    for path in root.rglob("*.py"):
+        for n, line in enumerate(path.read_text().splitlines(), 1):
+            # Only real branch code — the docstrings above quote the broken pattern on purpose.
+            if re.match(r"\s*(el)?if\s+.*provider\s+in\s+\(\s*[\"']gemini[\"']", line):
+                bad.append(f"{path.name}:{n}")
+    assert not bad, f"gate the model call on llm.wants_model() instead: {bad}"
+
+
 def test_model_id_per_role(monkeypatch):
     monkeypatch.delenv("GEMINI_MODEL", raising=False)
     monkeypatch.delenv("GEMINI_MODEL_FAST", raising=False)

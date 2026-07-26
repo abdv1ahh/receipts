@@ -38,7 +38,8 @@ def _cal_for(detail: dict, calibration: dict | None, horizon: int) -> dict | Non
 def _try_llm(provider: str, detail: dict, cal: dict | None, horizon: int) -> str | None:
     """Dispatch to the configured model provider (gemini, or any OpenAI-compatible endpoint via llm.py).
     Returns prose, or None if unavailable (no key, in cooldown, or call failed) — caller uses template."""
-    if provider in ("gemini", "openai"):
+    from .. import llm
+    if llm.wants_model(provider):
         try:
             from . import gemini
             return gemini.generate(detail, cal, horizon)
@@ -88,16 +89,18 @@ def explain(conn: psycopg.Connection, detail: dict, calibration: dict | None,
     cal = _cal_for(detail, calibration, horizon)
     template_prose = template.render(detail, cal, horizon)
 
+    # No provider gate here: `_try_llm` owns that decision and returns None for the template path.
+    # There used to be one, testing the provider name against a literal tuple, and it disagreed
+    # with the transport about what `gemini,openai` means — see llm.wants_model().
     result: Explanation | None = None
-    if provider in ("gemini", "openai"):
-        llm = _try_llm(provider, detail, cal, horizon)
-        if llm is not None:
-            allowed = allowed_numbers(detail, calibration or {})
-            if directive_guard(llm) and numbers_guard(llm, allowed) and base_rate_integrity_guard(llm, cal):
-                result = Explanation(llm, provider, _model_id(provider), False, False, version)
-            else:
-                log.warning("explanation guard tripped (provider=%s cluster=%s); using template",
-                            provider, cluster_id)
+    prose = _try_llm(provider, detail, cal, horizon)
+    if prose is not None:
+        allowed = allowed_numbers(detail, calibration or {})
+        if directive_guard(prose) and numbers_guard(prose, allowed) and base_rate_integrity_guard(prose, cal):
+            result = Explanation(prose, provider, _model_id(provider), False, False, version)
+        else:
+            log.warning("explanation guard tripped (provider=%s cluster=%s); using template",
+                        provider, cluster_id)
 
     if result is None:
         # template path: default (provider == 'template') or a fallback from a model provider
@@ -132,7 +135,8 @@ def extract_tickers(image_bytes: bytes, mime: str, provider: str | None = None) 
     provider = (provider or os.environ.get("EXPLAIN_PROVIDER", "template")).lower()
     candidates: list = []
     try:
-        if provider in ("gemini", "openai"):
+        from .. import llm
+        if llm.wants_model(provider):
             from . import gemini
             candidates = gemini.extract_tickers(image_bytes, mime)
     except Exception as exc:  # any provider failure -> manual entry

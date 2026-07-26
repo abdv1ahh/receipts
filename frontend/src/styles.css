@@ -1011,6 +1011,34 @@ button:disabled { opacity: 0.5; cursor: default; }
 .coach-foot { font-size: 11px; color: var(--faint); border-top: 1px solid var(--hairline); padding-top: 10px; margin-top: 14px; }
 @media (max-width: 760px) { .coach-cols { grid-template-columns: 1fr; } }
 
+/* ---- behavioural patterns in the coach card (Phase 6) ---- */
+.coach-patterns { margin-top: 16px; border-top: 1px solid var(--hairline); padding-top: 13px; }
+.coach-patterns .coach-col-h { color: var(--accent-2); text-transform: none; letter-spacing: 0; font-size: 12px; }
+.pattern { background: var(--panel-2); border: 1px solid var(--border); border-left: 2px solid var(--border-2); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
+.pattern-positive { border-left-color: var(--green); }
+.pattern-neutral { border-left-color: var(--accent); }
+.pattern-h { font-size: 13px; font-weight: 700; margin-bottom: 3px; }
+.pattern-d { font-size: 12.5px; color: var(--muted); line-height: 1.55; }
+
+/* ---- world context frozen at trade time (Phase 6) ---- */
+.analysis.world-ctx { border-left: 2px solid var(--accent-2); }
+.world-ctx .an-head { display: flex; align-items: center; gap: 7px; }
+.wc-verdict { display: flex; align-items: center; gap: 10px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font-size: 13px; line-height: 1.5; margin-bottom: 10px; }
+.wc-verdict svg { flex: none; }
+.wc-with { border-color: #2f4a2f; } .wc-with svg { color: var(--green); }
+.wc-against { border-color: rgba(255,194,92,0.4); } .wc-against svg { color: var(--amber); }
+.wc-mixed svg, .wc-none svg { color: var(--muted); }
+.wc-sym { display: flex; align-items: flex-start; gap: 9px; font-size: 12.5px; line-height: 1.5; padding: 7px 0; border-bottom: 1px solid var(--hairline); }
+.wc-sym:last-child { border-bottom: 0; }
+.wc-sym .chip { flex: none; margin-top: 1px; }
+.wc-sym-body { display: block; }
+.wc-list { display: flex; flex-direction: column; gap: 6px; margin-top: 9px; }
+.wc-row { display: flex; align-items: flex-start; gap: 10px; width: 100%; text-align: left; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; color: var(--text); font: inherit; font-size: 12.5px; cursor: pointer; }
+.wc-row:hover { border-color: var(--accent); }
+.wc-rel { flex: none; min-width: 26px; height: 20px; border-radius: 6px; display: grid; place-items: center; background: var(--grad-soft); border: 1px solid var(--border-2); color: var(--accent); font-size: 11px; font-weight: 700; }
+.wc-row-body { display: flex; flex-direction: column; gap: 2px; line-height: 1.45; }
+.wc-row-body .name { font-size: 11px; }
+
 /* ---- effortless capture dropzone ---- */
 .capture { border: 1.5px dashed var(--border-2); border-radius: var(--radius-lg); background: var(--panel-2); padding: 26px 20px; text-align: center; transition: border-color var(--dur), background var(--dur), transform var(--dur); margin-bottom: 16px; }
 .capture.over { border-color: var(--accent); background: rgba(110,140,255,0.07); transform: translateY(-1px); box-shadow: var(--glow); }

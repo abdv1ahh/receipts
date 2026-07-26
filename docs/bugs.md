@@ -276,3 +276,41 @@ own — but it is a genuine authorization hole and it makes per-user relevance i
 **Fix:** re-key to `user_id bigint REFERENCES users(id)` with a migration that maps existing rows,
 and scope every watchlist route by the session. Phase 8 (accounts) does the re-key; Phase 9 covers
 the authorization test. `_reader_frame` in `app.py` reads defensively in the meantime.
+
+---
+
+## Found later (Phase 6, the Journal)
+
+### B-23 · Every model-prose surface was silently switched off in production
+**Severity S1** (breaks a headline feature, invisibly). Found while wiring the Journal coach —
+its output said `used_template: true` on a machine with a working Gemini key.
+
+`EXPLAIN_PROVIDER` is documented in `llm.py` as a comma-separated **chain**, and production runs
+`gemini,openai`. `llm.chain()` parses it correctly. But six call sites that own their own prompt
+gated the model call on a literal membership test:
+
+```python
+if provider in ("gemini", "openai"):     # False for "gemini,openai"
+```
+
+Every one of them therefore fell through to its deterministic template — while reporting the model
+had been tried and failed. Affected: the signal explanation (`explain/base.py`, twice: the gate and
+the ticker extractor), the per-trade coach (`trades.py`), the journal report (`insights.py`), the
+assistant (`assistant.py`), and the news analyst's inter-call throttle (`intelligence/analyst.py`,
+where it meant no pacing between calls rather than no call).
+
+Nothing crashed and no test failed, because the template path is a legitimate output and every one
+of those tests ran under `EXPLAIN_PROVIDER=template` by design (`tests/conftest.py`). The failure
+was only visible by asking a running instance what produced its prose.
+
+**Fixed** by `llm.wants_model(provider)`, which parses the chain with the same function the
+transport uses, so the gate and the call can no longer disagree about what is configured. Verified
+live afterwards: signal explanation, trade coach, journal report and assistant all return
+`model_id: gemini-flash-latest`, `used_template: false`.
+
+Two tests hold it: `test_wants_model_accepts_the_chain_form_not_just_a_single_name`, and a static
+scan asserting no branch anywhere in the package gates on a bare provider name again.
+
+**Lesson recorded in `docs/state.md`:** a fallback that is indistinguishable from success is not a
+fallback, it is an outage with good manners. Where a path can degrade silently, something has to
+assert which path ran.

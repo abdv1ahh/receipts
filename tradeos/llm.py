@@ -66,6 +66,21 @@ def provider() -> str:
     return chain()[0]
 
 
+def wants_model(prov: str | None = None) -> bool:
+    """Does this provider setting name any real model provider?
+
+    Callers that own their own prompt (the signal explainer, the trade analyst, the journal coach,
+    the assistant) have to decide whether to attempt a model call at all. They each tested
+    `provider in ("gemini", "openai")`, which is right for a single name and silently False for the
+    documented CHAIN form — and `gemini,openai` is the value production actually runs. All four
+    surfaces were therefore serving their deterministic template while reporting the model had been
+    tried, which is the specific kind of quiet lie this codebase exists not to tell.
+
+    Ask this instead. It parses the chain the same way the transport does, so the gate and the call
+    can never again disagree about what is configured."""
+    return any(p in DEFAULTS for p in chain(prov))
+
+
 def model_id(prov: str | None = None, role: str = DEEP) -> str:
     """Human label of what actually produced prose (shown to the user)."""
     p = (prov or provider()).split(",")[0].strip().lower()
