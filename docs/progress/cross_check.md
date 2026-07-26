@@ -377,3 +377,19 @@ duration override in `shared/tokens.css` and would otherwise have survived it. T
 bearing both no-op. The bearing still renders its course, held, rather than vanishing.
 
 Checked at 375 / 768 / 1440px at six scroll depths each: no horizontal overflow anywhere.
+
+## Accessibility, found in the same pass
+
+- **Heading order was broken on the marketing site**: `h1` in the hero, then `h3` for each live
+  claim, with no `h2` between them. The live panel's own label is now an `h2`, which is what it
+  always was semantically. Eighteen headings, no jumps.
+- **The faintest text failed contrast on both front ends.** The site's `--paper-faint` measured
+  **4.16:1** and the app's `--faint` measured **3.10:1**, against a 4.5:1 AA floor for normal text —
+  and the brief asks for "contrast that passes". Raised to 5.0:1 and 5.4:1 on the page background
+  respectively, measured against every surface each token actually lands on rather than only the
+  easy one. The app's token stops one step short of clearing the transient row-hover background,
+  because the next value up collides with `--muted` and collapses the type hierarchy; that
+  trade-off is written into the token's comment rather than left for someone to rediscover.
+- The FAQ accordion was already a real `<button>` with `aria-expanded` and `aria-controls`, the
+  country picker already carried a role and a label, and `FAQPage` structured data was already
+  present and valid. Those needed nothing.

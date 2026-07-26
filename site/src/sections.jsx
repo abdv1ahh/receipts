@@ -74,10 +74,13 @@ export function Hero() {
         </div>
 
         <div className="live">
-          <div className="live-head">
+          {/* An h2, not a div: the claim headlines below it are h3, and without a heading here the
+              document jumped h1 -> h3. Screen-reader heading navigation is the main way this panel
+              is reached at all. */}
+          <h2 className="live-head">
             <span className="pulse" aria-hidden="true" />
             interpretations made in the last few hours
-          </div>
+          </h2>
           <div className="live-body">
             {d === undefined && [0, 1, 2].map((i) => (
               <div className="claim" key={i}>

@@ -48,7 +48,10 @@
   /* ---- chart paper: warm, never pure white ------------------------------------------------ */
   --paper: #e9e3d6;
   --paper-dim: #a7a89f;
-  --paper-faint: #6d7378;
+  /* 5.0:1 on --ink, so the smallest text on the page clears the 4.5:1 AA floor for normal
+     text. It was #6d7378, which measured 4.16:1 and failed — the brief asks for contrast
+     that passes, and the faintest token is the one that decides whether it does. */
+  --paper-faint: #7a8085;
 
   /* ---- the accent pair -------------------------------------------------------------------- */
   --magenta: #e8368f;           /* what the system CLAIMS */
@@ -230,6 +233,8 @@ section { padding: clamp(80px, 12vh, 160px) 0; position: relative; }
   overflow: hidden;
 }
 .live-head {
+  /* h2 for document structure; the visual weight stays the small mono label it always was. */
+  margin: 0; font-weight: 400;
   display: flex; align-items: center; gap: 10px;
   padding: 12px 16px;
   border-bottom: 1px solid var(--rule);

@@ -19,7 +19,13 @@
   --hairline: rgba(255,255,255,0.06);
   --text: #eaecf4;
   --muted: #8b93ab;
-  --faint: #565d75;
+  /* Measured against every surface faint text lands on: 5.4:1 on --bg, 5.1:1 on --panel,
+     4.7:1 on --card. All clear the 4.5:1 AA floor for normal text. The one exception is
+     --elev at 4.5:1 to two figures (4.47), which is the transient row-hover background only.
+     It was #565d75 — 3.1:1 on --bg and worse on a card, failing everywhere. Not raised further
+     because the next step up collides with --muted and collapses the type hierarchy, trading a
+     real distinction for a rounding difference in a hover state. */
+  --faint: #7b83a0;
   --accent: #6e8cff;          /* the one confident signal colour */
   --accent-2: #a98bff;        /* violet companion, used sparingly */
   --accent2: #a98bff;         /* legacy alias — existing views consume this */
