@@ -243,6 +243,14 @@ fastest:
    showing, and a test asserts the planes are never pooled. **Never quote a hit rate without
    saying which plane produced it.**
 
+0a3. **A partial backfill looks exactly like a broken signal.** The publish gate is
+   `min_source_classes: 2` + `min_voices: 3`, so a cluster needs at least two KINDS of filing.
+   Backfilling Form 4 alone over June 2023 produced 79 candidates and **zero** clusters — not
+   because anything was wrong, but because 13D/G history did not cover the same window. Always
+   backfill both sources over the same range (`make backfill-full`), and read "N candidates, 0
+   clusters" as "one source is missing" rather than as a failure. Measured cost: **35 minutes per
+   week of Form 4**, so 2.5 years is ~76 hours.
+
 0a2. **A point estimate without an interval invites a verdict the sample cannot support — in
    BOTH directions.** The signal plane reads 40.8% with +15.9% average on hits and −13.5% on
    misses, giving −1.52% expectancy. I reported that as "it does not work". It is not:

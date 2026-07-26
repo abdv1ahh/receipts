@@ -514,10 +514,25 @@ outlier row** — which is what made my earlier "Form 4 goes back to 2010" claim
 distribution starts in 2024. Clusters need insider *and* stake filings together, so 13D/G history
 alone produces no candidates.
 
-Measured: **one week of Form 4 backfill takes over ten minutes**, so 2.5 years is a twenty-hour job.
-That is the remaining work and it is time, not engineering — the three defects that made it
-*impossible* are fixed. `make backfill-full` is the command; it should be run overnight, then
-`compute-signals`, `run-backtest` and `import-signals` in that order.
+Measured properly rather than estimated: **one week of Form 4 backfill takes 35 minutes** (~700-950
+filings and ~1,000-1,500 transactions per day). So:
+
+| span | Form 4 backfill time |
+|---|---|
+| 1 year | ~30 hours |
+| 2.5 years | **~76 hours (3+ days)** |
+| 4 years | ~121 hours |
+
+An earlier note here said twenty hours. That was extrapolated from a partial run and was wrong by
+roughly four times; this figure is from a completed week.
+
+**Both sources must cover the same window, or the backfill produces nothing.** The publish gate is
+`min_source_classes: 2` and `min_voices: 3` — a cluster needs filings of at least two different
+kinds. Backfilling Form 4 alone for June 2023 moved the count from 0 candidates to **79 candidates
+and still 0 clusters**, because insider filings are one class and there was no 13D/G history beside
+them. That is not a failure, it is an incomplete backfill, and it looks identical to a failure from
+the outside. `make backfill-full` does both sources over one range, which is why it is the command
+to use rather than the individual ones.
 
 **What this changes about the verdict.** The signal was never measured on enough data to judge, and
 three separate bugs guaranteed it never would be. It still has not been shown to work. It has also
