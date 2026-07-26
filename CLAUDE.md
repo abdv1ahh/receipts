@@ -119,7 +119,7 @@ overnight calibration backfill.
 ### Database
 
 ```bash
-docker compose exec -T db psql -U tradeos -d tradeos -c '\dt'    # 60 tables
+docker compose exec -T db psql -U tradeos -d tradeos -c '\dt'    # 61 tables
 docker compose exec -T db psql -U tradeos -d tradeos             # interactive
 ```
 

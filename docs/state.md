@@ -20,7 +20,7 @@ Demo login `demo@tradeos.app` / `<generated at seed time>`. Surfaces: `/radar` `
 
 **Verified state at handoff:** 598 tests pass · 0 lint errors · 0 console errors on twelve
 surfaces incl. the marketing site, checked in a headless browser · migrations through **032**,
-applied cleanly to an EMPTY database and re-run as a no-op · 60 tables · gitleaks clean over 53
+applied cleanly to an EMPTY database and re-run as a no-op · 61 tables · gitleaks clean over 53
 commits · pip-audit and npm audit clean · the Ledger reads 40.8% of 282 (115 hit / 167 miss). The marketing site is at
 <http://localhost:8000/site/> after `cd site && npm install` then `make site`. `docs/deploy.md` is
 the deployment reference; `cli preflight` is its enforcer, and `docs/progress/phase_9.md` §"What is
