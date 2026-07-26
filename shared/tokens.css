@@ -1,0 +1,71 @@
+/* shared/tokens.css — the primitives the app and the marketing site both agree on.
+ *
+ * Consumed by `frontend/src/styles.css` and `site/src/styles.css`. Two sibling Vite projects, not
+ * an npm workspace — `docs/plan.md` §6 has the reasoning and it still holds.
+ *
+ * What belongs here: the measurements. Spacing, radii, type scale, motion curves, font stacks —
+ * things that must not drift between the front door and the product, because a visitor crosses
+ * from one to the other in a single click and a changed rhythm reads as a changed company.
+ *
+ * What does NOT belong here: colour. The brief is explicit that the site is "free to be more
+ * expressive", and the two palettes are deliberately different — the app is a dark instrument you
+ * sit in front of for an hour, the site is a chart you read for ninety seconds. Each defines its
+ * own field and accents after importing this file, so a later token here can never silently
+ * repaint a surface that was designed around a different one.
+ *
+ * Both importers declare their own `:root` AFTER this import, so any value they restate wins.
+ * That ordering is deliberate: it makes adding to this file safe by construction.
+ */
+
+:root {
+  /* ---- type stacks ------------------------------------------------------------------------ */
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  /* ---- type scale ------------------------------------------------------------------------- */
+  --fs-xs: 11px;
+  --fs-sm: 12.5px;
+  --fs-md: 13.5px;
+  --fs-base: 15px;
+  --fs-lg: 18px;
+  --fs-xl: 22px;
+  --fs-2xl: 27px;
+  --fs-3xl: 34px;
+  --fs-4xl: 44px;
+
+  /* ---- spacing (8px system) --------------------------------------------------------------- */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 24px;
+  --s6: 32px;
+  --s7: 48px;
+  --s8: 64px;
+
+  /* ---- radii ------------------------------------------------------------------------------ */
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+
+  /* ---- motion ----------------------------------------------------------------------------- */
+  --ease: cubic-bezier(0.22, 0.68, 0.15, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur: 0.16s;
+  --dur-2: 0.28s;
+  --dur-slow: 0.5s;
+}
+
+/* One accessibility rule worth centralising rather than trusting two codebases to remember.
+ * Not `animation: none` — that can leave an element stranded at frame zero of an entrance
+ * animation and therefore invisible. Collapsing the duration instead runs the animation to its
+ * final state instantly, so the page always ends up fully readable. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

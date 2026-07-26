@@ -180,3 +180,38 @@ def test_explain_is_deterministic_on_a_tie():
 
 def test_explain_degrades_when_nothing_scored():
     assert "general feed" in relevance.explain(dict.fromkeys(("confidence", "watchlist", "geo", "currency", "novelty"), 0.0))
+
+
+# ------------------------------------------------------------------ what a claim is ABOUT (Phase 7)
+
+def test_relevance_places_a_claim_by_what_it_affects_not_who_published_it():
+    """The single most repeated mistake in this project, found a fourth time — in the ranking.
+
+    `geo` on an event is where the OUTLET sits: the news adapter marks every US-markets item `US`,
+    so a US wire filing about Asian exporters was scored as a US event. `geography.countries_for`
+    exists precisely to fix this and was honoured by the globe and by Exposure but not by
+    relevance, which meant a reader in Tokyo and a reader in São Paulo saw nearly the same order.
+    """
+    us_wire_about_asia = {"confidence": 0.7, "geo": ["US"],
+                          "affected": [{"kind": "region", "value": "Asia", "direction": "down"}]}
+    assert "JP" in relevance.places(us_wire_about_asia)
+    assert relevance.places(us_wire_about_asia) != ["US"]
+
+
+def test_the_outlet_country_is_used_only_when_nothing_else_maps():
+    """A last resort, not a default — an unplaceable claim is better than a wrongly placed one."""
+    unmappable = {"geo": ["GB"], "affected": [{"kind": "asset", "value": "NVDA"}]}
+    assert relevance.places(unmappable) == ["GB"]
+    assert relevance.places({"geo": [], "affected": []}) == []
+
+
+def test_the_same_claim_ranks_differently_from_two_countries():
+    """The personalisation promise, asserted rather than assumed. Before the fix above these two
+    scored within a rounding of each other, because both were really scoring the publisher."""
+    gulf_story = {"confidence": 0.7,
+                  "geo": ["US"],                       # filed by a US outlet
+                  "affected": [{"kind": "region", "value": "Middle East", "direction": "down"}]}
+    ae = relevance.score(gulf_story, {"country": "AE"}, AE)
+    br = relevance.score(gulf_story, {"country": "BR"}, BR)
+    assert ae["relevance"] > br["relevance"]
+    assert ae["parts"]["geo"] == 1.0                   # it happened where the reader is

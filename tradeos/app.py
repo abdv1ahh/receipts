@@ -44,6 +44,7 @@ from . import (
     ledger,
     portfolio,
     presentation,
+    public_site,
     relevance,
     search,
     sentiment,
@@ -456,6 +457,32 @@ def ledger_view() -> dict:
     with db.connect() as conn:
         return {"ledger": ledger.summary(conn), "recent_misses": ledger.recent_misses(conn, limit=10),
                 "brand": config.brand_name()}
+
+
+# ------------------------------------------------------------------- the marketing site (Phase 7)
+#
+# Everything under /api/public is served to anonymous callers by design. It takes no session and
+# reads nothing user-scoped — see the module docstring in `public_site.py` for the boundary.
+
+@app.get("/api/public/walkthrough")
+def public_walkthrough() -> dict:
+    """One real interpretation walked end to end, rotating daily over the live store."""
+    with db.connect() as conn:
+        return public_site.walkthrough(conn)
+
+
+@app.get("/api/public/frame")
+def public_frame(country: str | None = None, limit: int = 5) -> dict:
+    """The same day read from one country — the personalisation demo, without an account."""
+    with db.connect() as conn:
+        return public_site.frame_preview(conn, country, limit)
+
+
+@app.get("/api/public/live")
+def public_live(limit: int = 5) -> dict:
+    """The freshest event-derived interpretations, for the hero. No ranking, no reader."""
+    with db.connect() as conn:
+        return {"claims": public_site.live_claims(conn, limit), "brand": config.brand_name()}
 
 
 @app.get("/api/claims")
@@ -2668,6 +2695,21 @@ def share_page(symbol: str) -> str:
 <a href="/?symbol={e(sym)}">Open {e(sym)} on TradeOSS &#8594;</a>
 <p>TradeOSS shows what the smartest money is quietly doing, with backtested, probability-framed context. Not investment advice.</p>
 </body></html>'''
+
+
+# ------------------------------------------------------------------- marketing site (Phase 7)
+#
+# Mounted BEFORE the app's own "/" mount, because that one is a catch-all: anything registered
+# after it is unreachable. Two separate bundles on one origin, which is what makes both verifiable
+# locally; Phase 8 puts the site on the apex domain and the app on a subdomain, the split the brief
+# implies by calling it "a separate public application".
+#
+# Built from `site/`, which is gitignored like `frontend/dist` — absent in a checkout until
+# `npm --prefix site run build`, so the mount is conditional rather than a hard dependency.
+
+_SITE_DIR = Path(__file__).parent / "site_static"
+if (_SITE_DIR / "index.html").exists():
+    app.mount("/site", StaticFiles(directory=str(_SITE_DIR), html=True), name="marketing")
 
 
 # ------------------------------------------------------------------- frontend (SPA)

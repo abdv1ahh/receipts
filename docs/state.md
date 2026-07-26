@@ -1,6 +1,6 @@
 # docs/state.md — where the work stands
 
-Updated: 2026-07-26, **Phase 6 complete**.
+Updated: 2026-07-26, **Phases 6 and 7 complete**.
 **Read this after `CLAUDE.md` and before `docs/plan.md` at the start of every session.**
 
 ---
@@ -11,16 +11,17 @@ Updated: 2026-07-26, **Phase 6 complete**.
 cd /path/to/receipts
 git checkout phase/6-sections          # all work lives here; not yet merged to main
 make dev                               # reload-in-place stack on :8000
-make test                              # 486 pass, ~0.5s, offline
+make test                              # 498 pass, ~0.5s, offline
 make lint                              # ruff, zero errors is the standard
 ```
 
 Demo login `demo@tradeos.app` / `<generated at seed time>`. Surfaces: `/radar` `/globe` `/ledger`
 `/exposure` `/crypto` `/news` `/brief` `/events` `/integrations` `/journal`.
 
-**Verified state at handoff:** 486 tests pass · 0 lint errors · 0 console errors on eleven surfaces
-checked in a headless browser · 601 events · 556 clusters · 357 claims · 323 scored outcomes ·
-migrations through 028 · 57 tables.
+**Verified state at handoff:** 498 tests pass · 0 lint errors · 0 console errors on eleven app
+surfaces and the marketing site, checked in a headless browser · migrations through 028 · 57
+tables. The marketing site is at <http://localhost:8000/site/> after `cd site && npm install` then
+`make site`.
 
 **Model prose is genuinely on again.** It was not, silently, for the whole of Phases 3–6 — see
 B-23 in `docs/bugs.md`. If you change anything in the model path, confirm a running instance
@@ -39,8 +40,8 @@ returns `used_template: false` rather than trusting the suite, which runs on `te
 | 4 — Radar | core complete (threading, saved filters, alerts outstanding) |
 | 5 — Globe | complete |
 | 6 — Rework sections | complete (all eight) |
-| **7 — Marketing site** | **not started — next** |
-| 8 — Accounts, limits, deployment | not started |
+| 7 — Marketing site | complete — `site/`, served at `/site` |
+| **8 — Accounts, limits, deployment** | **not started — next** |
 | 9 — Security | not started |
 
 Every phase has a report in `docs/progress/`.
@@ -49,27 +50,13 @@ Every phase has a report in `docs/progress/`.
 
 ## NEXT STEPS, in the order I would do them
 
-### 1. Phase 7 — the marketing site
-
-`site/` as a **sibling Vite project** to `frontend/`, sharing `shared/tokens.css`. Not npm
-workspaces — decided in `docs/plan.md` §6 and the reason still holds.
-
-Hero is the live product. Then the daily real-event walkthrough, then **the public Ledger**, which
-is now genuinely persuasive because it reads *41% of 282, with the misses shown*. Then the
-personalisation globe demo, then FAQ with `FAQPage` structured data.
-
-**Design direction is specified and non-obvious** — re-read `docs/tradeoss_veryimportant_prompt.md`
-§13 before designing. It explicitly rules out the current defaults (cream + serif + terracotta;
-near-black + one acid accent; broadsheet grid) and asks for a cartographic/instrumental vocabulary.
-Present the token system for review **before** building.
-
-### 2. Phase 8 — accounts, limits, deployment
+### 1. Phase 8 — accounts, limits, deployment
 
 Email + OAuth, sub-minute onboarding capturing country/currency/watchlist (the `user_profiles`
 table and `PUT /api/profile/frame` already exist — onboarding just has to fill them), server-side
 tier gating, and `docs/deploy.md`.
 
-### 3. Phase 9 — security
+### 2. Phase 9 — security
 
 Threat model first. `/security-review` has already run twice this project and found a **real
 vulnerability each time**, so budget for findings rather than a clean pass. Known work:
@@ -78,13 +65,13 @@ vulnerability each time**, so budget for findings rather than a clean pass. Know
 - gitleaks over full history — wired into CI, never run locally.
 - Adversarial authorization tests across every per-user object.
 
-### 4. Carried over, not blocking anything
+### 3. Carried over, not blocking anything
 
 - **Phase 4 remainder**: saved filter sets, in-place threading of developing stories, subscribable
   alerts.
-- **GDELT has never been observed ingesting.** Adapter built, parsing covered by offline tests
-  against real captured payloads, 429 backoff verified. My own unpaced probing throttled the IP;
-  it now backs off six hours. Check `SELECT count(*) FROM events WHERE source='gdelt'`.
+- ~~GDELT has never been observed ingesting.~~ **RESOLVED 2026-07-25** — it came back after the
+  backoff elapsed. 4 events in the store and gdelt-sourced claims are now on the Radar and in the
+  site's hero. The count is small; watch whether it keeps flowing rather than assuming it will.
 - **Bluesky** as a real `SocialSource` — the interface exists, the implementation does not.
 - **`/simplify` and `/code-review` have never been run** on any phase diff.
 - **`GOOG`/`GOOGL` render as two board rows** for one company; needs share-class collapsing.
@@ -160,9 +147,18 @@ Ordered roughly by how much time they would cost to rediscover.
    we deliberately do not, and `tests/test_gdelt.py` asserts the module still explains why.
 
 10. **`geo` on an event is where the OUTLET sits, not what the story is about.** This distinction
-    was written into the GDELT adapter and then violated twice — once in the news adapter, once
-    when trying to use geography to corroborate cross-outlet clustering. The single most repeated
-    mistake in this project.
+    was written into the GDELT adapter and then violated three times — the news adapter, an attempt
+    to use geography to corroborate cross-outlet clustering, and **relevance ranking itself**,
+    found in Phase 7. The third was the worst: personal relevance scored on the publisher's
+    country, so a reader in Tokyo and a reader in São Paulo were shown nearly the same order,
+    differing only by a rounding of the same US-centric number. The entire personalisation promise
+    was quietly not working, and it took building a page whose whole job is to *demonstrate* that
+    promise to notice.
+
+    **It is fixed at the root now**: `relevance.places()` derives the countries from what a claim
+    AFFECTS via `geography.countries_for`, falling back to the outlet's `geo` only when nothing
+    maps, so no caller has to remember the rule. Three tests hold it. If you add a fourth consumer
+    of `geo`, this is still the mistake you are about to make.
 
 11. **Cross-outlet clustering needs shared PROPER NOUNS**, not title similarity and not geography.
     Two reports of one event share who and where; two unrelated ones share topic vocabulary.

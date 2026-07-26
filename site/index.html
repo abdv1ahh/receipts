@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#05090c" />
+
+    <title>Rhumb — what the world's events cost you</title>
+    <meta name="description" content="Rhumb reads world events and commits to what they mean: the mechanism, the assets, the horizon, the confidence. Then it scores itself in public and publishes the misses first." />
+    <link rel="canonical" href="https://rhumb.app/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Rhumb" />
+    <meta property="og:title" content="Rhumb — what the world's events cost you" />
+    <meta property="og:description" content="Interpretations with a mechanism, a horizon and a confidence — scored in public afterwards, misses first." />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <!-- The field colour, inline, so the first frame is never a white flash before the CSS lands.
+         Everything else waits for the stylesheet; this one rule does not. -->
+    <style>
+      html { background: #05090c; }
+      body { margin: 0; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>
+      <div style="max-width:60ch;margin:12vh auto;padding:0 24px;color:#e9e3d6;font:16px/1.6 system-ui,sans-serif">
+        <h1 style="font-size:2rem">Rhumb</h1>
+        <p>Rhumb interprets world events into their market consequences — the mechanism, the assets
+        affected, the horizon and the confidence — and then scores every one of those calls against
+        what actually happened, publishing the record with the misses first.</p>
+        <p>This page shows live data from the product, which needs JavaScript. The accuracy record
+        itself is available as JSON at <a style="color:#e8368f" href="/api/ledger">/api/ledger</a>.</p>
+      </div>
+    </noscript>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

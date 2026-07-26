@@ -1,3 +1,8 @@
+/* Shared measurements (spacing, radii, type scale, motion) live in one place so the app and the
+ * marketing site cannot drift. Imported FIRST — everything this file declares below overrides it,
+ * which is what makes adding to the shared file safe. Colour is deliberately not shared. */
+@import "../../shared/tokens.css";
+
 :root {
   /* ===== Midnight Terminal, alive — a calm dark foundation with a confident indigo signal =====
      Layered near-black bases (cool blue-violet undertone, never a flat terminal). Borders are quiet

@@ -4,7 +4,7 @@
 
 X = docker compose exec -T api python -m tradeos.cli
 
-.PHONY: demo test dev web lint fix up down logs seed backfill-full
+.PHONY: demo test dev web site lint fix up down logs seed backfill-full
 
 # Reproducible demo from scratch. Uses a QUICK data window (a few weeks) so it finishes in
 # minutes; the full 24-month backfill (backfill-full) is a separate overnight job.
@@ -51,6 +51,11 @@ dev:
 
 web:
 	cd frontend && npm run build
+
+# The marketing site (Phase 7). A sibling Vite project; same 0.3s loop as `web` under `make dev`,
+# served at /site. First run needs `cd site && npm install`.
+site:
+	cd site && npm run build
 
 # Ruff is the linter. It is deliberately NOT the formatter here — see the note in pyproject.toml.
 lint:

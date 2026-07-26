@@ -217,6 +217,22 @@ def currency_weight(exposure: dict | None, affected: list[dict]) -> float:
     return 0.2
 
 
+def places(claim: dict) -> list[str]:
+    """The countries a claim actually bears on.
+
+    From what the claim says it AFFECTS, falling back to the event's own `geo` only when nothing
+    maps. That fallback is a last resort, not a default, because `geo` is where the OUTLET sits —
+    a US wire filing about Asian exporters is tagged US.
+
+    This distinction is written into `geography.py`, honoured by the globe and by Exposure, and was
+    still missing here: relevance ranked on the publisher's country, so a reader in São Paulo and a
+    reader in Tokyo were shown almost the same order, differing only by a rounding of the same
+    US-centric score. It is the single most repeated mistake in this project, and it lives here now
+    so no caller has to remember it."""
+    from . import geography
+    return geography.countries_for(claim.get("affected") or []) or list(claim.get("geo") or [])
+
+
 def score(claim: dict, profile: dict | None, exposure: dict | None,
           watchlist: set[str] | None = None, novelty: float | None = None) -> dict:
     """Relevance 0..1 for one claim and one reader, with the contributing parts returned.
@@ -228,7 +244,7 @@ def score(claim: dict, profile: dict | None, exposure: dict | None,
     parts = {
         "confidence": float(claim.get("confidence") or 0),
         "watchlist": watchlist_weight(affected, watchlist),
-        "geo": geo_weight((profile or {}).get("country"), exposure, claim.get("geo") or []),
+        "geo": geo_weight((profile or {}).get("country"), exposure, places(claim)),
         "currency": currency_weight(exposure, affected),
         "novelty": float(novelty if novelty is not None else 0.5),
     }

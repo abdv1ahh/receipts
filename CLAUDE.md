@@ -13,9 +13,9 @@ command.
 
 **Internal codename: TradeOSS. Display name: Rhumb** (`BRAND_NAME`). A world-event interpretation
 engine that explains market consequences. The product brief is
-`docs/tradeoss_veryimportant_prompt.md` — the source of truth for scope. **Phases 0–6 are done;
-Phase 7 (marketing site) is next. `docs/state.md` has the resume instructions and the ordered
-next steps.**
+`docs/tradeoss_veryimportant_prompt.md` — the source of truth for scope. **Phases 0–7 are done;
+Phase 8 (accounts, limits, deployment) is next. `docs/state.md` has the resume instructions and the
+ordered next steps.**
 
 It now has a claim engine (`claims.py`), a self-scoring Ledger (`ledger.py`, publishing 41% of 282
 with the misses shown), an event spine (`spine.py`), personal relevance (`relevance.py`), world
@@ -69,7 +69,7 @@ The app is at <http://localhost:8000>. Demo login: `demo@tradeos.app` / `<genera
 ### Tests
 
 ```bash
-make test     # 486 tests, ~0.5s, fully offline (no network)
+make test     # 498 tests, ~0.5s, fully offline (no network)
 make lint     # ruff; zero errors is the standard
 make dev      # reload-in-place stack; then `make web` for a UI change
 make fix      # ruff --fix
@@ -82,7 +82,8 @@ make fix      # ruff --fix
 
 ```bash
 make dev      # once: starts the reload-in-place stack
-make web      # after every UI edit (~0.3s) — this is what makes the change visible
+make web      # after every APP UI edit (~0.3s) — this is what makes the change visible
+make site     # same, for the marketing site at /site (needs `cd site && npm install` once)
 ```
 
 **In production the bundle is baked into the image at build time** (`Dockerfile` stage 1 copies
@@ -144,6 +145,7 @@ tradeos/                  the Python package (all backend code)
   claims.py               the impact engine. Mechanism rule + the prompt-injection boundary.
   ledger.py               outcome measurement vs SPY; the self-scoring record.
   relevance.py            personal ranking + the reader frame + country exposure data. No model.
+  public_site.py          the ONLY unauthenticated surface: what a stranger or a crawler can read.
   journal_context.py      the Radar frozen at trade time; the coach's process patterns. No model.
   geography.py            places events by what a claim AFFECTS, not who published it.
   exposure.py             what holdings are exposed to (replaced the position tracker).
@@ -156,6 +158,8 @@ tradeos/                  the Python package (all backend code)
   (surface modules)       dashboard, brief, news, social, sentiment, crypto, events,
                           trades, insights, portfolio, community, alerts, admin,
                           billing, search, library, presentation, assistant
+shared/tokens.css         measurements both front ends agree on. Colour is deliberately NOT shared.
+site/                     the marketing site: a sibling Vite project, served at /site. See its README.
 frontend/src/             React, one .jsx per surface, imported by App.jsx
   shell.jsx               routing, ErrorBoundary, LoadError/EmptyState, SourceGate
   radar.jsx ledger.jsx    the two flagship surfaces
