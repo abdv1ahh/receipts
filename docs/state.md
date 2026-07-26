@@ -16,7 +16,7 @@ the things it found were genuinely broken in the reader's face while every test 
 cd /path/to/receipts
 git checkout phase/6-sections          # all work lives here; not yet merged to main
 make dev                               # reload-in-place stack on :8000
-make test                              # 619 pass, ~1s (17 need the local DB)
+make test                              # 621 pass, ~1s (17 need the local DB)
 make lint                              # ruff, zero errors is the standard
 ```
 
@@ -24,7 +24,7 @@ Demo login `demo@tradeos.app` / `<generated at seed time>`. Surfaces: `/radar` `
 `/exposure` `/crypto` `/news` `/brief` `/events` `/journal` `/community` `/integrations`.
 `/` redirects a signed-out visitor to the marketing site at `/site/`.
 
-**Verified state at handoff:** 619 tests pass · 0 lint errors · 0 console errors and **0 horizontal
+**Verified state at handoff:** 621 tests pass · 0 lint errors · 0 console errors and **0 horizontal
 overflow on all 21 app surfaces at 375 / 768 / 1280px**, plus the marketing site, checked in a real
 browser · the 3D globe verified **rendering under actual WebGL** in headed Chromium, not merely
 "no errors in headless" (headless has no GPU, which is exactly how the globe stayed broken) ·
@@ -263,7 +263,10 @@ So a fresh session knows what it is resuming, not just where the files are.
 consequence rather than the headline, confidence always visible, disagreements surfaced.
 
 **The Ledger** publishes **41% of 282 resolved calls**, misses first, with calibration (said 38% →
-landed 40%). Broken down by origin so the signal plane and the model are never pooled.
+landed 40%) — and, since 2026-07-26, **expectancy: −1.52% per call versus SPY**. Read that number
+before quoting the hit rate. All 282 are the legacy `convergence-v3` signal; **the impact engine has
+80 open claims and zero resolved**, so it has no accuracy figure at all yet and no surface may imply
+otherwise. `open_by_origin` exists so every surface can say whose record it is showing.
 
 **The World** places events by what their claims *affect*, with 62 sourced trade corridors; 3D
 lazy-loaded behind WebGL detection, flat map otherwise.

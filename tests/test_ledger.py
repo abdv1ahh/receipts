@@ -80,3 +80,48 @@ def test_an_empty_slice_reports_no_rate_rather_than_zero():
 
 def test_an_uncategorised_slice_is_labelled_not_dropped():
     assert ledger._rate(None, 3, 2, 20)["key"] == "uncategorised"
+
+
+# ------------------------------------------------------------------ the record must not mislead
+#
+# These need the local database, and skip like the adversarial authz tests do when it is absent.
+
+def _db_reachable() -> bool:
+    try:
+        from tradeos import db
+        with db.connect() as conn, conn.cursor() as cur:
+            cur.execute("SELECT 1")
+        return True
+    except Exception:
+        return False
+
+
+needs_db = pytest.mark.skipif(not _db_reachable(), reason="ledger summary reads the database")
+
+
+@needs_db
+def test_the_summary_reports_magnitude_not_only_a_hit_rate():
+    """A hit rate on its own is misleading in BOTH directions — 40% right with large winners is a
+    good record and 60% right with large losers is a bad one. Reporting the count without the
+    weight is how a ledger stays technically true and still tells you the wrong thing."""
+    from tradeos import db, ledger
+    with db.connect() as conn:
+        o = ledger.summary(conn)["overall"]
+    for key in ("avg_excess_on_hits", "avg_excess_on_misses", "expectancy"):
+        assert key in o, f"{key} missing — a hit rate alone does not describe a record"
+
+
+@needs_db
+def test_the_two_planes_are_never_pooled_into_one_record():
+    """The impact engine and the backtested smart-money signal are different subsystems with
+    different results. Pooling them produced a marketing page that announced the product does not
+    work, using a number that had never measured the product. Open work has to be attributable
+    too, or a surface can only say "80 open" and not whose."""
+    from tradeos import db, ledger
+    with db.connect() as conn:
+        s = ledger.summary(conn)
+    origins = {r["key"] for r in s["open_by_origin"]}
+    assert any(k.startswith("impact engine") for k in origins)
+    assert any(k.startswith("signal plane") for k in origins)
+    # Every resolved row is attributed to exactly one plane, so nothing hides in an aggregate.
+    assert sum(r["n"] for r in s["by"]["origin"]) == s["overall"]["n"]

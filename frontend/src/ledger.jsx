@@ -12,6 +12,7 @@
 import { useEffect, useState } from "react";
 import { fetchLedger } from "./api";
 import { Icon } from "./icons.jsx";
+import { pct as signedPct } from "./format.js";
 import { EmptyState, LoadError } from "./shell.jsx";
 
 const pct = (v) => (v == null ? "—" : `${Math.round(v * 100)}%`);
@@ -41,6 +42,14 @@ function Headline({ o }) {
         <div className="lg-count bad"><b>{o.miss}</b><span>wrong</span></div>
         <div className="lg-count"><b>{o.inconclusive}</b><span>too small to call</span></div>
         <div className="lg-count"><b>{o.unscoreable}</b><span>no price series</span></div>
+        {/* The figure a hit rate hides. 40% right with winners twice the size of losers is a good
+            record; 60% right with small winners is a bad one. Counting calls without weighing
+            them is how a record stays true and still misleads. */}
+        {o.expectancy != null && (
+          <div className={`lg-count ${o.expectancy >= 0 ? "ok" : "bad"}`}>
+            <b>{signedPct(o.expectancy)}</b><span>average excess per call vs SPY</span>
+          </div>
+        )}
       </div>
     </div>
   );

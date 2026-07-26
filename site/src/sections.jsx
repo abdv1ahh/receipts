@@ -8,6 +8,7 @@
 import { useState } from "react";
 import { fetchFrame, fetchLedger, fetchLive, fetchWalkthrough } from "./api";
 import { useLoad, useReveal } from "./hooks";
+import { Graticule } from "./graticule.jsx";
 import { Rose } from "./rose.jsx";
 import { WorldMap } from "./worldmap.jsx";
 
@@ -54,7 +55,10 @@ export function Hero() {
   const d = useLoad(() => fetchLive(4));
   return (
     <header className="hero">
-      <Rose />
+      {/* Three depth layers. They move at different rates against each other, which is what makes
+          this read as crossing a chart rather than as a picture sliding. */}
+      <div className="depth depth-far"><Graticule /></div>
+      <div className="depth depth-mid"><Rose /></div>
       <div className="wrap hero-grid">
         <div>
           <h1>The world moves.<br />Here is <em>what it costs you</em>.</h1>
@@ -170,7 +174,10 @@ export function Walkthrough() {
 
               {d.settled && (
                 <div className="step-card outcome">
-                  <div className="step-k">and one that has already been marked</div>
+                  {/* Explicitly labelled as the signal plane. It sat here unlabelled directly
+                      under a world-event walkthrough, which read as though the engine's calls were
+                      already being scored — they are not; none has resolved yet. */}
+                  <div className="step-k">and one from the signal plane, already marked</div>
                   <p>
                     On <b className="mono">{day(d.settled.made_on)}</b> it said{" "}
                     <b className="mono">{d.settled.subject} {d.settled.predicted}</b> at{" "}
@@ -181,7 +188,10 @@ export function Walkthrough() {
                     against SPY — recorded a <b>{d.settled.verdict}</b>.
                   </p>
                   <p className="claim-foot" style={{ marginTop: 0 }}>
-                    Measured as excess return, so a call that said "up" in a week when everything
+                    That one is from the older smart-money signal, which has a finished record —
+                    shown here because it is a real marked call, not because it is this engine's.
+                    The interpretation above has not resolved yet, and neither has any other.
+                    Measured as excess return, so a call that said “up” in a week when everything
                     rose gets no credit for it.
                   </p>
                 </div>
@@ -201,45 +211,108 @@ export function Ledger() {
   const l = d?.ledger;
   const o = l?.overall;
 
+  // Two planes, and they must never be pooled or confused for one another.
+  //
+  // This section used to headline "We are wrong most of the time" over a 41% hit rate, directly
+  // under a hero promising an engine that interprets world events. Both halves were misleading.
+  // The 41% is the SIGNAL PLANE — a backtested smart-money convergence score — and the engine the
+  // page actually sells has no resolved calls at all yet. Publishing one subsystem's failure as
+  // the other's track record is not candour, it is just a different inaccuracy, and it told every
+  // visitor the product does not work using a number that never measured the product.
+  const origins = l?.open_by_origin || [];
+  const engine = origins.find((x) => x.key.startsWith("impact engine"));
+  const signal = (l?.by?.origin || []).find((x) => x.key.startsWith("signal plane"));
+
   return (
     <Section id="ledger">
       <div className="wrap">
         <div className="eyebrow">the accuracy record</div>
-        <h2>We are wrong most of the time.</h2>
+        <h2>Every call is scored, including the bad ones.</h2>
         <p className="lede" style={{ marginBottom: "var(--s6)" }}>
-          Here is the number, and here are the misses. A forecaster who publishes only a hit rate is
-          telling you the half of the story that flatters them — this page is the reason to believe
-          anything else on the site.
+          An interpretation is written down before the outcome exists — asset, direction, horizon,
+          confidence — and cannot be edited afterwards. When the horizon elapses it is measured
+          against SPY and the verdict is published whichever way it went. Below is everything that
+          has been scored so far, and it is not flattering.
         </p>
 
         {d === undefined && <div className="skel" style={{ height: 140 }} />}
         {d === null && <p className="err">The Ledger is not reachable from here right now.</p>}
 
-        {o && (
+        {l && (
           <>
-            <div className="ledger-hero">
-              <div className="lfig">
-                <div className="lfig-v">{o.hit_rate != null ? `${Math.round(o.hit_rate * 100)}%` : "—"}</div>
-                <div className="lfig-l">of {o.n} resolved calls landed{o.sufficient ? "" : " — sample still thin"}</div>
+            {/* The engine's own record: currently empty, and said so plainly rather than borrowing
+                a number from elsewhere to fill the space. */}
+            {engine && (
+              <div className="plane">
+                <div className="plane-h">
+                  <span className="plane-t">The interpretation engine</span>
+                  <span className="plane-tag open">record still building</span>
+                </div>
+                <p className="plane-p">
+                  {engine.resolved === 0 ? (
+                    <>
+                      <b>{engine.open} interpretations are open and none has resolved yet.</b> Every
+                      one names its assets, direction and horizon already, and each is scored the day
+                      its horizon closes — so this number can only become a real record, never a
+                      curated one. There is nothing here to show you yet, and inventing something
+                      would defeat the point of the page.
+                    </>
+                  ) : (
+                    <>
+                      <b>{engine.resolved} resolved, {engine.open} still open.</b> Scored on the same
+                      terms as everything else on this page.
+                    </>
+                  )}
+                </p>
               </div>
-              <div className="lfig hit">
-                <div className="lfig-v">{o.hit}</div>
-                <div className="lfig-l">right</div>
+            )}
+
+            {/* The signal plane: a real, complete, unflattering record. */}
+            {signal && o && (
+              <div className="plane">
+                <div className="plane-h">
+                  <span className="plane-t">The smart-money signal</span>
+                  <span className="plane-tag done">{signal.n} resolved</span>
+                </div>
+                <p className="plane-p">
+                  A separate, older subsystem that scores clusters of insider and institutional
+                  filings. It has a full record, and the record says it did not work.
+                </p>
+
+                <div className="ledger-hero">
+                  <div className="lfig">
+                    <div className="lfig-v">{Math.round(signal.hit_rate * 100)}%</div>
+                    <div className="lfig-l">of {signal.n} resolved calls landed</div>
+                  </div>
+                  <div className="lfig hit">
+                    <div className="lfig-v">{signal.hits}</div>
+                    <div className="lfig-l">right</div>
+                  </div>
+                  <div className="lfig miss">
+                    <div className="lfig-v">{signal.misses}</div>
+                    <div className="lfig-l">wrong</div>
+                  </div>
+                  {o.expectancy != null && (
+                    <div className="lfig miss">
+                      <div className="lfig-v">{pct(o.expectancy)}</div>
+                      <div className="lfig-l">average excess per call versus SPY</div>
+                    </div>
+                  )}
+                </div>
+
+                <p className="plane-p">
+                  That last figure is the one that matters and the one a hit rate hides. Following
+                  every call would have trailed simply holding SPY. We publish it because a record
+                  you only show when it flatters you is not a record — and because the engine above
+                  will be held to exactly this standard.
+                </p>
               </div>
-              <div className="lfig miss">
-                <div className="lfig-v">{o.miss}</div>
-                <div className="lfig-l">wrong</div>
-              </div>
-              <div className="lfig">
-                <div className="lfig-v">{l.open_claims}</div>
-                <div className="lfig-l">open and already scheduled to be scored</div>
-              </div>
-            </div>
+            )}
 
             {l.calibration?.some((c) => c.sufficient) && (
               <div className="cal">
                 <div className="eyebrow" style={{ marginTop: "var(--s6)", marginBottom: "var(--s3)" }}>
-                  calibration — when it says 40%, does 40% happen
+                  calibration — does stated confidence match what happens
                 </div>
                 {l.calibration.filter((c) => c.sufficient).map((c, i) => (
                   <div className="cal-row" key={i}>
@@ -257,6 +330,11 @@ export function Ledger() {
                   <span style={{ color: "var(--magenta)" }}>▬</span> stated confidence &nbsp;
                   <span style={{ color: "var(--verdigris)" }}>▬</span> what actually landed
                 </div>
+                <p className="plane-p" style={{ marginTop: "var(--s3)" }}>
+                  This is the one number that comes out well. It said 38% and 40% happened — it does
+                  not claim to be more certain than it turns out to be, which is what makes a stated
+                  confidence worth reading at all.
+                </p>
               </div>
             )}
 
@@ -278,7 +356,10 @@ export function Ledger() {
             )}
 
             <p className="claim-foot" style={{ marginTop: "var(--s5)", maxWidth: "78ch", lineHeight: 1.7 }}>
-              {l.note}
+              Scored as excess return against SPY, so a call that said “up” in a week when everything
+              rose gets no credit. Moves inside 2% are recorded as inconclusive rather than counted
+              either way, and a claim naming three assets is scored three times — getting one right
+              and two wrong is not “right”.
             </p>
           </>
         )}
@@ -359,6 +440,10 @@ export const FAQS = [
   {
     q: "How is accuracy measured?",
     a: "Every interpretation names an asset, a direction and a horizon at the moment it is made, and is timestamped so it cannot be edited afterwards. When the horizon elapses the asset's return is measured against SPY over the same window. Excess return, not raw return — a call that said \"up\" in a week when everything rose is not credited for it. Moves smaller than 2% are recorded as inconclusive rather than counted either way, and a claim naming three assets is scored three times, because getting one right and two wrong is not \"right\".",
+  },
+  {
+    q: "So how accurate is it, actually?",
+    a: "Two different things are measured and they must not be pooled. The interpretation engine — the thing this site is about — has interpretations open and none resolved yet, so it has no accuracy figure and this page does not invent one for it. The older smart-money signal does have a finished record: 41% of 282 resolved calls landed, and following every call would have trailed SPY by about 1.5% per call. That is a bad result and it is published rather than buried. The figure that does hold up is calibration: when it stated 38% confidence, 40% happened, so it does not claim more certainty than it earns.",
   },
   {
     q: "Where does the data come from?",

@@ -1,5 +1,7 @@
 // The page. Five bands in the order the brief sets, plus the structured data a search engine reads.
 import { useEffect } from "react";
+import { Bearing } from "./bearing.jsx";
+import { useScrollDriver } from "./hooks";
 import { Close, Faq, FAQS, Hero, Ledger, Personalisation, Walkthrough } from "./sections.jsx";
 
 const APP = "/";
@@ -42,6 +44,11 @@ function StructuredData() {
 }
 
 export function App() {
+  // One scroll listener for the entire page. Every parallax effect reads the custom properties it
+  // writes; nothing else subscribes to scroll. No-ops under prefers-reduced-motion and where the
+  // browser drives scroll animations natively.
+  useScrollDriver();
+
   return (
     <>
       <StructuredData />
@@ -49,6 +56,7 @@ export function App() {
 
       <nav className="nav">
         <span className="nav-mark">Rhumb</span>
+        <Bearing />
         <div className="nav-links">
           <a href="#how">How it works</a>
           <a href="#ledger">Accuracy</a>
@@ -75,11 +83,18 @@ export function App() {
             <a href="#ledger" style={{ color: "var(--paper-dim)" }}>Accuracy record</a>
           </div>
           <p className="disc">
+            {/* This used to assert the product "is wrong more often than it is right". That number
+                belonged to the smart-money signal, not to the interpretation engine, which has no
+                resolved calls yet — so the sentence was both discouraging and inaccurate about the
+                thing it described. What is true is stated instead, and the Ledger carries the
+                figures. */}
             Rhumb publishes informational analysis of public information. It is not personalised
-            investment advice, it does not know your circumstances, and it is wrong more often than
-            it is right — the Ledger above is the actual number, not a disclaimer. Market data and
-            filings are sourced from SEC EDGAR, public RSS, Nasdaq, CoinGecko and Tiingo; every
-            figure in the product carries its source and its timestamp.
+            investment advice and it does not know your circumstances. Every interpretation is
+            recorded before its outcome exists and scored against SPY when its horizon closes,
+            whichever way it goes; the Ledger above is the live record, including the subsystem
+            whose record is poor. Market data and filings are sourced from SEC EDGAR, public RSS,
+            Nasdaq, CoinGecko and Tiingo; every figure in the product carries its source and its
+            timestamp.
           </p>
         </div>
       </footer>

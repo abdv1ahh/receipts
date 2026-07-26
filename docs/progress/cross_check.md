@@ -284,3 +284,96 @@ Both gates were run by me reading the diff directly rather than by fan-out agent
 
 - **Bluesky addresses accounts by handle, not DID**, so a renamed account fails and is logged by
   name. Fine for 16 curated institutions; revisit if the list grows or starts tracking individuals.
+
+---
+
+# Marketing site pass — the accuracy problem
+
+The owner's report: "it literally markets in some section in a way where our application is not
+even useful, and if that is true then there's no use of this application because it's more often
+than not wrong."
+
+That reading was correct, and the underlying situation was worse than a wording problem.
+
+## What was actually on the page
+
+The accuracy section carried the H2 **"We are wrong most of the time."** above 41%, 115 right, 167
+wrong. The footer repeated it: "it is wrong more often than it is right". A visitor's conclusion —
+this does not work — was the only available one.
+
+## What the number actually was
+
+Three facts, each verified against the database rather than the docs:
+
+1. **All 282 resolved calls are `convergence-v3`** — the legacy smart-money signal. Not one is from
+   the impact engine.
+2. **The impact engine, which is what the entire site sells, has 80 open claims and zero resolved.**
+   It has no accuracy figure at all.
+3. **The signal genuinely does not work.** 115/282 is 40.8%, which is **3.1 standard deviations
+   below a coin flip** (p ≈ 0.002) on a directional call. Expectancy is **−1.52% excess per call
+   versus SPY**; following every call across the whole sample would have trailed the index by 429
+   percentage points.
+
+So the page took one subsystem's failing record, published it under the heading "the accuracy
+record", and placed it beneath a hero describing a different subsystem. It was discouraging *and*
+inaccurate about the thing it appeared to describe.
+
+## The missing statistic
+
+The Ledger reported a hit rate and no magnitude, and a hit rate alone is misleading in both
+directions: 40% right with winners twice the size of losers is a good record, and 60% right with
+large losers is a bad one. `ledger.summary()` now returns `avg_excess_on_hits`,
+`avg_excess_on_misses` and `expectancy`, and both the app's Ledger and the marketing site show it.
+For this signal it makes the record look worse, which is exactly the argument for having it.
+
+## What the site says now
+
+- The H2 is **"Every call is scored, including the bad ones."** The promise is the commitment —
+  written down before the outcome exists, uneditable, scored whichever way it goes.
+- **The two planes are separated on the page and cannot be confused.** The engine's block says
+  plainly that 80 interpretations are open, none has resolved, and there is nothing to show yet —
+  rather than borrowing a number to fill the space.
+- **The signal plane's block publishes its full record including the −1.5% expectancy**, and says
+  in words that following it would have trailed SPY.
+- **Calibration is given its due**, because it is the one measure that comes out well: it stated
+  38% and 40% happened, so it does not claim more certainty than it earns.
+- The walkthrough's already-marked example is **labelled as the signal plane**; it previously sat
+  unlabelled under a world-event walkthrough, implying the engine's calls were being scored.
+- A new FAQ answers the question directly: *"So how accurate is it, actually?"*
+- The footer no longer asserts the product is wrong more often than right.
+
+**This is a question for the owner, not something I decided.** The smart-money convergence signal is
+significantly worse than chance and has negative expectancy over 282 resolved calls. It is still
+shipped in the app as "Smart Money Score" and still generates alerts. Publishing its record is
+honest; continuing to surface it as a signal to act on is a product decision worth making
+deliberately. Being reliably worse than chance is itself information — but that is an argument for
+investigating the mapping, not for leaving it on the dashboard as-is.
+
+## Motion
+
+The brief offers GSAP ScrollTrigger with Lenis, or Framer Motion, then sets a first-contentful-paint
+target of 1.5s two paragraphs later. None of those libraries is here, because the platform now does
+this natively: `animation-timeline: view()/scroll()` runs the whole parallax on the compositor with
+zero JavaScript. Where a browser lacks it, one passive listener writes two custom properties per
+frame and the same CSS reads them — one listener for the page, not one per element. Everything
+animated is transform or opacity only.
+
+What moves, and why it is that and not something else:
+
+- **Three depth layers in the hero.** A new chart graticule sits furthest back (meridians fanned
+  from a vanishing point, parallels bowed — a projection, not graph paper), the wind rose mid, the
+  content in front. Parallax needs something to have parallax *against*.
+- **The rose is a compass card and it swings 60° across the page.** A rhumb line is a course held
+  at a constant bearing; that is the definition and it is what the product is named after.
+- **A live bearing readout in the nav**, sweeping N 000° → NNE 060°, driven by the same page
+  progress as the rose — verified in the browser to agree to within 0.05°. The card you watch turn
+  and the number reporting it are one instrument.
+- Smooth-scroll hijacking is deliberately not done. It takes scrolling away from the OS, breaks
+  trackpad and keyboard feel, and fights assistive tooling.
+
+Reduced motion: every animation rule sits inside `prefers-reduced-motion: no-preference`, verified
+structurally rather than by eye — which matters here, because scroll-driven animations ignore the
+duration override in `shared/tokens.css` and would otherwise have survived it. The JS driver and the
+bearing both no-op. The bearing still renders its course, held, rather than vanishing.
+
+Checked at 375 / 768 / 1440px at six scroll depths each: no horizontal overflow anywhere.

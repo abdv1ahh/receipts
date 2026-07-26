@@ -389,3 +389,99 @@ section { padding: clamp(80px, 12vh, 160px) 0; position: relative; }
 /* Live claim text on this page comes from the same ingested sources as the app, and ingested text
    contains bare URLs — one unbreakable token is enough to push the page wider than a phone. */
 .wrap, .faq-q, .faq-a { overflow-wrap: anywhere; }
+
+/* ---- Ledger: the two planes, kept visibly apart -------------------------------------------------
+   The engine's record and the smart-money signal's record are different subsystems with different
+   results. Pooling them under one number is how this page came to tell every visitor the product
+   does not work, using a figure that never measured the product. */
+.plane { border: 1px solid var(--rule); border-radius: var(--radius); padding: clamp(18px, 2.4vw, 26px); margin-bottom: var(--s5); }
+.plane-h { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.plane-t { font-size: clamp(17px, 2vw, 21px); font-weight: 600; letter-spacing: -0.01em; }
+.plane-tag { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--rule); color: var(--paper-faint); }
+.plane-tag.open { color: var(--verdigris); border-color: color-mix(in srgb, var(--verdigris) 40%, transparent); }
+.plane-tag.done { color: var(--paper-dim); }
+.plane-p { color: var(--paper-dim); line-height: 1.7; max-width: 74ch; margin-top: 10px; }
+.plane-p b { color: var(--paper); }
+
+/* =====================================================================================================
+   SCROLL MOTION
+   -----------------------------------------------------------------------------------------------------
+   Two implementations of the same effects, and the browser picks.
+
+   1. `animation-timeline: view()/scroll()` — Chrome/Edge 115+, Safari 26+. Runs on the compositor,
+      never touches the main thread, and needs no JavaScript at all.
+   2. Custom properties written once per frame by scroll.js, read here with calc(). One listener
+      for the page.
+
+   Everything animated below is transform or opacity only. Animating anything that triggers layout
+   during a scroll is what makes parallax feel cheap, and it is the reason most sites' version of
+   this stutters.
+
+   All of it is inside `prefers-reduced-motion: no-preference`. Under reduced motion the layers
+   simply sit where they are, which is a composition that was designed to work standing still.
+   ===================================================================================================== */
+
+.depth { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
+.graticule-field {
+  position: absolute; inset: -34% -12% -34% -12%;
+  mask-image: radial-gradient(ellipse 78% 70% at 40% 52%, #000 18%, transparent 76%);
+  -webkit-mask-image: radial-gradient(ellipse 78% 70% at 40% 52%, #000 18%, transparent 76%);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* --- fallback path: driven by scroll.js's --sy ------------------------------------------------ */
+  .depth-far  { will-change: transform; transform: translate3d(0, calc(var(--sy, 0) * 0.045px), 0); }
+  .depth-mid  { will-change: transform; transform: translate3d(0, calc(var(--sy, 0) * 0.11px), 0); }
+
+  /* The rose is a COMPASS CARD. A rhumb line is a course held at a constant bearing, so as the
+     page travels the card swings — slowly, a few degrees, the way a real card settles rather than
+     spins. This is the one deliberately bold thing on the page and nothing else competes with it. */
+  .rose-field {
+    will-change: transform;
+    transform: rotate(calc(var(--sp, 0) * 60deg)) scale(calc(1 + var(--sp, 0) * 0.3));
+    transform-origin: 36% 56%;                     /* the rose's eye, not the SVG's centre */
+  }
+
+  /* Sections lift as they arrive. The existing IntersectionObserver reveal handles opacity; this
+     adds the depth. */
+  .live { will-change: transform; transform: translate3d(0, calc(var(--sy, 0) * -0.022px), 0); }
+
+  /* --- native path: same effects, off the main thread ------------------------------------------- */
+  @supports (animation-timeline: view()) {
+    .depth-far, .depth-mid, .rose-field, .live { transform: none; }
+
+    .depth-far  { animation: drift-far  linear both; animation-timeline: scroll(root block); }
+    .depth-mid  { animation: drift-mid  linear both; animation-timeline: scroll(root block); }
+    .rose-field { animation: card-swing linear both; animation-timeline: scroll(root block); }
+    .live       { animation: lift-live  linear both; animation-timeline: view(); animation-range: entry 0% cover 60%; }
+
+    @keyframes drift-far  { to { transform: translate3d(0, 90px, 0); } }
+    @keyframes drift-mid  { to { transform: translate3d(0, 220px, 0); } }
+    @keyframes card-swing { to { transform: rotate(60deg) scale(1.3); } }
+    @keyframes lift-live  { from { transform: translate3d(0, 26px, 0); } to { transform: none; } }
+
+    /* Each section's own arrival, timed against itself rather than the page. */
+    .reveal {
+      animation: rise-in linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 85%;
+    }
+    @keyframes rise-in {
+      from { opacity: 0; transform: translate3d(0, 34px, 0); }
+      to   { opacity: 1; transform: none; }
+    }
+  }
+}
+
+/* ---- the bearing readout ------------------------------------------------------------------------
+   The instrument that follows you down the page. Tabular figures so the number changing never
+   shifts the layout beside it — a readout that nudges its neighbours every frame is the cheapest
+   possible way to make a page feel unstable. */
+.bearing {
+  display: inline-flex; align-items: center; gap: 8px; margin-left: 14px;
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em;
+  color: var(--paper-faint); font-variant-numeric: tabular-nums;
+}
+.bearing-tick { width: 1px; height: 12px; background: var(--rule); }
+.bearing-v { min-width: 7ch; color: var(--verdigris); }
+@media (max-width: 760px) { .bearing { display: none; } }

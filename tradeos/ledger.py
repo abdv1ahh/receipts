@@ -192,6 +192,18 @@ def summary(conn, min_sample: int = 20) -> dict:
         cur.execute("SELECT count(*) FROM claims WHERE status = 'open'")
         open_claims = cur.fetchone()[0]
 
+        # Open work split the same way `by.origin` splits resolved work. Without this the surfaces
+        # can only say "80 open" and cannot say WHOSE — which is how the marketing site came to
+        # present the signal plane's resolved record as though it were the impact engine's. The
+        # engine's record being empty is a fact about the product and has to be sayable.
+        cur.execute(
+            """SELECT CASE WHEN event_id IS NULL THEN 'signal plane (backtested)'
+                           ELSE 'impact engine (model)' END AS origin,
+                      count(*) FILTER (WHERE status = 'open')     AS open,
+                      count(*) FILTER (WHERE status = 'resolved') AS resolved
+                 FROM claims GROUP BY 1""")
+        open_by_origin = [{"key": k, "open": o, "resolved": r} for k, o, r in cur.fetchall()]
+
         by = {}
         # `origin` falls back to the model version so signal-plane claims stay separable from
         # model-generated ones. A reader has to be able to ask "how does the MODEL do on its own?"
@@ -233,19 +245,46 @@ def summary(conn, min_sample: int = 20) -> dict:
                 "n": n, "sufficient": n >= min_sample,
             })
 
+        # Magnitude. A hit rate on its own cannot tell you whether a record is any good, in EITHER
+        # direction: 40% right with winners twice the size of losers is a good record, and 60%
+        # right with tiny winners and large losers is a bad one. This is the number that settles
+        # it, and leaving it out is how a hit rate becomes misleading while staying true.
+        #
+        # `expectancy` is the average excess return of FOLLOWING every scored call — the direction
+        # it named, against SPY, over its own horizon. It is the closest thing here to "what would
+        # this have been worth", and it is reported whichever way it points.
+        cur.execute(
+            """SELECT avg(o.excess_return) FILTER (WHERE o.verdict='hit'),
+                      avg(o.excess_return) FILTER (WHERE o.verdict='miss'),
+                      avg(CASE WHEN o.predicted='up' THEN o.excess_return
+                               ELSE -o.excess_return END)
+                 FROM claim_outcomes o
+                WHERE o.verdict IN ('hit','miss') AND o.excess_return IS NOT NULL""")
+        avg_hit, avg_miss, expectancy = cur.fetchone()
+        magnitude = {
+            "avg_excess_on_hits": round(float(avg_hit), 4) if avg_hit is not None else None,
+            "avg_excess_on_misses": round(float(avg_miss), 4) if avg_miss is not None else None,
+            "expectancy": round(float(expectancy), 4) if expectancy is not None else None,
+        }
+
     scoreable = hit + miss
     return {
         "overall": {"hit": hit, "miss": miss, "inconclusive": inconclusive,
                     "unscoreable": unscoreable, "n": scoreable,
                     "hit_rate": round(hit / scoreable, 3) if scoreable else None,
-                    "sufficient": scoreable >= min_sample},
+                    "sufficient": scoreable >= min_sample,
+                    **magnitude},
         "claims_scored": claims_scored, "open_claims": open_claims,
+        "open_by_origin": open_by_origin,
         "by": by, "calibration": calibration, "min_sample": min_sample,
         "note": ("Hit rate is measured as excess return versus SPY, so a claim that said 'up' in a "
                  f"week when everything rose is not credited. Moves inside {NOISE_FLOOR:.0%} are "
                  "recorded as inconclusive rather than counted either way. Claims about "
                  "currencies and regions have no price series here and are reported as "
-                 "unscoreable rather than dropped from the sample."),
+                 "unscoreable rather than dropped from the sample. `expectancy` is the average "
+                 "excess return of following every scored call; a hit rate without it can be "
+                 "flattering or damning for the wrong reason, because it counts calls without "
+                 "weighing them."),
     }
 
 

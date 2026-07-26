@@ -76,7 +76,7 @@ The app is at <http://localhost:8000>. Demo login: `demo@tradeos.app` / `<genera
 ### Tests
 
 ```bash
-make test     # 619 tests, ~1s. Offline except 17 authz tests that need the local DB
+make test     # 621 tests, ~1s. Offline except 17 authz tests that need the local DB
 make lint     # ruff; zero errors is the standard
 make dev      # reload-in-place stack; then `make web` for a UI change
 make fix      # ruff --fix
@@ -233,6 +233,21 @@ fastest:
    **`llm.wants_model(provider)`**; a test forbids the old pattern. More generally: the suite runs
    on `template` by design, so **verify a model change against a running instance**
    (`used_template: false`), never against the tests alone.
+
+0a. **The Ledger's headline number was never the product's.** All 282 resolved calls are
+   `convergence-v3`, the legacy smart-money signal; the impact engine has 80 open and **zero**
+   resolved. The marketing site published the signal's 41% under the heading "the accuracy record"
+   with an H2 reading "We are wrong most of the time", directly beneath a hero selling the engine.
+   Two subsystems, one number, and the one on display had never measured the thing being sold.
+   `ledger.summary()` now returns `open_by_origin` so any surface can say WHOSE record it is
+   showing, and a test asserts the planes are never pooled. **Never quote a hit rate without
+   saying which plane produced it.**
+
+0a2. **A hit rate without magnitude is misleading in both directions.** 40% right with winners
+   twice the size of losers is a good record; 60% right with large losers is a bad one. The signal
+   plane is the second kind: 40.8%, +15.9% average on hits, −13.5% on misses, and an expectancy of
+   **−1.52% per call versus SPY** — following it would have trailed simply holding the index.
+   `overall.expectancy` now carries that and both Ledger surfaces show it.
 
 0b2. **A formatter duplicated across files WILL drift, and the drift is silent.** `pct` lived as
    near-identical copies in three surfaces; the fourth copy omitted the ×100 and published a +10%

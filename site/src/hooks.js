@@ -1,5 +1,6 @@
 // Two hooks the whole page is built from.
 import { useEffect, useRef, useState } from "react";
+import { startScrollDriver, trackElementProgress } from "./scroll.js";
 
 /** Load once on mount. `undefined` while in flight, `null` on failure — the three states every
  *  section on this page renders explicitly, because "no data yet" and "could not reach it" are
@@ -42,5 +43,20 @@ export function useReveal() {
     io.observe(el);
     return () => io.disconnect();
   }, []);
+  return ref;
+}
+
+
+/** Page-level scroll driver, mounted once by App. Everything parallax reads the two custom
+ *  properties it writes; nothing else subscribes to scroll. */
+export function useScrollDriver() {
+  useEffect(() => startScrollDriver(), []);
+}
+
+/** Element-local scroll progress on `--ep` (0 entering, 1 leaving), for motion that has to be
+ *  timed against one section rather than the page. Costs nothing while off screen. */
+export function useProgress() {
+  const ref = useRef(null);
+  useEffect(() => trackElementProgress(ref.current), []);
   return ref;
 }
