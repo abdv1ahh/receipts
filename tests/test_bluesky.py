@@ -140,3 +140,12 @@ def test_adapter_does_not_reach_for_the_search_endpoint():
 def test_utc_import_is_used_for_awareness():
     # Guards against a refactor that drops tzinfo and silently shifts every knowable_time.
     assert bsky._parse_time("2026-07-26T14:30:38+02:00").astimezone(UTC).hour == 12
+
+
+def test_the_adapter_checks_the_host_like_every_other_one_here():
+    """gdelt, prices and reddit all re-derive the hostname from the URL they are about to request
+    and refuse anything off the allowlist. A new adapter that skips it is a quiet deviation from a
+    security pattern the package already holds, so this asserts the guard exists."""
+    src = open(bsky.__file__, encoding="utf-8").read()
+    assert "host allowlist violation" in src
+    assert "urlparse(url).hostname != HOST" in src

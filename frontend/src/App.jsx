@@ -7,6 +7,7 @@ import { SmartMoneyView, IssuerDetail } from "./smartmoney.jsx";
 import { JournalView } from "./journal.jsx";
 import { AssistantView } from "./assistant.jsx";
 import { SocialView } from "./social.jsx";
+import { CommunityView, TraderView } from "./community.jsx";
 import { AlertsView, NotificationsView } from "./alerts.jsx";
 import { BriefView } from "./brief.jsx";
 import { NewsView } from "./news.jsx";
@@ -28,18 +29,19 @@ import { LedgerView } from "./ledger.jsx";
 import { ErrorBoundary, useRoute } from "./shell.jsx";
 import { Icon } from "./icons.jsx";
 
-const NAV_LABELS = { radar: "Radar", globe: "The World", ledger: "Ledger", dashboard: "Dashboard", brief: "Morning Brief", news: "News", events: "Calendar", home: "Smart Money", trending: "Social", crypto: "Crypto", journal: "Journal", exposure: "Exposure", watchlist: "Watchlist", alerts: "Alerts", assistant: "AI Assistant", screener: "Screener", library: "Library", methodology: "Methodology", integrations: "Integrations" };
-const NAV_ICONS = { radar: "radar", globe: "layers", ledger: "target", dashboard: "grid", brief: "sparkles", news: "news", events: "calendar", home: "signal", trending: "trending", crypto: "crypto", journal: "journal", exposure: "briefcase", watchlist: "star", alerts: "bell", assistant: "compass", screener: "filter", library: "book", methodology: "target", integrations: "plug" };
+const NAV_LABELS = { radar: "Radar", globe: "The World", ledger: "Ledger", dashboard: "Dashboard", brief: "Morning Brief", news: "News", events: "Calendar", home: "Smart Money", trending: "Social", crypto: "Crypto", journal: "Journal", exposure: "Exposure", watchlist: "Watchlist", community: "Community", alerts: "Alerts", assistant: "AI Assistant", screener: "Screener", library: "Library", methodology: "Methodology", integrations: "Integrations" };
+const NAV_ICONS = { radar: "radar", globe: "layers", ledger: "target", dashboard: "grid", brief: "sparkles", news: "news", events: "calendar", home: "signal", trending: "trending", crypto: "crypto", journal: "journal", exposure: "briefcase", watchlist: "star", community: "users", alerts: "bell", assistant: "compass", screener: "filter", library: "book", methodology: "target", integrations: "plug" };
 // A calmer rail: the essentials up front, utilities tucked into a collapsible "More".
 const SIDEBAR = [
   { label: "Overview", items: ["radar", "globe", "dashboard", "brief"] },
   { label: "Intelligence", items: ["ledger", "home", "trending", "news", "crypto", "events"] },
   { label: "Your desk", items: ["journal", "exposure", "watchlist", "assistant", "alerts"] },
+  { label: "People", items: ["community"] },
 ];
 const MORE = ["screener", "library", "integrations", "methodology"];
 // Everything reachable from the ⌘K command palette.
 const CMD_ITEMS = [
-  ...["radar", "globe", "ledger", "dashboard", "brief", "home", "trending", "news", "crypto", "events", "journal", "exposure", "watchlist", "assistant", "alerts", "screener", "library", "integrations", "methodology"]
+  ...["radar", "globe", "ledger", "dashboard", "brief", "home", "trending", "news", "crypto", "events", "journal", "exposure", "watchlist", "community", "assistant", "alerts", "screener", "library", "integrations", "methodology"]
     .map((v) => ({ v, label: NAV_LABELS[v], icon: NAV_ICONS[v], group: "Go to" })),
   { v: "pricing", label: "Upgrade plan", icon: "sparkles", group: "Actions" },
   { v: "notifications", label: "Notifications", icon: "bell", group: "Actions" },
@@ -101,7 +103,7 @@ function CommandPalette({ onGo, onClose }) {
 // Which surfaces are reachable by URL. Anything not listed falls back to the dashboard, so a
 // stale bookmark lands somewhere sensible instead of a blank page.
 const ROUTES = new Set([...Object.keys(NAV_LABELS), "auth", "pricing", "notifications",
-                        "search", "asset", "profile", "library-entry", "admin",
+                        "search", "asset", "profile", "library-entry", "admin", "trader",
                         // Reached from an email. Without these the link fell through to the SPA
                         // catch-all and landed on the marketing page with the token ignored.
                         "verify", "reset"]);
@@ -125,6 +127,8 @@ export default function App() {
   const [detail, setDetail] = useState(null);
   const [explanation, setExplanation] = useState(null);
   const [assetSymbol, setAssetSymbol] = useState(null);
+  const [traderHandle, setTraderHandle] = useState(
+    () => new URLSearchParams(window.location.search).get("handle") || null);
   const [profile, setProfile] = useState(null); // {kind, id}
   const [librarySlug, setLibrarySlug] = useState(null);
   const [search, setSearch] = useState("");
@@ -194,6 +198,9 @@ export default function App() {
     fetchExplanation(id, horizon).then(setExplanation).catch(() => {});
   };
   const openSymbol = (sym) => { setAssetSymbol(sym.toUpperCase()); setDetail(null); setView("asset", { symbol: sym.toUpperCase() }); };
+  // The handle goes in the URL so a track record can be linked to. A record nobody can point at
+  // is not much of a record.
+  const openTrader = (handle) => { setTraderHandle(handle); setView("trader", { handle }); };
   const openProfile = (kind, id) => { setProfile({ kind, id }); setDetail(null); setView("profile", { kind, id }); };
   const openLibrary = (slug) => { setLibrarySlug(slug); setDetail(null); setView("library-entry", { slug }); };
   const onAuthed = (u) => { setUser(u); setView("radar"); };
@@ -289,7 +296,7 @@ export default function App() {
           ) : view === "dashboard" ? (
             <Dashboard user={user} onOpenSymbol={openSymbol} onNav={go} />
           ) : view === "search" ? (
-            <SearchView query={search} onOpenSymbol={openSymbol} onOpenProfile={openProfile} onOpenLibrary={openLibrary} onOpenTrader={() => {}} />
+            <SearchView query={search} onOpenSymbol={openSymbol} onOpenProfile={openProfile} onOpenLibrary={openLibrary} onOpenTrader={openTrader} />
           ) : view === "home" ? (
             detail ? (
               detail === "loading" ? (
@@ -334,6 +341,10 @@ export default function App() {
                        onOpenProfile={openProfile} onBack={() => go("home")} />
           ) : view === "profile" ? (
             <ProfileView kind={profile.kind} id={profile.id} user={user} onOpenSymbol={openSymbol} onBack={() => go("home")} />
+          ) : view === "community" ? (
+            <CommunityView user={user} onOpenTrader={openTrader} />
+          ) : view === "trader" ? (
+            <TraderView handle={traderHandle} user={user} onBack={() => go("community")} />
           ) : view === "screener" ? (
             <Screener onOpenSymbol={openSymbol} />
           ) : view === "watchlist" ? (

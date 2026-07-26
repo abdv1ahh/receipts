@@ -86,43 +86,38 @@ something is "dead" while it sits live in the database will mislead the next rea
 
 ## Cannot confirm — asking before touching
 
-### A-01 · `tradeos/ingestion/finra.py` + the `short_interest` table — **ASK**
-Short interest is ingested and stored, `ENABLE_SHORT_INTEREST` is `false`, and
-`config.short_interest_enabled()` describes it as "reserved: weighting it into the
-convergence score is a logged version bump (decision #31)". So this is deliberately parked
-work, not debris. **Keep or cut?** It costs an ingestion path and a table; it buys an input
-you may want when convergence v4 lands.
+### A-01 · `tradeos/ingestion/finra.py` + the `short_interest` table — **RESOLVED: KEEP, PARKED**
+Owner ruling 2026-07-26: keep. Short interest stays ingested and stored against a future
+convergence-score version bump (decision #31). It is **deliberately dormant, not debris** —
+`config.short_interest_enabled()` is the switch and `ENABLE_SHORT_INTEREST` is false. Do not
+"clean this up" in a later pass; this line is the record that it was considered and kept.
 
-### A-02 · `ENABLE_CONGRESS` + `congress` flag row — **ASK**
-`config.congress_enabled()` says the source is off because "no clean structured primary
-source (decision #29)". There is no `ingestion/congress.py` — the flag gates a source that
-was never built. Recommend removing the flag and the row; the decision is recorded in
-`docs/decision-log.md` and does not need a live switch. Confirm.
+### A-02 · `ENABLE_CONGRESS` + `congress` flag row — **RESOLVED: REMOVED**
+Owner ruling 2026-07-26: remove. `config.congress_enabled()` and the admin surface entry are gone,
+and **migration 033** deletes the seed row. The flag gated a congressional-disclosure source that
+was never built; the reasoning stays recorded in `docs/decision-log.md` (#29), which is where a
+decision belongs. A live switch for a feature that does not exist only misleads.
 
-### A-03 · Stripe price-id variables — **ASK**
-`STRIPE_PRICE_RETAIL` and `STRIPE_PRICE_PRO` are passed into the container by
-`docker-compose.yml` and listed in `.env.example`, but no Python file reads either name.
-`billing.py` runs in test mode with no `STRIPE_SECRET_KEY`. Either `billing.py` is missing
-the plan→price mapping (a bug) or the variables are vestigial (dead config). Given the brief
-defers monetisation to Phase 8, recommend removing them now and reintroducing them with the
-real Stripe integration. Confirm.
+### A-03 · Stripe price-id variables — **RESOLVED: THE AUDIT WAS WRONG, KEEP**
+This entry claimed "no Python file reads either name". They are read, through an indirection the
+original grep missed: `billing.PLANS` stores `price_id_env` and `billing.py:108` does
+`os.environ.get(PLANS[plan]["price_id_env"])`. The variables are live configuration for real Stripe
+checkout, not vestigial. **Nothing to remove.** Left as a warning that grepping for a literal name
+misses config reached through a lookup table.
 
-### A-04 · `tradeos/presentation.py` and `/api/card/{symbol}.svg` + `/s/{symbol}` — **ASK**
-Server-rendered social share cards and a public per-symbol HTML page. No frontend calls them,
-by design — they exist for link previews when a symbol page is shared. Nothing currently
-generates such links, so the feature is built but unreachable. Keep for Phase 7 (the
-marketing site will want OG cards) or delete? Recommend **keep**; Phase 7 has a clear use.
+### A-04 · `tradeos/presentation.py` and `/api/card/{symbol}.svg` + `/s/{symbol}` — **RESOLVED: KEEP**
+Keep, as recommended, and it is no longer unreachable: `/s/{symbol}` is a real link-preview page and
+its outbound link was corrected on 2026-07-26 (it pointed at `/`, which now redirects a signed-out
+visitor to the marketing site and would have dropped the symbol; it points at `/asset?symbol=` now).
 
-### A-05 · `uploads/` at repository root — **ASK**
-An empty directory in the working tree. The container writes to the `uploads` Docker volume
-mounted at `/app/uploads`, not here, so this is a leftover from before the volume existed.
-Recommend deleting the local directory. Confirm nothing on the owner's machine relies on it.
+### A-05 · `uploads/` at repository root — **RESOLVED: ALREADY GONE**
+No such directory exists in the working tree. It was removed at some point after this audit was
+compiled. Nothing to do.
 
-### A-06 · `tests/test_gemini.py` — **ASK, likely rename**
-The file name says `gemini`, but the module under test is now the unified `llm.py` transport
-which covers both providers. Not dead — it passes — but misnamed in a way that will send a
-future reader to the wrong place. Recommend renaming to `test_llm_gemini.py` or folding into
-`test_llm.py`. Low priority.
+### A-06 · `tests/test_gemini.py` — **RESOLVED: NO SUCH FILE, NO RENAME NEEDED**
+The audit named a file that does not exist. The real file is `tests/test_explain_gemini.py`, and it
+tests `tradeos/explain/gemini.py` — a real module, correctly named for what it covers. The unified
+`llm.py` transport has its own `tests/test_llm.py`. There was never anything misleading here.
 
 ---
 

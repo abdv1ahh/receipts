@@ -217,6 +217,27 @@ def currency_weight(exposure: dict | None, affected: list[dict]) -> float:
     return 0.2
 
 
+# A claim with no named author is neither boosted nor penalised. Most claims have none — an SEC
+# filing or a cluster of wire copy is not "said by" anyone in the sense this measures — and pushing
+# those down for lacking a byline would be scoring an absence.
+NEUTRAL_AUTHORITY = 0.5
+
+
+def authority_weight(claim: dict) -> float:
+    """How consequential the voice behind this is, 0..1.
+
+    A STATED EDITORIAL WEIGHT from the consequential-accounts list, never a measurement of reach:
+    it says this product treats a central bank governor as more consequential than an anonymous
+    account, which is a defensible position, not a claim to have measured anyone's influence. It is
+    weighted lightly for that reason — who said something is evidence about it, not a substitute
+    for what it says.
+    """
+    v = claim.get("author_influence")
+    if v is None:
+        return NEUTRAL_AUTHORITY
+    return max(0.0, min(1.0, float(v)))
+
+
 def places(claim: dict) -> list[str]:
     """The countries a claim actually bears on.
 
@@ -247,20 +268,25 @@ def score(claim: dict, profile: dict | None, exposure: dict | None,
         "geo": geo_weight((profile or {}).get("country"), exposure, places(claim)),
         "currency": currency_weight(exposure, affected),
         "novelty": float(novelty if novelty is not None else 0.5),
+        "authority": authority_weight(claim),
     }
-    total = (parts["confidence"] * 0.25 + parts["watchlist"] * 0.25 + parts["geo"] * 0.25
-             + parts["currency"] * 0.10 + parts["novelty"] * 0.15)
+    # Weights sum to 1.0. `authority` is deliberately the smallest: it is an editorial opinion about
+    # a source, and it should nudge an ordering rather than decide one. The others were scaled down
+    # proportionally to make room rather than one being singled out to pay for it.
+    total = (parts["confidence"] * 0.22 + parts["watchlist"] * 0.24 + parts["geo"] * 0.24
+             + parts["currency"] * 0.10 + parts["novelty"] * 0.12 + parts["authority"] * 0.08)
     return {"relevance": round(min(1.0, total), 4), "parts": {k: round(v, 3) for k, v in parts.items()}}
 
 
 # Checked in this order on a tie, most specific reason first: "touches your watchlist" tells a
 # reader more than "the interpretation is confident", which is true of most claims.
-_REASON_ORDER = ("watchlist", "currency", "geo", "novelty", "confidence")
+_REASON_ORDER = ("watchlist", "currency", "geo", "novelty", "confidence", "authority")
 _LABELS = {"watchlist": "it touches something on your watchlist",
            "currency": "it touches your currency",
            "geo": "of where it happened relative to you",
            "novelty": "it is genuinely new information",
-           "confidence": "the interpretation is a confident one"}
+           "confidence": "the interpretation is a confident one",
+           "authority": "of who reported it"}
 
 
 def explain(parts: dict) -> str:

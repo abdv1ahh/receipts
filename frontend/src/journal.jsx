@@ -11,10 +11,8 @@ import {
 } from "./api";
 import { Icon } from "./icons.jsx";
 import { BRAND } from "./brand.js";
+import { cls, money, pct } from "./format.js";
 
-const pct = (v) => (v == null ? "—" : `${v >= 0 ? "+" : ""}${(v * 100).toFixed(1)}%`);
-const cls = (v) => (v == null ? "" : v > 0 ? "pos-pos" : v < 0 ? "pos-neg" : "");
-const money = (v) => (v == null ? "—" : `$${(+v).toLocaleString(undefined, { maximumFractionDigits: 2 })}`);
 const DIRS = ["long", "short"];
 const ASSETS = ["equity", "crypto", "forex", "option", "future", "other"];
 const STATUSES = ["planned", "open", "closed"];

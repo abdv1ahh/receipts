@@ -541,14 +541,20 @@ def auth_google_callback(request: Request, response: Response, code: str | None 
                          state: str | None = None, error: str | None = None):
     """Where Google sends the browser back. Every failure lands the user on a page that says what
     went wrong rather than on a JSON blob — this is a browser navigation, not an API call."""
-    def _fail(msg: str):
-        from urllib.parse import quote
-        return RedirectResponse(f"/auth?auth_error={quote(msg[:160])}", status_code=302)
+    # A CODE, never a message. Two reasons, both learned from this landing on a page that renders it:
+    # anyone can hand a victim a link to our real login screen carrying arbitrary text, and text we
+    # supply is trusted-looking there — so the client owns the wording and only recognises a fixed
+    # set. And `str(exc)` on an internal error has no business travelling through a URL bar into a
+    # browser; it is logged here instead, where whoever needs it can actually see it.
+    def _fail(code: str, detail: str | None = None):
+        if detail:
+            log.warning("google sign-in failed (%s): %s", code, detail)
+        return RedirectResponse(f"/auth?auth_error={code}", status_code=302)
 
     if error:
-        return _fail("Google sign-in was cancelled.")
+        return _fail("cancelled")
     if not code:
-        return _fail("Google sign-in returned no authorization code.")
+        return _fail("no_code")
 
     with db.connect() as conn:
         try:
@@ -561,7 +567,7 @@ def auth_google_callback(request: Request, response: Response, code: str | None 
                 ip=request.client.host if request.client else None,
                 ua=request.headers.get("user-agent"))
         except oauth.OAuthError as exc:
-            return _fail(str(exc))
+            return _fail("failed", detail=str(exc))
 
     redirect = RedirectResponse(destination, status_code=302)
     _set_session_cookie(redirect, token)
@@ -808,7 +814,13 @@ def claims_list(hours: int = 72, limit: int = 40, tos_session: str | None = Cook
             """SELECT c.id, c.created_at, c.mechanism, c.affected, c.horizon, c.confidence,
                       c.analogs, c.reasoning_trace, c.contradicts, c.status, c.model_version,
                       e.title, e.source, e.source_url, e.geo, e.category,
-                      cl.novelty_score, cl.source_count, c.cluster_id, c.supersedes
+                      cl.novelty_score, cl.source_count, c.cluster_id, c.supersedes,
+                      -- The most consequential voice that carried this story. A cluster gathers
+                      -- many reports; what matters for ranking is whether a central bank said it
+                      -- or an aggregator repeated it, so this is the MAX across the cluster and
+                      -- NULL when nothing in it has a named author (which is most of them).
+                      (SELECT max(ev.author_influence) FROM events ev
+                        WHERE ev.cluster_id = c.cluster_id)
                  FROM claims c
                  LEFT JOIN events e ON e.id = c.event_id
                  LEFT JOIN event_clusters cl ON cl.id = c.cluster_id
@@ -816,7 +828,8 @@ def claims_list(hours: int = 72, limit: int = 40, tos_session: str | None = Cook
              ORDER BY c.created_at DESC LIMIT %s""", (hours, limit))
         cols = ("id", "created_at", "mechanism", "affected", "horizon", "confidence", "analogs",
                 "reasoning_trace", "contradicts", "status", "model_version", "headline", "source",
-                "url", "geo", "category", "novelty", "source_count", "cluster_id", "supersedes")
+                "url", "geo", "category", "novelty", "source_count", "cluster_id", "supersedes",
+                "author_influence")
         rows = [dict(zip(cols, r, strict=True)) for r in cur.fetchall()]
 
     out = []
@@ -2382,7 +2395,6 @@ def _ops_config() -> dict:
     switch (same honesty rule as the 'not connected yet' sources)."""
     from . import config
     return {
-        "congress": {"enabled": config.congress_enabled(), "controlled_by": "ENABLE_CONGRESS (env)"},
         "short_interest": {"enabled": config.short_interest_enabled(), "controlled_by": "ENABLE_SHORT_INTEREST (env)"},
         "reddit": {"enabled": config.reddit_configured(), "controlled_by": "REDDIT_CLIENT_ID/SECRET (env)"},
         "youtube": {"enabled": config.youtube_configured(), "controlled_by": "YOUTUBE_API_KEY (env)"},

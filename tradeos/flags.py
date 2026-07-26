@@ -11,8 +11,8 @@ be safe to toggle at runtime and genuinely useful to a bootstrapped operator:
   community_writes  off -> the community goes read-only (no comments / reactions / follows / reports).
   crypto            off -> the crypto market surface is hidden.
 
-Things that are controlled by the deployment environment or a third-party key — the modular SEC
-inputs (ENABLE_CONGRESS / ENABLE_SHORT_INTEREST), the sentiment source keys (Reddit / YouTube), and
+Things that are controlled by the deployment environment or a third-party key — the parked SEC
+input ENABLE_SHORT_INTEREST, the sentiment source keys (Reddit / YouTube), and
 Stripe — are NOT runtime flags. A web toggle can't conjure an API key, so the console shows their real
 state read-only (config.py) rather than pretending a switch controls them. Same honesty rule as the
 'not connected yet' sources elsewhere.
@@ -26,8 +26,10 @@ import time
 
 import psycopg
 
-# name -> {label, description, default}. Only these names are surfaced/managed by the admin console;
-# the dead seed rows in feature_flags (congress/short_interest/signals/previews) are ignored here.
+# name -> {label, description, default}. Only these names are surfaced/managed by the admin console.
+# Migration 009 also seeded short_interest/signals/previews, which nothing reads: short_interest is
+# deliberately parked (see config.short_interest_enabled), the other two are inert. The congress row
+# and its env flag were removed in migration 033 — they gated a source that was never built.
 FLAGS: dict[str, dict] = {
     "ai_assistant": {
         "label": "AI Market Assistant",

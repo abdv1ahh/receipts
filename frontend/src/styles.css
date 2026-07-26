@@ -1711,3 +1711,38 @@ div.intg-warn { margin-top: 8px; border: 0; border-radius: 8px; padding: 7px 10p
 .voices-row .src-dot { flex: none; }
 .voices-note { color: var(--muted); line-height: 1.5; }
 .voices-row.unavailable .voices-note { color: var(--faint); }
+
+/* ---- Community: public trades, replies, track records -------------------------------------------
+   Rebuilt surface for the Slice F backend, which kept working the whole time its UI was gone. */
+.cfeed { display: flex; flex-direction: column; gap: 12px; margin-top: 14px; }
+.cfeed-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 13px 15px; min-width: 0; }
+.cfeed-card:hover { border-color: var(--border-2); }
+.cfeed-top { display: flex; align-items: baseline; gap: 10px; }
+.cfeed-author { background: none; border: 0; padding: 0; color: var(--accent); font: inherit; font-weight: 700; font-size: 13px; cursor: pointer; }
+.cfeed-author:hover { text-decoration: underline; }
+.cfeed-when { color: var(--faint); font-size: 11px; font-family: var(--mono); margin-left: auto; }
+.cfeed-trade { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 9px; }
+.cfeed-strat { color: var(--muted); font-size: 12px; }
+.cfeed-stats { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 8px; font-size: 12.5px; color: var(--muted); }
+.cfeed-stats b { color: var(--text); font-family: var(--mono); }
+.cfeed-actions { display: flex; gap: 8px; margin-top: 10px; }
+.cfeed-act { display: inline-flex; align-items: center; gap: 6px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 9px; padding: 5px 11px; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; transition: border-color var(--dur), color var(--dur); }
+.cfeed-act:hover { border-color: var(--border-2); color: var(--text); }
+.cfeed-act.on { color: var(--accent); border-color: var(--accent); }
+
+.cm-list { margin-top: 11px; border-top: 1px solid var(--border); padding-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.cm-empty { color: var(--faint); font-size: 12px; }
+.cm-row { display: flex; align-items: baseline; gap: 8px; font-size: 12.5px; flex-wrap: wrap; }
+.cm-author { color: var(--accent); flex: none; }
+.cm-body { color: var(--text); min-width: 0; }
+.cm-when { color: var(--faint); font-size: 11px; font-family: var(--mono); margin-left: auto; flex: none; }
+.cm-compose { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
+.cm-compose .search { flex: 1; min-width: 0; }
+.cm-msg { color: var(--muted); font-size: 12px; }
+.cm-note { color: var(--muted); font-size: 12.5px; line-height: 1.55; margin-top: 12px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+.cm-profile { max-width: 520px; }
+.cm-field { display: block; margin-top: 12px; }
+.cm-field span { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 5px; }
+.cm-field .search { width: 100%; }
+.cm-phead { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-top: 6px; }
+.cm-stats { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 12px; }

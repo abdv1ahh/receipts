@@ -326,6 +326,14 @@ export function WatchlistView({ onOpenSymbol, onLogin }) {
   );
 }
 
+// Codes the Google sign-in handler can send back, and the only wording that will be shown for
+// them. An unrecognised code renders nothing at all.
+const AUTH_ERRORS = {
+  cancelled: "Google sign-in was cancelled.",
+  no_code: "Google sign-in did not complete — no authorization code came back. Please try again.",
+  failed: "Google sign-in could not be completed. You can sign in with your email and password instead.",
+};
+
 export function AuthPanel({ onAuthed, onBack, initialInvite }) {
   const [forgot, setForgot] = useState(false);
   const [mode, setMode] = useState(initialInvite ? "register" : "login");
@@ -333,11 +341,14 @@ export function AuthPanel({ onAuthed, onBack, initialInvite }) {
   const [pw, setPw] = useState("");
   const [invite, setInvite] = useState(initialInvite || "");
   const [totp, setTotp] = useState("");
-  // A failed Google sign-in redirects here carrying its reason. Nothing used to read it, so the
-  // handler's promise that a failure "lands the user on a page that says what went wrong" was
-  // false — the reader just saw a blank login form and no explanation.
-  const [err, setErr] = useState(
-    () => new URLSearchParams(window.location.search).get("auth_error") || null);
+  // A failed Google sign-in redirects here carrying a CODE, and the wording lives here rather than
+  // in the URL. Nothing used to read this at all, so the handler's promise that a failure "lands
+  // the user on a page that says what went wrong" was false — the reader saw a blank login form.
+  // Making it true meant putting text on the login screen, which is why only recognised codes
+  // render: otherwise anyone could hand a victim a link to this real page carrying whatever
+  // official-sounding sentence they liked.
+  const [err, setErr] = useState(() => AUTH_ERRORS[
+    new URLSearchParams(window.location.search).get("auth_error")] || null);
   const submit = async () => {
     setErr(null);
     const r = mode === "login" ? await authLogin(email, pw, totp) : await authRegister(email, pw, invite);

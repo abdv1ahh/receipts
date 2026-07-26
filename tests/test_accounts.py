@@ -244,7 +244,25 @@ def test_the_callback_never_returns_a_raw_error_to_the_browser():
 
     src = inspect.getsource(app_module.auth_google_callback)
     assert "RedirectResponse" in src
-    assert re.search(r"quote\(msg\[:\d+\]\)", src), "error text must be url-encoded and truncated"
+
+
+def test_the_callback_sends_a_code_and_never_free_text():
+    """The login screen renders this parameter, so whatever it carries is trusted-looking text on
+    our real domain. If the handler reflected a MESSAGE, anyone could hand a victim a link to the
+    genuine login page carrying any sentence they liked ("your account is locked, call ..."), and
+    an internal exception string would travel through a URL bar into a browser.
+
+    So the handler emits a short code, the client owns the wording, and it renders only codes it
+    recognises. This fails if free text ever gets back into that redirect."""
+    from tradeos import app as app_module
+
+    src = inspect.getsource(app_module.auth_google_callback)
+    # The redirect interpolates the code and nothing else.
+    assert 'auth_error={code}' in src
+    assert not re.search(r"auth_error=\{(?!code\})", src), "auth_error must carry only the code"
+    # The exception detail may be LOGGED, but must never be the redirected value.
+    assert "_fail(str(exc))" not in src
+    assert re.search(r"_fail\(\s*[\"']\w+[\"']", src), "failures identify themselves by a literal code"
 
 
 # ------------------------------------------------------------------ verification + reset (post-9)

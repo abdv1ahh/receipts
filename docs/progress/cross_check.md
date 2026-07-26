@@ -184,3 +184,88 @@ Not "write more tests" — the failures were not test-shaped. Specifically:
 4. **A new ingestion module is not finished until it has a `sources.py` entry.**
 
 These are now in `CLAUDE.md` as gotchas 0c, 0d and 0e, and in the sources section.
+
+---
+
+# Follow-up pass — same day
+
+The owner's instruction after reading the above was "whatever has not been done it needs to be
+done". Four decisions were taken by them; everything else below is work.
+
+## Their rulings
+
+- **Community: rebuild the UI.** Not deleted.
+- **Short interest: keep it parked.** Now says so in `config.short_interest_enabled()`, so the next
+  cleanup pass finds a note instead of an orphan.
+- **Cleanups: action all three.** Two turned out to be stale audit entries (see below).
+- **Keys: set up all four.** Runbook written at `docs/runbooks/keys.md`.
+
+## Community, rebuilt rather than restored
+
+`community.py` (Slice F) was complete and tested the whole time; it lost its surface when the
+discovery hub linking to it was deleted as dead code. The new `/community` has a public feed, a
+Following feed, a track-record leaderboard, and a profile editor, plus addressable trader pages at
+`/trader?handle=x` — a track record nobody can link to is not much of a record.
+
+Verified end to end in a browser: follow (followers 1 → 2), like (0 → 1), comment posted and
+deleted, Following populating only after a follow. Test data cleaned up afterwards.
+
+The leaderboard ranks by **win rate over public closed trades**, never by a return figure, and
+shows nobody at all below the sample floor rather than ranking someone on four trades. Both rules
+are printed on the surface.
+
+## The six audit rulings, resolved — three of them were wrong
+
+- **A-01 short interest** — kept, parked, documented.
+- **A-02 ENABLE_CONGRESS** — removed, plus migration 033 dropping the seed row.
+- **A-03 Stripe price ids** — **the audit was wrong.** It claimed nothing reads them; `billing.py`
+  reads them through a `price_id_env` lookup that a literal grep missed. Live config, kept.
+- **A-04 share cards** — kept, and its outbound link fixed (it pointed at `/`, which now redirects).
+- **A-05 `uploads/`** — already gone.
+- **A-06 `test_gemini.py`** — **no such file.** The real one is `test_explain_gemini.py`, correctly
+  named for the module it tests. Nothing to rename.
+
+Three of six entries in a document written to find stale claims were themselves stale. Worth
+remembering when reading any audit here, including this one.
+
+## `author_influence`: stored, and now actually read
+
+`watchlist_accounts.py` has always documented the spine as the place a source's editorial weight is
+stored. `spine.upsert_event` never wrote the column, and nothing read it back — invisible because no
+source supplied one until Bluesky. Now written, backfilled onto the 110 older Bluesky events from
+their stored payloads, and folded into `relevance.score` as an `authority` part weighted 0.08.
+
+Deliberate choices: a claim with no author scores the NEUTRAL default, so an SEC filing is not
+penalised for lacking a byline; authority is the smallest weight, because who said something is
+evidence about it rather than a substitute for what it says; and a test asserts a maximally
+authoritative but irrelevant claim still ranks below a quiet one that touches your watchlist.
+
+## What the two quality gates actually found
+
+**`/security-review`** — one real issue, in code from the earlier pass. Making `auth_error` render
+(it never had) meant anyone could send a victim `/auth?auth_error=<any text>` and have arbitrary
+official-looking wording appear on the genuine login page; separately `_fail(str(exc))` reflected
+internal exception detail through the URL. React escaped the HTML so it was never XSS, but it was a
+clean phishing surface on our own domain. **Fixed at the root**: the handler emits a short code, the
+client owns the wording and renders only codes it recognises, and the exception detail is logged
+server-side. The pre-existing test that asserted the old escaping now asserts the stronger property.
+
+**`/simplify`** — one real bug. `pct` existed as near-identical copies in three surfaces; the fourth
+copy, in the new community feed, omitted the ×100. `trades.realized_pnl_pct` returns a fraction, so
+a +10% trade was being published to other people's screens as **"+0.1%"**. Formatters now live in
+`frontend/src/format.js`, used by journal, portfolios and community, and both surfaces now agree.
+Also added: the Bluesky adapter was missing the hostname-allowlist check that gdelt, prices and
+reddit all perform — added, with a test.
+
+Both gates were run by me reading the diff directly rather than by fan-out agents.
+
+## Still open
+
+- **The four keys are the owner's to create.** Nothing else blocks on me.
+- **`/code-review` has still never been run** on any diff here.
+- **`/security-review` has never covered the code predating this branch** — it has only ever seen
+  diffs. Phase 9 §"What is NOT fixed" remains the honest list.
+- **The backup cron line is still not installed.** `scripts/backup.sh` works; nobody schedules it.
+- **The 3D globe is verified on desktop WebGL only** — no real low-power mobile device.
+- **Bluesky addresses accounts by handle, not DID**, so a renamed account fails and is logged by
+  name. Fine for 16 curated institutions; revisit if the list grows or starts tracking individuals.

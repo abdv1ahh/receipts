@@ -13,10 +13,12 @@ def test_add_business_days_skips_weekends():
     assert _add_business_days(date(2026, 5, 15), 8) == date(2026, 5, 27)
 
 
-def test_modular_flags_default_off(monkeypatch):
-    monkeypatch.delenv("ENABLE_CONGRESS", raising=False)
+def test_short_interest_flag_defaults_off_and_can_be_turned_on(monkeypatch):
+    """ENABLE_CONGRESS was removed in migration 033 — it gated a source that was never built.
+    ENABLE_SHORT_INTEREST stays: the data is ingested and parked against a future scoring version,
+    which the owner confirmed on 2026-07-26 (docs/dead_code.md A-01)."""
     monkeypatch.delenv("ENABLE_SHORT_INTEREST", raising=False)
-    assert config.congress_enabled() is False
     assert config.short_interest_enabled() is False
     monkeypatch.setenv("ENABLE_SHORT_INTEREST", "true")
     assert config.short_interest_enabled() is True
+    assert not hasattr(config, "congress_enabled")

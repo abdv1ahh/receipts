@@ -16,18 +16,19 @@ the things it found were genuinely broken in the reader's face while every test 
 cd /path/to/receipts
 git checkout phase/6-sections          # all work lives here; not yet merged to main
 make dev                               # reload-in-place stack on :8000
-make test                              # 598 pass, ~1s (17 need the local DB)
+make test                              # 619 pass, ~1s (17 need the local DB)
 make lint                              # ruff, zero errors is the standard
 ```
 
 Demo login `demo@tradeos.app` / `<generated at seed time>`. Surfaces: `/radar` `/globe` `/ledger`
-`/exposure` `/crypto` `/news` `/brief` `/events` `/integrations` `/journal`.
+`/exposure` `/crypto` `/news` `/brief` `/events` `/journal` `/community` `/integrations`.
+`/` redirects a signed-out visitor to the marketing site at `/site/`.
 
-**Verified state at handoff:** 612 tests pass · 0 lint errors · 0 console errors and **0 horizontal
+**Verified state at handoff:** 619 tests pass · 0 lint errors · 0 console errors and **0 horizontal
 overflow on all 21 app surfaces at 375 / 768 / 1280px**, plus the marketing site, checked in a real
 browser · the 3D globe verified **rendering under actual WebGL** in headed Chromium, not merely
 "no errors in headless" (headless has no GPU, which is exactly how the globe stayed broken) ·
-migrations through **032** · 61 tables · the Ledger reads 41% of 282.
+migrations through **033** · 61 tables · the Ledger reads 41% of 282.
 
 **The marketing site is at <http://localhost:8000/site/>, and `/` now redirects there** for anyone
 signed out — it was previously reachable by no link from anywhere, which is why the owner could not
@@ -82,8 +83,11 @@ Every phase has a report in `docs/progress/`.
 - **Exercise Google sign-in against Google.** Still untested auth code until someone does.
 - **SMTP is not configured**, so verification and reset cannot actually send. The machinery is
   built and tested; it needs a provider (`SMTP_HOST`, `MAIL_FROM`) and `preflight` says so.
-- **Run `/security-review` on the whole branch.** It has found a real vulnerability twice here,
-  both times in code I had just written and believed was correct.
+- ~~Run `/security-review`~~ **RUN 2026-07-26 on the cross-check diff**, and it earned its keep a
+  third time: rendering `auth_error` (which nothing had ever read) let anyone put arbitrary
+  official-looking text on the real login page, and `_fail(str(exc))` reflected internal
+  exception detail through the URL bar. Both fixed — the handler now emits a CODE and the client
+  renders only codes it recognises. **Still not run over the code that predates this branch.**
 
 ### 2. Deploy it
 
@@ -102,9 +106,13 @@ correct it in the same change that discovers a mistake.
 - ~~GDELT has never been observed ingesting.~~ **RESOLVED 2026-07-25** — it came back after the
   backoff elapsed and it has kept flowing — **22 events** as of 2026-07-26, up from 4 the day
   before, with gdelt-sourced claims on the Radar and in the marketing site's hero.
-- **Bluesky** as a real `SocialSource` — the interface exists, the implementation does not.
-- **`/code-review` has never been run** on any phase diff. `/simplify` and `/security-review` were
-  run on the Phase 6 diff.
+- ~~Bluesky as a real `SocialSource`~~ **DONE 2026-07-26.** 16 curated accounts, each verified
+  against the live API before seeding, keyless, feeding the spine hourly. Note for anyone
+  extending it: `searchPosts` 403s without auth, so network-wide search is not available.
+- **`/code-review` has still never been run.** `/simplify` was run on the cross-check diff and
+  found a real one: `pct` was duplicated across three surfaces and the fourth copy dropped the
+  ×100, so the community feed published a +10% trade as "+0.1%". Formatters now live in
+  `frontend/src/format.js`.
 
 - **Google sign-in has never been exercised against Google** — no credentials. Validation logic is
   tested; the handshake is not.
@@ -120,9 +128,12 @@ correct it in the same change that discovers a mistake.
 | # | Question | Blocks |
 |---|---|---|
 | 1 | **OpenRouter free key** (<https://openrouter.ai/keys>) — offered, not yet provided | Nothing, but Gemini's daily allowance ran out twice in one session and it is the real throttle on claim generation |
-| 2 | Reddit free key (<https://www.reddit.com/prefs/apps>, type "script") | The only source that measures *mood* rather than attention |
-| 3 | OpenFIGI free key (<https://www.openfigi.com/api>) | 19,851 unmapped 13F holdings, invisible everywhere |
-| 4 | The six ASK rulings in `docs/dead_code.md` | Cleanup only |
+| 2 | **Four keys the owner agreed to create 2026-07-26**: Reddit, SMTP, OpenFIGI, Google OAuth. Step-by-step in **`docs/runbooks/keys.md`**, each verifiable with `cli check-source`. | Reddit = mood; SMTP = password reset can actually send (the real blocker before other users); OpenFIGI = 19,851 invisible holdings; Google = untested auth code |
+
+~~The six ASK rulings in `docs/dead_code.md`~~ **ALL RESOLVED 2026-07-26.** Short interest kept and
+parked; ENABLE_CONGRESS removed (migration 033); the Stripe and `test_gemini.py` entries turned out
+to be audit errors, not debris; `uploads/` was already gone. The community surface was rebuilt
+rather than deleted, on the owner's ruling.
 
 ## Decisions already taken
 

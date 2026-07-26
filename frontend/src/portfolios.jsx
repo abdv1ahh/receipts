@@ -9,9 +9,8 @@ import {
   getPortfolio, removePosition,
 } from "./api";
 import { Icon } from "./icons.jsx";
+import { cls, pct } from "./format.js";
 
-const pct = (v) => (v == null ? "—" : `${v >= 0 ? "+" : ""}${(v * 100).toFixed(1)}%`);
-const cls = (v) => (v == null ? "" : v > 0 ? "pos-pos" : v < 0 ? "pos-neg" : "");
 
 function health(s) {
   const n = s.positions || 0;

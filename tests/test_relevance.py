@@ -121,7 +121,7 @@ def _claim(**kw):
 def test_score_is_bounded_and_explains_itself():
     out = relevance.score(_claim(), {"country": "AE"}, AE, {"XOM"}, novelty=0.8)
     assert 0.0 <= out["relevance"] <= 1.0
-    assert set(out["parts"]) == {"confidence", "watchlist", "geo", "currency", "novelty"}
+    assert set(out["parts"]) == {"confidence", "watchlist", "geo", "currency", "novelty", "authority"}
 
 
 def test_a_relevant_claim_outranks_an_irrelevant_one_for_the_same_reader():
@@ -215,3 +215,45 @@ def test_the_same_claim_ranks_differently_from_two_countries():
     br = relevance.score(gulf_story, {"country": "BR"}, BR)
     assert ae["relevance"] > br["relevance"]
     assert ae["parts"]["geo"] == 1.0                   # it happened where the reader is
+
+
+# ------------------------------------------------------------------ authority (consequential accounts)
+#
+# `author_influence` is a stated editorial weight carried on an event by the consequential-accounts
+# list. It reached the events table and was then read by nothing for the whole build; these hold the
+# wiring in place.
+
+def test_a_claim_with_no_author_is_neither_boosted_nor_penalised():
+    """Most claims have no byline — a filing is not "said by" anyone in the sense this measures.
+    Scoring an absence would push every SEC-derived interpretation down for no reason."""
+    assert relevance.authority_weight({}) == relevance.NEUTRAL_AUTHORITY
+    assert relevance.authority_weight({"author_influence": None}) == relevance.NEUTRAL_AUTHORITY
+
+
+def test_a_more_consequential_voice_outranks_a_less_consequential_one():
+    wire = relevance.score(_claim(author_influence=0.85), {"country": "AE"}, AE, {"XOM"}, novelty=0.5)
+    blog = relevance.score(_claim(author_influence=0.2), {"country": "AE"}, AE, {"XOM"}, novelty=0.5)
+    assert wire["relevance"] > blog["relevance"]
+
+
+def test_authority_is_clamped_and_never_crashes_on_a_bad_value():
+    assert relevance.authority_weight({"author_influence": 4}) == 1.0
+    assert relevance.authority_weight({"author_influence": -3}) == 0.0
+
+
+def test_authority_moves_the_score_less_than_what_the_claim_actually_says():
+    """Who said it is evidence, not a substitute for the content. A maximally authoritative source
+    must not outrank a claim that genuinely touches the reader's watchlist."""
+    loud_but_irrelevant = relevance.score(
+        _claim(author_influence=1.0, affected=[{"kind": "asset", "value": "ZZZ", "direction": "up"}]),
+        {"country": "AE"}, AE, {"XOM"}, novelty=0.5)
+    quiet_but_relevant = relevance.score(
+        _claim(author_influence=0.0), {"country": "AE"}, AE, {"XOM"}, novelty=0.5)
+    assert quiet_but_relevant["relevance"] > loud_but_irrelevant["relevance"]
+
+
+def test_explain_never_cites_authority_for_an_unauthored_claim():
+    """The neutral default must not produce "shown because of who reported it" on a claim that has
+    no author at all — that would be the interface inventing a reason."""
+    out = relevance.score(_claim(), {"country": "AE"}, AE, {"XOM"}, novelty=0.99)
+    assert "who reported it" not in relevance.explain(out["parts"])

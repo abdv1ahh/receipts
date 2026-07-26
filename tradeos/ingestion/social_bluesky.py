@@ -32,6 +32,7 @@ from __future__ import annotations
 import logging
 import time
 from datetime import UTC, datetime
+from urllib.parse import urlparse
 
 import httpx
 
@@ -128,15 +129,29 @@ def to_event(item: dict, account: dict) -> dict | None:
 # ------------------------------------------------------------------ network
 
 def _get(client: httpx.Client, method: str, params: dict) -> dict:
+    """One paced GET against the AppView.
+
+    The hostname is re-derived from the URL actually about to be requested and checked against the
+    allowlist, which is what every other adapter in this package does (gdelt, prices, reddit). It
+    reads as redundant while API is a literal constant, and that is the point: it fails loudly the
+    day someone makes the base URL configurable."""
+    url = f"{API}/{method}"
+    if urlparse(url).hostname != HOST:
+        raise ValueError("bluesky host allowlist violation")
     _pace()
-    r = client.get(f"{API}/{method}", params=params)
+    r = client.get(url, params=params)
     r.raise_for_status()
     return r.json()
 
 
 def resolve_did(client: httpx.Client, handle: str) -> str | None:
-    """Handle → DID. A DID survives a handle change, which is exactly the sort of silent breakage
-    that leaves a panel empty for weeks."""
+    """Handle → DID, used as the liveness probe behind `cli check-source bluesky`.
+
+    Note what this is NOT: ingest() addresses accounts by handle, not by DID, so a watched account
+    that renames itself starts failing and is logged by name for the operator to fix. Resolving to
+    DIDs up front would survive that, at the cost of a second request per account per pass plus a
+    cache to make it worth having. Sixteen curated accounts do not rename often enough to buy it —
+    but if this list ever grows or starts tracking individuals, that is the trade to revisit."""
     try:
         return (_get(client, "app.bsky.actor.getProfile", {"actor": handle}) or {}).get("did")
     except Exception as exc:

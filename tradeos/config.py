@@ -17,14 +17,14 @@ def _flag(name: str) -> bool:
     return os.environ.get(name, "false").strip().lower() in ("1", "true", "yes")
 
 
-def congress_enabled() -> bool:
-    """Modular input (Decision 11). Off: no clean structured primary source (decision #29)."""
-    return _flag("ENABLE_CONGRESS")
-
-
 def short_interest_enabled() -> bool:
     """Modular input. Reserved: short interest is ingested as context; weighting it into the
-    convergence score is a logged version bump (decision #31), gated by this flag when it lands."""
+    convergence score is a logged version bump (decision #31), gated by this flag when it lands.
+
+    PARKED ON PURPOSE, confirmed by the owner 2026-07-26 — not debris. `ingestion/finra.py` and the
+    `short_interest` table exist and are fed; nothing reads them yet. A future cleanup pass will
+    find an ingestion path with no consumer and be tempted; this is the note saying it was already
+    considered and kept. See docs/dead_code.md A-01."""
     return _flag("ENABLE_SHORT_INTEREST")
 
 

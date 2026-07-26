@@ -20,7 +20,7 @@ engine that explains market consequences. The product brief is
 It now has a claim engine (`claims.py`), a self-scoring Ledger (`ledger.py`, publishing 41% of 282
 with the misses shown), an event spine (`spine.py`), personal relevance (`relevance.py`), world
 context frozen at trade time (`journal_context.py`), and surfaces at `/radar` `/globe` `/ledger`
-`/exposure` `/crypto` `/news` `/brief` `/events` `/journal` `/integrations`.
+`/exposure` `/crypto` `/news` `/brief` `/events` `/journal` `/community` `/integrations`.
 
 **`/` is the marketing site for anyone signed out** (307 to `/site/`, decided on the presence of
 the session cookie so no database round trip is needed). The app's own landing page was deleted: it
@@ -76,7 +76,7 @@ The app is at <http://localhost:8000>. Demo login: `demo@tradeos.app` / `<genera
 ### Tests
 
 ```bash
-make test     # 612 tests, ~1s. Offline except 17 authz tests that need the local DB
+make test     # 619 tests, ~1s. Offline except 17 authz tests that need the local DB
 make lint     # ruff; zero errors is the standard
 make dev      # reload-in-place stack; then `make web` for a UI change
 make fix      # ruff --fix
@@ -173,7 +173,7 @@ tradeos/                  the Python package (all backend code)
   assistant_tools.py      six READ-ONLY tools; a security boundary, not a convenience layer.
   smartmoney_claims.py    convergence signals expressed as scoreable claims.
   watchlist_accounts.py   the consequential-accounts influence list.
-  migrations/             001..032 ordered .sql; NEVER edit an applied migration, and every
+  migrations/             001..033 ordered .sql; NEVER edit an applied migration, and every
                           file MUST insert its own schema_migrations row
   (surface modules)       dashboard, brief, news, social, sentiment, crypto, events,
                           trades, insights, portfolio, community, alerts, admin,
@@ -233,6 +233,12 @@ fastest:
    **`llm.wants_model(provider)`**; a test forbids the old pattern. More generally: the suite runs
    on `template` by design, so **verify a model change against a running instance**
    (`used_template: false`), never against the tests alone.
+
+0b2. **A formatter duplicated across files WILL drift, and the drift is silent.** `pct` lived as
+   near-identical copies in three surfaces; the fourth copy omitted the ×100 and published a +10%
+   trade to other readers as "+0.1%". `trades.realized_pnl_pct` returns a FRACTION (0.1 == +10%).
+   Shared display formatters now live in `frontend/src/format.js` — use them rather than writing a
+   fourth `pct`.
 
 0c. **A media query adds NO specificity, so mobile overrides must sit at the END of `styles.css`.**
    A `@media (max-width: 720px) { .bt { white-space: normal } }` placed at line 190 loses to the
