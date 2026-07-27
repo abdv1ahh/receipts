@@ -100,6 +100,55 @@ def countries_for(affected: list[dict]) -> list[str]:
     return seen
 
 
+def countries_with_reason(affected: list[dict]) -> list[tuple[str, str]]:
+    """Like `countries_for`, but says WHY each country is attached: 'location' or 'commodity'.
+
+    The distinction is not pedantic, it is the difference between personalisation working and not.
+    A region or a currency places an event somewhere. A commodity does not — it names a
+    RELATIONSHIP, and "oil" attaches six producers at once. Treating those two as the same thing
+    meant a reader in Abu Dhabi and a reader in São Paulo both scored a Gulf oil story at the
+    maximum, identically, because both countries appear in the oil list. That is precisely the
+    comparison the product exists to make, and it was returning the same answer for both.
+
+    `countries_for` deliberately keeps its old behaviour: the globe wants every country a claim
+    touches, however it touches them. Only relevance ranking needs to tell the two apart.
+    """
+    out: list[tuple[str, str]] = []
+    for item in affected or []:
+        kind = str(item.get("kind", "")).lower()
+        value = str(item.get("value", ""))
+        if kind == "region":
+            out += [(c, "location") for c in _match(REGIONS, value)]
+        elif kind == "currency":
+            out += [(c, "location") for c in CURRENCY_COUNTRIES.get(value.strip().upper(), [])]
+        elif kind == "commodity":
+            out += [(c, "commodity") for c in _match(COMMODITY_COUNTRIES, value)]
+    seen: dict[str, str] = {}
+    for c, why in out:
+        # A location claim beats a commodity one for the same country: if an event is IN Brazil and
+        # also touches soybeans, it is a Brazilian event.
+        if seen.get(c) != "location":
+            seen[c] = why
+    return list(seen.items())
+
+
+def commodities_in(affected: list[dict]) -> list[str]:
+    """The commodity keys a claim names, normalised to the table's vocabulary ('oil', not
+    'Brent Crude Oil'). Used to weigh a reader's own exposure to that commodity."""
+    out: list[str] = []
+    for item in affected or []:
+        if str(item.get("kind", "")).lower() != "commodity":
+            continue
+        v = (str(item.get("value", "")) or "").strip().lower()
+        if not v:
+            continue
+        key = v if v in COMMODITY_COUNTRIES else next(
+            (k for k in sorted(COMMODITY_COUNTRIES, key=len, reverse=True) if k in v), None)
+        if key and key not in out:
+            out.append(key)
+    return out
+
+
 def corridors(rows: list[dict]) -> list[dict]:
     """Trade corridors between the countries we hold exposure data for.
 

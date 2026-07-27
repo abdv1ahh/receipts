@@ -4,7 +4,10 @@ import { Bearing } from "./bearing.jsx";
 import { useScrollDriver } from "./hooks";
 import { Close, Faq, FAQS, Hero, Ledger, Personalisation, Walkthrough } from "./sections.jsx";
 
-const APP = "/";
+// The Radar itself, not "/". A signed-out visitor at "/" is redirected straight back here to
+// the marketing site, so a footer link to "/" was a loop — click "Open the app", land on the
+// page you were already reading. Same fix as sections.jsx.
+const APP = "/radar";
 
 // FAQPage structured data, generated from the SAME array the accordion renders. Written as one
 // object rather than duplicated into the HTML head, because a hand-maintained copy is a copy that

@@ -19,6 +19,8 @@ from __future__ import annotations
 
 import logging
 
+from . import geography
+
 log = logging.getLogger("tradeos.relevance")
 
 # Sources: currency regimes from each central bank's own published framework; trade partners from
@@ -192,6 +194,32 @@ def geo_weight(profile_country: str | None, exposure: dict | None, event_geo: li
     return round(best, 3) if best else 0.3
 
 
+def commodity_weight(exposure: dict | None, commodities: list[str]) -> float:
+    """0..1 — how much a commodity story is THIS reader's story, by how central it is to them.
+
+    `geo_weight` alone could not answer this. "oil" attaches six producers, so a reader in any of
+    them scored the maximum and a Gulf oil story ranked identically in Abu Dhabi and São Paulo —
+    the exact comparison the product is built to make.
+
+    Centrality comes from sourced data already held per country: position in `key_exports` /
+    `key_imports`. Crude oil is the UAE's first export and Brazil's third, behind soybeans and iron
+    ore, so the same story weighs more in one than the other — which is true, and is the point.
+    """
+    if not exposure or not commodities:
+        return 0.0
+    exports = [str(x).lower() for x in (exposure.get("key_exports") or [])]
+    imports = [str(x).lower() for x in (exposure.get("key_imports") or [])]
+    best = 0.0
+    for c in commodities:
+        for lst, base in ((exports, 1.0), (imports, 0.85)):   # producing it beats buying it
+            for i, item in enumerate(lst):
+                if c in item or item in c:
+                    # First on the list is the country's defining trade; fifth is a footnote.
+                    best = max(best, base * max(0.25, 1.0 - i * 0.18))
+                    break
+    return round(min(1.0, best), 3)
+
+
 def watchlist_weight(affected: list[dict], watchlist: set[str]) -> float:
     """0..1 — does this claim touch something the user actually holds or follows."""
     if not affected:
@@ -239,19 +267,21 @@ def authority_weight(claim: dict) -> float:
 
 
 def places(claim: dict) -> list[str]:
-    """The countries a claim actually bears on.
+    """Countries an event LANDED in, for geographic ranking.
 
-    From what the claim says it AFFECTS, falling back to the event's own `geo` only when nothing
-    maps. That fallback is a last resort, not a default, because `geo` is where the OUTLET sits —
-    a US wire filing about Asian exporters is tagged US.
+    Only location-derived countries now: a region or a currency places an event somewhere, a
+    commodity does not. "oil" attaches six producers at once, and treating that as a location gave
+    every one of them the maximum geographic score — so a Gulf oil story ranked identically for a
+    reader in Abu Dhabi and one in São Paulo. Commodity exposure is real and is still scored, but
+    through `commodity_weight`, where centrality can be weighed instead of being all-or-nothing.
 
-    This distinction is written into `geography.py`, honoured by the globe and by Exposure, and was
-    still missing here: relevance ranked on the publisher's country, so a reader in São Paulo and a
-    reader in Tokyo were shown almost the same order, differing only by a rounding of the same
-    US-centric score. It is the single most repeated mistake in this project, and it lives here now
-    so no caller has to remember it."""
-    from . import geography
-    return geography.countries_for(claim.get("affected") or []) or list(claim.get("geo") or [])
+    Falls back to the outlet's `geo` only when nothing maps. Note what that is: where the OUTLET
+    sits, not what the story is about — the most repeated mistake in this project. It is a last
+    resort, never a preference.
+    """
+    located = [c for c, why in geography.countries_with_reason(claim.get("affected") or [])
+               if why == "location"]
+    return located or list(claim.get("geo") or [])
 
 
 def score(claim: dict, profile: dict | None, exposure: dict | None,
@@ -269,19 +299,22 @@ def score(claim: dict, profile: dict | None, exposure: dict | None,
         "currency": currency_weight(exposure, affected),
         "novelty": float(novelty if novelty is not None else 0.5),
         "authority": authority_weight(claim),
+        "commodity": commodity_weight(exposure, geography.commodities_in(affected)),
     }
     # Weights sum to 1.0. `authority` is deliberately the smallest: it is an editorial opinion about
     # a source, and it should nudge an ordering rather than decide one. The others were scaled down
     # proportionally to make room rather than one being singled out to pay for it.
-    total = (parts["confidence"] * 0.22 + parts["watchlist"] * 0.24 + parts["geo"] * 0.24
-             + parts["currency"] * 0.10 + parts["novelty"] * 0.12 + parts["authority"] * 0.08)
+    total = (parts["confidence"] * 0.20 + parts["watchlist"] * 0.22 + parts["geo"] * 0.20
+             + parts["commodity"] * 0.14 + parts["currency"] * 0.08 + parts["novelty"] * 0.10
+             + parts["authority"] * 0.06)
     return {"relevance": round(min(1.0, total), 4), "parts": {k: round(v, 3) for k, v in parts.items()}}
 
 
 # Checked in this order on a tie, most specific reason first: "touches your watchlist" tells a
 # reader more than "the interpretation is confident", which is true of most claims.
-_REASON_ORDER = ("watchlist", "currency", "geo", "novelty", "confidence", "authority")
+_REASON_ORDER = ("watchlist", "commodity", "currency", "geo", "novelty", "confidence", "authority")
 _LABELS = {"watchlist": "it touches something on your watchlist",
+           "commodity": "it moves something your economy runs on",
            "currency": "it touches your currency",
            "geo": "of where it happened relative to you",
            "novelty": "it is genuinely new information",

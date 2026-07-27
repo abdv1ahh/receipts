@@ -121,7 +121,8 @@ def _claim(**kw):
 def test_score_is_bounded_and_explains_itself():
     out = relevance.score(_claim(), {"country": "AE"}, AE, {"XOM"}, novelty=0.8)
     assert 0.0 <= out["relevance"] <= 1.0
-    assert set(out["parts"]) == {"confidence", "watchlist", "geo", "currency", "novelty", "authority"}
+    assert set(out["parts"]) == {"confidence", "watchlist", "geo", "currency", "novelty",
+                                 "authority", "commodity"}
 
 
 def test_a_relevant_claim_outranks_an_irrelevant_one_for_the_same_reader():
@@ -257,3 +258,51 @@ def test_explain_never_cites_authority_for_an_unauthored_claim():
     no author at all — that would be the interface inventing a reason."""
     out = relevance.score(_claim(), {"country": "AE"}, AE, {"XOM"}, novelty=0.99)
     assert "who reported it" not in relevance.explain(out["parts"])
+
+
+# ------------------------------------------------------------------ commodities are a relationship,
+#                                                                     not a location
+#
+# The flagship promise is that the same day reads differently from different places. It did not.
+# COMMODITY_COUNTRIES["oil"] lists six producers, `places()` treated all six as the event's
+# LOCATION, and geo_weight returns 1.0 when your country is in that list — so a Gulf oil story
+# scored identically, to four decimal places, for a reader in Abu Dhabi and one in Sao Paulo.
+
+OIL_CLAIM = {"affected": [{"kind": "commodity", "value": "Brent Crude Oil"},
+                          {"kind": "sector", "value": "Defense"}],
+             "confidence": 0.7, "geo": None}
+
+
+def test_a_commodity_no_longer_pretends_to_be_a_location():
+    """Six oil producers are not six places an event happened."""
+    assert relevance.places(OIL_CLAIM) == []
+
+
+def test_a_region_still_places_an_event():
+    claim = {"affected": [{"kind": "region", "value": "Middle East"}]}
+    assert relevance.places(claim), "a region must still locate an event"
+
+
+def test_the_same_oil_story_ranks_differently_in_the_uae_and_brazil():
+    """Both are oil exporters and both are in the oil producer list. Crude is the UAE's FIRST
+    export and Brazil's third, behind soybeans and iron ore — so it should not weigh the same."""
+    uae = relevance.score(OIL_CLAIM, {"country": "AE"}, AE, set(), 0.76)
+    brazil = relevance.score(OIL_CLAIM, {"country": "BR"}, BR, set(), 0.76)
+    assert uae["relevance"] != brazil["relevance"], "personalisation is not personalising"
+    assert uae["relevance"] > brazil["relevance"]
+
+
+def test_commodity_weight_ranks_by_how_central_the_commodity_is():
+    assert relevance.commodity_weight(AE, ["oil"]) > relevance.commodity_weight(BR, ["oil"])
+    # Producing something outranks importing it.
+    assert relevance.commodity_weight(BR, ["soybeans"]) > relevance.commodity_weight(BR, ["oil"])
+
+
+def test_commodity_weight_is_zero_for_a_reader_with_no_exposure_data():
+    assert relevance.commodity_weight(None, ["oil"]) == 0.0
+    assert relevance.commodity_weight(AE, []) == 0.0
+
+
+def test_explain_never_credits_a_commodity_a_reader_has_no_exposure_to():
+    out = relevance.score(OIL_CLAIM, {"country": "JP"}, None, set(), 0.5)
+    assert "your economy runs on" not in relevance.explain(out["parts"])
