@@ -37,6 +37,19 @@ from .signals import definitions
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 
+# httpx logs every request at INFO with the FULL URL, query string included. Any API authenticated
+# with `?token=` or `?key=` therefore prints its credential into stdout, and from there into a CI
+# log, a captured shell session, or a screenshot. Tiingo is exactly that shape, and the key showed
+# up in plain text the first time deep price history was pulled by hand.
+#
+# `scheduler.redact()` already strips query strings from anything STORED, but it never saw these —
+# they come from httpx's own logger, not from an exception this code handles. Lifting that one
+# logger to WARNING removes the whole class of leak and costs nothing: the suppressed lines say
+# "HTTP Request: GET <url> 200 OK", which the per-source counters already report more usefully.
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+
+
 # each ingest command maps to a (module) exposing ingest_day + a human label
 INGESTERS = {
     "ingest-form4": (ingest_form4_day, "Form 4"),

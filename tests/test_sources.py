@@ -123,3 +123,15 @@ def test_watchlist_queries_are_scoped_by_user_id():
     for line in src.splitlines():
         if "FROM watchlists" in line or "INTO watchlists" in line:
             assert "user_key" not in line, f"watchlist query still uses user_key: {line.strip()}"
+
+
+def test_httpx_request_logging_cannot_print_an_api_key():
+    """httpx logs every request at INFO with the full URL, query string included. Tiingo
+    authenticates with `?token=`, so that one logger turns a captured CLI session or a CI log into
+    a credential disclosure. It leaked in exactly that way while backfilling price history by hand.
+
+    scheduler.redact() covers what gets STORED; this covers what gets PRINTED."""
+    import pathlib
+    src = pathlib.Path(__file__).resolve().parents[1].joinpath("tradeos", "cli.py").read_text()
+    assert 'logging.getLogger("httpx").setLevel(logging.WARNING)' in src, (
+        "httpx INFO logging re-enabled — any ?token= or ?key= URL will print its credential")

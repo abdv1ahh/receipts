@@ -537,3 +537,42 @@ to use rather than the individual ones.
 **What this changes about the verdict.** The signal was never measured on enough data to judge, and
 three separate bugs guaranteed it never would be. It still has not been shown to work. It has also
 never been given the chance, and the Ledger can now tell those two apart.
+
+## The 13D/G backfill finished — and found two more blockers
+
+Coverage went from nothing before 2024-07 to **31,698 stake events in 2022 and 30,048 in 2023**.
+With Form 4 also reaching 2022 (54,353 transactions), the two-source gate could finally be
+satisfied and 2022 published its first clusters — 378 of them, from ~1,700 candidates a day.
+
+Then the scored sample did not move. Two more things in the chain:
+
+**4. The benchmark had no history.** Every verdict is excess return *versus SPY*, and `prices_eod`
+held SPY only from **2026-01-02** while the cluster tickers reached back to 2021-06-01. So all 297
+historical outcomes were written with a NULL return: unscoreable, silently. One command fixed it
+(1,293 rows), and the backtest then produced 150 importable claims immediately.
+
+**5. httpx prints API keys.** Pulling that SPY history by hand put the Tiingo token in plain text
+on stdout — httpx logs every request at INFO with the full URL, query string included, and
+`logging.basicConfig(level=INFO)` in `cli.py` enables it globally. `scheduler.redact()` covers what
+is STORED but never saw these, because they come from httpx's own logger rather than from an
+exception this code handles. The httpx and httpcore loggers are now pinned to WARNING, with a test
+asserting it. The suppressed lines only ever said "HTTP Request: GET <url> 200 OK", which the
+per-source counters report more usefully anyway.
+
+Nothing reached the container logs — checked — but the key was displayed in a terminal session and
+should be treated as exposed.
+
+### What the bigger sample says
+
+| | before | after |
+|---|---|---|
+| resolved calls | 282 | **412** |
+| hit rate | 40.8% (z = −3.10) | **43.2% (z = −2.76)** |
+| expectancy | −1.52% | **−1.18%** |
+| 95% interval | [−3.80%, +0.76%] | **[−2.93%, +0.57%]** |
+| distinguishable from zero | no | **still no** |
+| calls needed for a 1% edge | ~1,470 | **~1,270** |
+
+The record improved on every measure and still shows no edge either way. That is the correct
+conclusion to draw from it, and the sample is now roughly a third of the way to the point where the
+question can be settled. The Form 4 backfill continues.
