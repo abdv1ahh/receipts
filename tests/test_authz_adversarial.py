@@ -98,7 +98,13 @@ def actors():
 
         with conn.cursor() as cur:
             for uid in (alice.uid, mallory.uid):
-                # `sessions.user_id` has no ON DELETE CASCADE, so the session rows go first.
+                # Neither `sessions.user_id` nor `invites.used_by` cascades, so both references go
+                # first. The invite one was missing: registering redeems an invite, so a torn-down
+                # user left an invites row pointing at it and the DELETE aborted the whole
+                # transaction — leaving the accounts behind. Three of them were found still sitting
+                # in the demo database days later.
+                cur.execute("UPDATE invites SET used_by = NULL WHERE used_by = %s", (uid,))
+                cur.execute("DELETE FROM trades WHERE user_id = %s", (uid,))
                 cur.execute("DELETE FROM sessions WHERE user_id = %s", (uid,))
                 cur.execute("DELETE FROM users WHERE id = %s", (uid,))
         conn.commit()
