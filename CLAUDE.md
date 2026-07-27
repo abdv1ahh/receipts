@@ -76,7 +76,7 @@ The app is at <http://localhost:8000>. Demo login: `demo@tradeos.app` / `<genera
 ### Tests
 
 ```bash
-make test     # 631 tests, ~1s. Offline except 17 authz tests that need the local DB
+make test     # 637 tests, ~1s. Offline except 17 authz tests that need the local DB
 make lint     # ruff; zero errors is the standard
 make dev      # reload-in-place stack; then `make web` for a UI change
 make fix      # ruff --fix
@@ -242,6 +242,16 @@ fastest:
    `ledger.summary()` now returns `open_by_origin` so any surface can say WHOSE record it is
    showing, and a test asserts the planes are never pooled. **Never quote a hit rate without
    saying which plane produced it.**
+
+0a0. **A commodity is a RELATIONSHIP, not a location — and conflating them killed
+   personalisation.** `COMMODITY_COUNTRIES["oil"]` lists six producers, `places()` treated all six
+   as where the event happened, and `geo_weight` returns 1.0 when your country is in that list. So
+   a Gulf oil story scored identically for Saudi Arabia, the US, Russia, the UAE, Iraq and Brazil,
+   and the marketing site's "pick a country" demo returned a byte-identical feed for Abu Dhabi and
+   Sao Paulo. `geography.countries_with_reason` now labels each country `location` or `commodity`;
+   `places()` takes only the former, and `commodity_weight` scores the latter by rank in the
+   reader's own `key_exports`/`key_imports`. `countries_for` is unchanged — the globe legitimately
+   wants every country a claim touches.
 
 0a3. **A partial backfill looks exactly like a broken signal.** The publish gate is
    `min_source_classes: 2` + `min_voices: 3`, so a cluster needs at least two KINDS of filing.

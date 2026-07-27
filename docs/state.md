@@ -16,7 +16,7 @@ the things it found were genuinely broken in the reader's face while every test 
 cd /path/to/receipts
 git checkout main                      # merged and pushed 2026-07-27 (367142e)
 make dev                               # reload-in-place stack on :8000
-make test                              # 631 pass, ~1s (17 need the local DB)
+make test                              # 637 pass, ~1s (17 need the local DB)
 make lint                              # ruff, zero errors is the standard
 ```
 
@@ -24,7 +24,7 @@ Demo login `demo@tradeos.app` / `<generated at seed time>`. Surfaces: `/radar` `
 `/exposure` `/crypto` `/news` `/brief` `/events` `/journal` `/community` `/integrations`.
 `/` redirects a signed-out visitor to the marketing site at `/site/`.
 
-**Verified state at handoff:** 631 tests pass · 0 lint errors · 0 console errors and **0 horizontal
+**Verified state at handoff:** 637 tests pass · 0 lint errors · 0 console errors and **0 horizontal
 overflow on all 21 app surfaces at 375 / 768 / 1280px**, plus the marketing site, checked in a real
 browser · the 3D globe verified **rendering under actual WebGL** in headed Chromium, not merely
 "no errors in headless" (headless has no GPU, which is exactly how the globe stayed broken) ·
