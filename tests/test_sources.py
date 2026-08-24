@@ -62,6 +62,47 @@ def test_redact_leaves_no_key_material_behind():
     assert "generativelanguage.googleapis.com" in out    # the host is still useful for debugging
 
 
+def test_the_scheduler_and_the_ingesters_share_one_redactor():
+    """Two copies of this would drift, and the copy that drifted would leak a key. `scheduler.redact`
+    is the ingestion helper, not a second implementation of it."""
+    from tradeos.ingestion import common
+    assert scheduler.redact is common.redact
+
+
+def test_reject_redacts_before_it_stores():
+    """The leak this test exists for: httpx puts the whole request URL in its exception message,
+    Tiingo authenticates with `?token=`, and five adapters hand raw exception text to `reject()`.
+    1,172 rows in `ingest_rejects` held the live key in plain text back to 2026-07-16. Redaction
+    happens inside `reject` so a sixth adapter cannot reintroduce it by forgetting."""
+    from tradeos.ingestion.common import reject
+
+    stored = {}
+
+    class _Cur:
+        def execute(self, _sql, params):
+            stored["row"] = params
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_a):
+            return False
+
+    class _Conn:
+        def cursor(self):
+            return _Cur()
+
+    counters = {"rejected": 0}
+    raw = ("HTTPStatusError: Client error '429 Too Many Requests' for url "
+           "'https://api.tiingo.com/tiingo/daily/aesi/prices?startDate=2026-07-20&token=LIVEKEY123'")
+    reject(_Conn(), "prices", "AESI", raw, counters)
+
+    _source, _accession, reason = stored["row"]
+    assert "LIVEKEY123" not in reason and "token=" not in reason
+    assert "429" in reason and "api.tiingo.com" in reason     # still diagnosable
+    assert counters["rejected"] == 1
+
+
 # ------------------------------------------------------------------ authorization, adversarially
 
 def test_require_admin_contract_is_user_on_success_none_on_failure():

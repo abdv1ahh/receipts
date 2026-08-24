@@ -399,6 +399,48 @@ Replayed against the real 118-call history: calls made drop from 116 to 31, wast
 to 26, and the success rate of calls actually made rises from **6.0% to 16.1%**. The User-Agent is
 not rotated and must not be; see the module docstring.
 
+### B-30 · The live Tiingo API key was stored in the database in plain text — S1, SECURITY
+`ingestion/common.reject()` stored raw exception text. httpx puts the full request URL, query
+string included, in that text, and Tiingo authenticates with `?token=`. **1,172 rows in
+`ingest_rejects` held the live key in plain text, back to 2026-07-16.** Five adapters pass raw
+exception text to `reject()`; only Tiingo authenticates by query string, so only it leaked.
+
+This is gotcha #5 in `CLAUDE.md` and the subject of the most recent commit ("httpx prints API
+keys") — `scheduler.redact()` was applied to the scheduler path and to nothing else.
+
+**Fixed** by redacting **inside `reject()`**, not at the five call sites, so a sixth adapter cannot
+reintroduce it by forgetting. `redact` now lives in `ingestion/common.py` with `scheduler.redact`
+importing it rather than keeping a second copy — two copies would drift and the copy that drifted
+would leak a key. The 1,175 affected rows were rewritten in place (host, path and status kept, so
+they stay diagnosable) and a sweep of **all 225 text/jsonb columns in the database** found no other
+credential material.
+
+**Rotated 2026-08-24.** The old key now returns `403 Invalid token.` from Tiingo, verified directly.
+The live database is clean — a sweep of all 234 text/json columns across 57 tables found zero
+occurrences — as are `.env.example`, the compose files and all container logs. Git never held it:
+`.env` has been gitignored from the start and `git log --all -S` over the full history returns
+nothing.
+
+**It remains at rest in the backup dumps, and that is unavoidable without destroying them.** The
+dumps are `-Fc`, so the key is *compressed inside them* and a plaintext `grep` over the files finds
+nothing — the only way to see it is `pg_restore --data-only -t ingest_rejects`. Do not read a clean
+grep of a `.dump` as a clean backup. Counts at rotation time (2026-08-24):
+
+| dump | `ingest_rejects` rows holding the key |
+|---|---|
+| `rhumb-20260820T232305Z.dump` | 1,166 |
+| `rhumb-20260823T165503Z.dump` | 1,166 |
+| `rhumb-20260823T215359Z.dump` | 11 |
+
+The drop to 11 is this bug's own row-rewrite landing between the second and third snapshot; the
+remaining 11 are rejects written after it by the then-still-unpatched running image. Everything
+older than 2026-08-20 — including the whole 2026-07-16 onward window where the leak began — has
+already been deleted by the 14-day retention in `scripts/backup.sh`, so **only these three files
+exist and all three predate the rotation**. They age out on 2026-09-03 and 2026-09-06. Since the
+key they contain is now revoked, they are safe to keep; the reason to care is that a dump is
+exactly the artefact most likely to be copied offsite, and this one carries a credential the
+filename does not advertise.
+
 ### B-32 · The cue table was ordered by importance, not by specificity — S2
 `classify()` is first-match-wins, so the list order IS the behaviour. `trade_policy` sat **ninth**,
 behind `conflict` (second, owning "war" — which matches inside "trade war") and `regulation`

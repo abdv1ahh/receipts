@@ -328,6 +328,14 @@ fastest:
    and would have replaced most of those 349 labels with `other`. Any reclassification pass must
    skip `source = 'gdelt'` and any category outside `_CATEGORY_CUES`.
 
+0g. **`reject()` and `redact()` are one thing, and the reason is a leaked key.** httpx puts the
+   full request URL in its exception message, five adapters hand raw exception text to
+   `ingestion.common.reject`, and Tiingo authenticates with `?token=` — so 1,172 rows of
+   `ingest_rejects` held the live API key in plain text for five weeks. Redaction happens INSIDE
+   `reject`, not at the call sites, and `scheduler.redact` imports it rather than keeping a second
+   copy. **Never store `str(exc)` from an HTTP client without it**, and never write a second
+   redactor: the copy that drifts is the one that leaks.
+
 1. **Frontend changes need `make web`** (0.3s) under `make dev`, or a full image rebuild otherwise.
 2. **`geo` on an event is where the OUTLET sits, not what the story is about.** The single most
    repeated mistake in this project — made three times.
