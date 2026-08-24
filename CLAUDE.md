@@ -340,11 +340,22 @@ fastest:
 
 0g. **`reject()` and `redact()` are one thing, and the reason is a leaked key.** httpx puts the
    full request URL in its exception message, five adapters hand raw exception text to
-   `ingestion.common.reject`, and Tiingo authenticates with `?token=` — so 1,172 rows of
+   `ingestion.common.reject`, and Tiingo used to authenticate with `?token=` — so 1,172 rows of
    `ingest_rejects` held the live API key in plain text for five weeks. Redaction happens INSIDE
    `reject`, not at the call sites, and `scheduler.redact` imports it rather than keeping a second
    copy. **Never store `str(exc)` from an HTTP client without it**, and never write a second
    redactor: the copy that drifts is the one that leaks.
+
+0g2. **Authenticate with a HEADER, not a query parameter, and redaction stops being load-bearing.**
+   B-30's first fix scrubbed the key out of the exception text on its way to the database; the key
+   still went onto the wire in the URL, so `redact()` was the single control protecting it and it
+   only covered the one path that runs through `reject()`. `TiingoClient` now sends
+   `Authorization: Token <key>` — Tiingo accepts both forms, so it was free. Verified against live
+   Tiingo with `redact` swapped for the identity function: a real 429 wrote a reject row carrying
+   no credential, while the same request re-issued the old `?token=` way still leaked. When you add
+   a source, **check whether it accepts a header before reaching for `?key=`**; `redact` is the net,
+   not the wire. One consequence: `follow_redirects` must stay **False**, because a header is sent
+   to whatever host a redirect lands on and `daily()`'s allowlist only checks the URL we build.
 
 0h. **Free Tiingo is ~57 unique symbols/HOUR and ~500/month, and there was no "what is stale"
    selector.** All three symbol selectors asked what was *missing*, so a feed that stopped a month
@@ -378,7 +389,8 @@ fastest:
 4. **Gemini quota is per model and has a real daily ceiling.** Use `gemini-flash-latest` (DEEP) and
    `gemini-flash-lite-latest` (FAST). `gemini-2.0-flash` has a zero free-tier allowance.
 5. **httpx puts the full request URL, query string included, in exception messages.** Any API
-   authenticated with `?key=` leaks its credential. `scheduler.redact()` strips them. Keep it.
+   authenticated with `?key=` leaks its credential. `scheduler.redact()` strips them. Keep it —
+   Gemini still authenticates that way. Tiingo no longer does; see 0g2.
 6. **The prompt fence in `claims.py` uses a per-request nonce.** Do not "simplify" it to fixed
    markers — `str.replace` cannot sanitise a delimiter, it reassembles. Found by `/security-review`.
 7. **Do not quote prompt-injection examples in a prompt.** Azure's content filter classifies that
