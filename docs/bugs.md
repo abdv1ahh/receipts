@@ -399,6 +399,18 @@ Replayed against the real 118-call history: calls made drop from 116 to 31, wast
 to 26, and the success rate of calls actually made rises from **6.0% to 16.1%**. The User-Agent is
 not rotated and must not be; see the module docstring.
 
+### B-29 · `excess_return`'s reason was computed and thrown away — S2
+`measure_claim` bound it to `_why` and discarded it, so all **273** unscoreable outcome rows
+carried one sentence — "no price series for this subject" — and it was false for most of them.
+`BA` and `SPY`, with 1,293 price rows each, were both filed under "no price series"; their series
+simply ended before the claims naming them were made.
+
+**Fixed** with `UNSCOREABLE_REASONS`, distinguishing four cases: a subject whose *kind* has no
+price series (named, with the kind), a symbol absent from `prices_eod`, a feed that ends before the
+claim (**no entry price**), and a horizon that has not closed in the data. The distinction is not
+cosmetic: one is a permanent property of the subject, the other is an operational fault someone can
+fix this afternoon, and for a month they were indistinguishable.
+
 ### B-30 · The live Tiingo API key was stored in the database in plain text — S1, SECURITY
 `ingestion/common.reject()` stored raw exception text. httpx puts the full request URL, query
 string included, in that text, and Tiingo authenticates with `?token=`. **1,172 rows in

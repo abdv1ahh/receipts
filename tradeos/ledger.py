@@ -94,13 +94,36 @@ def confidence_bucket(c: float) -> str:
     return "high"
 
 
-def verdict_for(direction: str, excess: float | None) -> tuple[str, str | None]:
+# Why a subject could not be scored, in the reader's words. `excess_return` already distinguishes
+# these; the Ledger used to bind its answer to `_why` and throw it away, so all 273 unscoreable
+# rows carried the same sentence and two completely different problems looked like one.
+#
+# The distinction is not cosmetic. "no price series" says the subject is unpriceable and always
+# will be — a region, a currency, the word "tourism". "the price feed ends before the claim" says
+# the subject is perfectly scoreable and the FEED is stale, which is a fixable operational fault
+# and was invisible for as long as the note lied about it. BA and SPY, with 1,293 price rows each,
+# were both filed under "no price series".
+UNSCOREABLE_REASONS = {
+    "not_priceable_kind": "{subject} is a {kind}, which has no price series here",
+    "no_symbol": "no price history for this subject",
+    "no_entry_price": "the price feed ends before this claim was made, so there is no entry price",
+    "horizon_open_or_delisted": "the price feed ends before the horizon closed",
+}
+DEFAULT_UNSCOREABLE = "no price series for this subject"
+
+
+def verdict_for(direction: str, excess: float | None,
+                reason: str | None = None) -> tuple[str, str | None]:
     """(verdict, note) for one measured subject. Pure.
 
     `inconclusive` is a real outcome, not a hedge: a claim that said "up" and got +0.3% did not
-    move enough to be evidence either way, and counting it as a hit would flatter the record."""
+    move enough to be evidence either way, and counting it as a hit would flatter the record.
+
+    `reason` is the second element of `excess_return`, or one of the keys above when the lookup
+    never got that far. It is what makes the unscoreable note TRUE rather than merely plausible;
+    without it every unscoreable row says the same thing and the real fault stays hidden."""
     if excess is None:
-        return "unscoreable", "no price series for this subject"
+        return "unscoreable", (reason or DEFAULT_UNSCOREABLE)
     if abs(excess) < NOISE_FLOOR:
         return "inconclusive", f"moved {excess:+.2%} vs SPY, inside the {NOISE_FLOOR:.0%} noise floor"
     went_up = excess > 0
@@ -140,16 +163,24 @@ def measure_claim(conn, claim_id: int, spy: Series | None = None) -> dict:
         for item in affected:
             subject = str(item.get("value", "")).upper()
             direction = item.get("direction")
+            kind = item.get("kind")
             excess, entry, exit_day = None, None, None
             # Only equity-like subjects have a price series here. A currency or a region is
-            # honestly unscoreable rather than quietly dropped.
-            if item.get("kind") in ("asset",) and subject:
+            # honestly unscoreable rather than quietly dropped — but it must say WHICH of these it
+            # is. Four different failures used to arrive here wearing the same sentence.
+            if kind not in ("asset",) or not subject:
+                why = UNSCOREABLE_REASONS["not_priceable_kind"].format(
+                    subject=subject or "an unnamed subject", kind=kind or "non-asset subject")
+            else:
                 sym = _series(conn, subject)
-                if sym.days:
-                    excess, _why = excess_return(sym, spy, as_of_day, horizon_days)
+                if not sym.days:
+                    why = UNSCOREABLE_REASONS["no_symbol"]
+                else:
+                    excess, why = excess_return(sym, spy, as_of_day, horizon_days)
+                    why = UNSCOREABLE_REASONS.get(why, why)
                     entry = _entry_day(sym, as_of_day)
                     exit_day = _exit_day(sym, entry, horizon_days) if entry else None
-            v, note = verdict_for(direction, excess)
+            v, note = verdict_for(direction, excess, why)
             counts[v] += 1
             cur.execute(
                 """INSERT INTO claim_outcomes (claim_id, subject, predicted, magnitude, entry_day,
