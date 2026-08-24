@@ -462,16 +462,27 @@ def cmd_reprocess(args) -> None:
             cur.execute("DELETE FROM event_clusters WHERE NOT EXISTS "
                         "(SELECT 1 FROM events e WHERE e.cluster_id = event_clusters.id)")
             conn.commit()
+        # A category the cue table cannot PRODUCE was supplied by an adapter that knows more than
+        # the cue table does, and reclassifying it destroys that knowledge. GDELT's category is the
+        # topic of the query that found the article; `macro` comes from the ECB and Fed feeds and
+        # `corporate` from 8-K item codes, and neither word appears in any cue — so a blanket
+        # reclassify silently deleted 349 correct labels and replaced most of them with `other`.
+        # The classifier may only overwrite its own vocabulary.
+        owned = {c for c, _ in spine._CATEGORY_CUES} | {"other", None}
+        kept = 0
         clusters = set()
         for i, eid in enumerate(ids, 1):
             if args.reclassify:
                 # Re-read the stored title/body through the current cue table. This is the point
                 # of keeping raw payloads: an improved classifier is applied to history, not only
                 # to what arrives next.
-                cur.execute("SELECT title, body FROM events WHERE id = %s", (eid,))
-                title, body = cur.fetchone()
-                cur.execute("UPDATE events SET category = %s WHERE id = %s",
-                            (spine.classify(title, body), eid))
+                cur.execute("SELECT title, body, category, source FROM events WHERE id = %s", (eid,))
+                title, body, category, source = cur.fetchone()
+                if source == "gdelt" or category not in owned:
+                    kept += 1
+                else:
+                    cur.execute("UPDATE events SET category = %s WHERE id = %s",
+                                (spine.classify(title, body), eid))
             clusters.add(spine.assign_cluster(conn, eid))
             if i % 200 == 0:
                 conn.commit()
@@ -480,7 +491,8 @@ def cmd_reprocess(args) -> None:
         for cid in clusters:
             spine.score_cluster(conn, cid)
         conn.commit()
-    print(f"reprocess: {len(ids)} events -> {len(clusters)} clusters")
+    note = f", {kept} kept (adapter-supplied category)" if args.reclassify and kept else ""
+    print(f"reprocess: {len(ids)} events -> {len(clusters)} clusters{note}")
 
 
 def cmd_seed_watchlist(_args) -> None:

@@ -302,6 +302,32 @@ fastest:
    and `globeMaterial()` is NOT a method on the React ref (only `pointOfView`, `controls`, `scene`,
    `camera`, `renderer` and the utilities are).
 
+0f. **A word-bounded cue cannot match its own plural, and the cue table is full of them.**
+   `\btariff\b` does not match "tariffs" — the trailing `\b` wants a non-word character and `s` is
+   one. Inside `other` there were 37 events containing "tariffs" and **zero** containing "tariff",
+   because any singular was caught and never got there. `spine._cue_pattern` now expands each cue
+   to its inflected forms, every word of a phrase (the plural of "ban on" is "bans on"), so write
+   the cue once in whichever number reads best. Do **not** patch a single word by listing both
+   forms — that was done once for "port"/"ports" and hid the general bug for eight phases.
+   `_NO_INFLECTION` is the escape hatch for a genuinely ambiguous cue and every entry needs a
+   measurement: "strikes" is military 33 times to 2 in this corpus.
+
+0f2. **The cue table's ORDER is behaviour, and it is sorted by specificity, not importance.**
+   First match wins. `trade_policy` sat ninth behind `conflict` ("war" is inside "trade war") and
+   `regulation` ("sanction"), so the two categories most likely to hold a tariff story both won
+   first — 21 events, every one a tariff story, filed as conflict/regulation/election. Order is
+   now: unambiguous vocabularies first (`protocol_upgrade`, `monetary_policy`, `trade_policy`),
+   metaphor-prone ones last (`technology` stays bottom — "ai" is two letters, "chip" is a snack).
+   Five tests pin the constraints. Demoting `conflict` further was measured and rejected: 35 more
+   moves, zero additional trade_policy.
+
+0f3. **A category the cue table cannot PRODUCE is adapter-authoritative — never reclassify it.**
+   GDELT's category is the topic of the query that found the article (284 events); `macro` comes
+   from the ECB/Fed feeds (39) and `corporate` from 8-K item codes (26), and no cue spells either
+   word. `reprocess --reclassify` used to `UPDATE ... SET category = classify(...)` unconditionally
+   and would have replaced most of those 349 labels with `other`. Any reclassification pass must
+   skip `source = 'gdelt'` and any category outside `_CATEGORY_CUES`.
+
 1. **Frontend changes need `make web`** (0.3s) under `make dev`, or a full image rebuild otherwise.
 2. **`geo` on an event is where the OUTLET sits, not what the story is about.** The single most
    repeated mistake in this project — made three times.
