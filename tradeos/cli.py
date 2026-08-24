@@ -259,6 +259,33 @@ def _probe(key: str) -> tuple[bool, str]:
                                headers={"Authorization": f"Token {os.environ['TIINGO_API_KEY']}"})
             r.raise_for_status()
             return True, "token accepted by Tiingo's test endpoint"
+        if key == "openfigi":
+            # The mapping endpoint works KEYLESS, so a 200 on an ordinary request proves nothing
+            # about the key — the same trap `/api/test` set for Tiingo above. Two things make this
+            # a real auth check. First, OpenFIGI genuinely rejects a bad key: measured 2026-08-24,
+            # a well-formed but invalid key returns 401 "Invalid API key." rather than silently
+            # falling back to the keyless tier. Second, the body deliberately carries ELEVEN jobs,
+            # one over the keyless cap of 10, so the three states are all distinct and a key that
+            # is merely well-formed cannot pass:
+            #   valid key -> 200   invalid key -> 401   absent/ignored key -> 413 (too many jobs)
+            from .resolution.openfigi import OPENFIGI_URL
+            cusips = ["037833100", "594918104", "88160R101", "02079K305", "023135106",
+                      "30303M102", "67066G104", "478160104", "46625H100", "742718109",
+                      "931142103"]
+            with httpx.Client(timeout=30.0) as client:
+                r = client.post(
+                    OPENFIGI_URL,
+                    json=[{"idType": "ID_CUSIP", "idValue": c} for c in cusips],
+                    headers={"Content-Type": "application/json",
+                             "X-OPENFIGI-APIKEY": os.environ["OPENFIGI_API_KEY"]},
+                )
+            if r.status_code == 413:
+                return False, ("413 too many jobs — the key was not applied, so the request was "
+                               "rated as keyless. Check OPENFIGI_API_KEY reached the container.")
+            r.raise_for_status()
+            mapped = sum(1 for item in r.json() if isinstance(item, dict) and item.get("data"))
+            return True, (f"key accepted at the raised 100-job limit; mapped {mapped}/{len(cusips)} "
+                          f"known CUSIPs")
         if key == "coingecko":
             with httpx.Client(timeout=20.0) as client:
                 r = client.get("https://api.coingecko.com/api/v3/ping")

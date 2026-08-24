@@ -135,3 +135,73 @@ def test_httpx_request_logging_cannot_print_an_api_key():
     src = pathlib.Path(__file__).resolve().parents[1].joinpath("tradeos", "cli.py").read_text()
     assert 'logging.getLogger("httpx").setLevel(logging.WARNING)' in src, (
         "httpx INFO logging re-enabled — any ?token= or ?key= URL will print its credential")
+
+
+def _openfigi_probe_source() -> str:
+    import pathlib
+    src = pathlib.Path(__file__).resolve().parents[1].joinpath("tradeos", "cli.py").read_text()
+    return src.split('if key == "openfigi":')[1].split('if key == "coingecko":')[0]
+
+
+def test_openfigi_probe_cannot_pass_without_the_key_doing_work():
+    """OpenFIGI's mapping endpoint answers KEYLESS requests too, so a 200 on an ordinary body
+    proves nothing about the key — the same trap `/api/test` set for Tiingo. Measured
+    2026-08-24: the keyless cap is 10 jobs per request and a key raises it to 100, so a body of
+    ELEVEN separates the three states cleanly (valid 200 / invalid 401 / absent 413). A probe
+    that drops back under 10 jobs would report OK for a key that is never applied."""
+    probe = _openfigi_probe_source()
+    assert "X-OPENFIGI-APIKEY" in probe, "the probe must actually send the key"
+    # Count the CUSIPs the probe posts; it must stay over the keyless ceiling.
+    listed = probe.split("cusips = [")[1].split("]")[0]
+    jobs = len([c for c in listed.split(",") if c.strip()])
+    assert jobs > 10, (
+        f"probe posts {jobs} jobs — at or under the keyless cap of 10 it would also succeed "
+        "with no key at all, so it would no longer test authentication"
+    )
+    assert "413" in probe, "a 413 means the key was not applied and must report FAILED, not OK"
+
+
+def test_openfigi_probe_reports_failure_when_the_key_was_not_applied(monkeypatch):
+    """413 is the signature of a request that was rated as keyless — the key never reached the
+    process. That is precisely the misconfiguration this command exists to surface, so it must
+    not raise_for_status into a generic 'request failed'."""
+    import httpx
+
+    from tradeos import cli
+
+    class _Resp:
+        status_code = 413
+
+        def raise_for_status(self):
+            raise AssertionError("413 must be handled before raise_for_status")
+
+        def json(self):
+            return []
+
+    class _Client:
+        def __init__(self, *a, **k): pass
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def post(self, *a, **k): return _Resp()
+
+    monkeypatch.setenv("OPENFIGI_API_KEY", "irrelevant-to-this-test")
+    monkeypatch.setattr(httpx, "Client", _Client)
+    ok, detail = cli._probe("openfigi")
+    assert ok is False, "a keyless-rated request must report FAILED"
+    assert "not applied" in detail
+
+
+def test_openfigi_client_never_puts_the_key_in_a_url():
+    """B-30: httpx puts the full request URL in its exception text, so a credential carried in a
+    query string lands in any stored error — that is how 1,172 ingest_rejects rows came to hold
+    the live Tiingo key. OpenFIGI authenticates with a HEADER and must keep doing so."""
+    import pathlib
+    src = pathlib.Path(__file__).resolve().parents[1].joinpath(
+        "tradeos", "resolution", "openfigi.py").read_text()
+    assert 'headers["X-OPENFIGI-APIKEY"] = api_key' in src, (
+        "the key must travel as a header, never in the URL"
+    )
+    assert "params=" not in src, "a params= dict would put the key in the query string"
+    assert "str(exc)" not in src, (
+        "raw httpx exception text carries the request URL; store the exception TYPE instead"
+    )

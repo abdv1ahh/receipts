@@ -93,7 +93,7 @@ connected on `/integrations` rather than failing or fabricating.
 | `TIINGO_API_KEY` | End-of-day prices — **this is how claim outcomes get scored**, so the Ledger stops advancing without it | <https://www.tiingo.com/account/api/token> |
 | `REDDIT_CLIENT_ID` + `REDDIT_CLIENT_SECRET` | The only source that measures mood rather than attention | <https://www.reddit.com/prefs/apps>, type "script" |
 | `YOUTUBE_API_KEY` | Video discussion volume | Google Cloud console, YouTube Data API |
-| `OPENFIGI_API_KEY` | Maps 13F CUSIPs to tickers; 19,851 holdings are currently invisible without it | <https://www.openfigi.com/api> — works keyless at a lower rate |
+| `OPENFIGI_API_KEY` | Maps 13F CUSIPs to tickers. Set 2026-08-24; took holdings visibility from 20.5% to 69.2%. Keyless still works but caps requests at 10 jobs, so a backfill without it is ~10× slower | <https://www.openfigi.com/api> |
 
 ### Sign in with Google — optional, and unverified
 

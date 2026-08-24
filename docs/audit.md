@@ -139,7 +139,7 @@ tightening of an existing pattern, not a new architecture.
 | `prices.py` | Tiingo | `TIINGO_API_KEY` | connected |
 | `finra.py` | FINRA short interest | none | ingested, flag-gated off |
 | `social_reddit.py` | Reddit | `REDDIT_CLIENT_ID/SECRET` | **not connected** — silent no-op |
-| `openfigi.py` | OpenFIGI | `OPENFIGI_API_KEY` | optional; 19,851 CUSIPs unresolved |
+| `openfigi.py` | OpenFIGI | `OPENFIGI_API_KEY` | **connected** 2026-08-24; 69.2% of holdings resolved, rest are ETPs (B-14) |
 | `llm.py` | GitHub Models / Gemini | `OPENAI_*` / `GEMINI_*` | connected, **sunsetting** |
 
 Caching and quota discipline are partly present: per-item analysis is cached in

@@ -336,6 +336,7 @@ fastest:
 | Hacker News | none | Attention | connected |
 | CoinGecko | none | Crypto | connected |
 | Tiingo | `TIINGO_API_KEY` | EOD prices | connected |
+| OpenFIGI | `OPENFIGI_API_KEY` | 13F CUSIP → ticker; unmapped holdings are invisible | connected |
 | Reddit | `REDDIT_CLIENT_ID` + `_SECRET` | Social sentiment | **not connected** |
 | YouTube | `YOUTUBE_API_KEY` | Social sentiment | not connected |
 | X / Twitter | — | — | **no free read tier; do not attempt — Bluesky covers the need** |

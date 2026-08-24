@@ -197,10 +197,23 @@ with Wikipedia dominating, most names have exactly one source. The pulse tile re
 `— MOOD NOT MEASURED · CONNECT REDDIT` and the smart-money overlap count is `0`. Honest, but
 the surface currently delivers close to zero signal.
 
-### B-14 · 19,851 13F holdings have unresolved CUSIPs
-`cli status` reports it. These holdings exist in the database but cannot be attributed to a
-ticker, so they are invisible to every surface. Materially reduces Smart Money's institutional
-coverage. Requires `resolve-cusips` runs (OpenFIGI, rate-limited) or an alternate mapping.
+### B-14 · 19,851 13F holdings have unresolved CUSIPs — FIXED 2026-08-24 (7,684 remain, by design)
+`OPENFIGI_API_KEY` was never set, so `resolve-cusips` had never run to completion. With the key
+in place one pass (4,044 distinct CUSIPs, 41 requests, 1m41s) linked **12,167 holdings**:
+unresolved fell 19,851 → **7,684**, visibility 20.5% → **69.2%** of rows and **77.1%** of
+holding value.
+
+The remaining 2,076 distinct CUSIPs are **terminal, not pending** — a second pass mapped zero
+more. Measured split:
+
+- **1,686 (81%)** — OpenFIGI knows the ticker, but it is absent from SEC `company_tickers.json`,
+  so decision #20's "never guess" rule refuses to invent an entity link. **1,427 of these are
+  ETPs**, plus 53 ADRs, 20 closed-end and 14 open-end funds. The SEC file lists operating
+  filers; an ETF is not one. Fixing this needs a fund-ticker source, not another OpenFIGI run.
+- **290 (14%)** — OpenFIGI returns "No identifier found." Unmappable at the registry.
+
+Do not re-run `resolve-cusips` expecting movement here; the work list re-selects every CUSIP
+that lacks a `security_map` row, so the unresolvable ones are re-queried on every pass forever.
 
 ### B-15 · "On the radar" is a calendar preview, not a prioritised feed
 Confirmed as reported. It renders `d.radar` — the next few scheduled events. No relevance
