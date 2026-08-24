@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import logging
 import os
-import re
 import time
 from datetime import UTC, date, datetime, timedelta
 
@@ -218,13 +217,12 @@ def _last_success(conn, job: str) -> datetime | None:
 # free APIs do the same). httpx puts the full request URL into its exception message, so an
 # unhandled 4xx would otherwise write a live key into job_runs and into any surface that reads it.
 # Strip every query string before the message is stored or logged.
-_QUERY = re.compile(r"(\?|&)[^\s'\"]+")
-
-
-def redact(text: str) -> str:
-    """An error message with query strings removed, so a credential passed as a URL parameter never
-    reaches the database or the logs. Pure and offline-testable."""
-    return _QUERY.sub(r"\1<redacted>", text or "")
+#
+# The rule now lives in `ingestion.common` because the ingestion adapters need it too — Tiingo
+# authenticates with `?token=` and `reject()` had been storing it unredacted. `scheduler.redact` is
+# re-exported rather than reimplemented: two copies of this would drift, and the copy that drifted
+# would leak a key. Imported here so existing callers and tests keep working unchanged.
+from .ingestion.common import redact  # noqa: E402  (placed with the reasoning it belongs to)
 
 
 def run_job(conn, name: str, fn) -> dict:

@@ -197,10 +197,23 @@ with Wikipedia dominating, most names have exactly one source. The pulse tile re
 `— MOOD NOT MEASURED · CONNECT REDDIT` and the smart-money overlap count is `0`. Honest, but
 the surface currently delivers close to zero signal.
 
-### B-14 · 19,851 13F holdings have unresolved CUSIPs
-`cli status` reports it. These holdings exist in the database but cannot be attributed to a
-ticker, so they are invisible to every surface. Materially reduces Smart Money's institutional
-coverage. Requires `resolve-cusips` runs (OpenFIGI, rate-limited) or an alternate mapping.
+### B-14 · 19,851 13F holdings have unresolved CUSIPs — FIXED 2026-08-24 (7,684 remain, by design)
+`OPENFIGI_API_KEY` was never set, so `resolve-cusips` had never run to completion. With the key
+in place one pass (4,044 distinct CUSIPs, 41 requests, 1m41s) linked **12,167 holdings**:
+unresolved fell 19,851 → **7,684**, visibility 20.5% → **69.2%** of rows and **77.1%** of
+holding value.
+
+The remaining 2,076 distinct CUSIPs are **terminal, not pending** — a second pass mapped zero
+more. Measured split:
+
+- **1,686 (81%)** — OpenFIGI knows the ticker, but it is absent from SEC `company_tickers.json`,
+  so decision #20's "never guess" rule refuses to invent an entity link. **1,427 of these are
+  ETPs**, plus 53 ADRs, 20 closed-end and 14 open-end funds. The SEC file lists operating
+  filers; an ETF is not one. Fixing this needs a fund-ticker source, not another OpenFIGI run.
+- **290 (14%)** — OpenFIGI returns "No identifier found." Unmappable at the registry.
+
+Do not re-run `resolve-cusips` expecting movement here; the work list re-selects every CUSIP
+that lacks a `security_map` row, so the unresolvable ones are re-queried on every pass forever.
 
 ### B-15 · "On the radar" is a calendar preview, not a prioritised feed
 Confirmed as reported. It renders `d.radar` — the next few scheduled events. No relevance
@@ -314,3 +327,206 @@ scan asserting no branch anywhere in the package gates on a bare provider name a
 **Lesson recorded in `docs/state.md`:** a fallback that is indistinguishable from success is not a
 fallback, it is an outage with good manners. Where a path can degrade silently, something has to
 assert which path ran.
+
+---
+
+## Found 2026-08-24 while fixing the feasibility spike's three bugs
+
+### B-24 · The cue table cannot match a plural, so every plural fell to `other` — S2
+`classify()` compiles cues with word boundaries, and `\btariff\b` cannot match "tariffs": the
+trailing `\b` demands a non-word character and `s` is one. The corpus proved it — inside the
+`other` bucket there were **37 events containing "tariffs" and exactly zero containing "tariff"**,
+because any singular was caught by the cue and never reached `other`. The same held for
+sanctions, wildfires, elections, missiles, lawsuits and interest rates.
+
+The table had been patched for this **once**, by listing both `"port"` and `"ports"`, and never
+generalised — with a comment about cue hygiene directly above the pair.
+
+**Fixed** by expanding each cue to its inflected forms at compile time (`_forms`, `_plural`,
+`_singular`, `_cue_pattern`). Every word of a phrase is inflected, not just the last, because the
+plural of "ban on" is "bans on". `"ports"` was deleted as redundant. Re-running classification
+over the 4,045-event corpus moved **227 events out of `other`**, the largest groups being
+disaster +68, regulation +42, trade_policy +34, election +32, conflict +27.
+
+**Not fixed, deliberately:** the missing vocabulary the spike also lists (export controls,
+embargo, entity list, anti-dumping, countervailing duty, protectionism, "federal funds rate",
+"Federal Open Market Committee"). That is a separate change and would have contaminated the
+measurement above.
+
+### B-25 · `\binsurgen\b` matched nothing for the module's entire life — S3
+The `conflict` cue list contained `"insurgen"`, written as a prefix. Cues are word-bounded, so it
+could never match "insurgent" or "insurgency" — the identical defect as B-24, in the same table.
+**Fixed** by spelling both words out; inflection then covers the plurals. Net corpus effect: zero
+events moved, because those stories were already caught by "troops", "missile" or "war". A dead
+cue that costs nothing is still a dead cue.
+
+### B-26 · Pluralising `strike` would have mislabelled 30 war stories as `labour` — S2 (avoided)
+Bare "strike"/"strikes" decides the category for 44 events in the corpus: **33 military, 2
+industrial, 9 neither**. `conflict` is checked before `labour` but owns only the compounds
+"airstrike" and "drone strike", so every bare one falls through to `labour`. Inflecting it would
+have moved 30 stories about strikes on Iran into the labour category.
+
+**Handled** by `_NO_INFLECTION`, a measured opt-out containing exactly `("labour", "strike")`, so
+behaviour for that one cue is unchanged. `other` is the honest answer here; a confident wrong
+label is not. The real fix is conflict-side vocabulary and is not yet made.
+
+### B-27 · GDELT's `trade_policy` query had never once executed — S1
+A refusal `break`s the whole pass and `QUERIES` was walked from position zero every time, so the
+tail was unreachable. Positions three, four and five — `supply_chain`, `energy`, `trade_policy` —
+produced **zero events, ever**. GDELT's entire contribution to the corpus is 142 `conflict` and
+142 `monetary_policy` events.
+
+**Fixed** by `_next_start`, which begins each pass at the least-recently-**attempted** query
+(never-attempted first, later positions winning ties). This is self-correcting: whatever got
+starved is by definition what runs next, and a pass that dies after one request still advances the
+rotation. Recording the topic in `source_calls.endpoint` is what makes it possible — and also
+makes the starvation visible after the fact, which it never was.
+
+### B-28 · The backoff was blind to the most common refusal — S1
+GDELT refuses on volume under **either** HTTP 429 **or HTTP 200 carrying the same plain-text
+refusal with no content-type header** (measured live 2026-08-24: 429, no content-type, 444 bytes).
+The second form hit the non-JSON check, raised `ValueError`, and recorded as `status = 0` — **89 of
+118 calls, 75%**. `_in_backoff` looks for `status = 429`, so the most common way GDELT says no was
+invisible to it: 30 calls on 2026-08-21, 25 on the 22nd, zero successes, and no pause.
+
+**Fixed** in two places. `_fetch` recognises the refusal wherever it appears and raises
+`RateLimited`, which `ingest` records as 429 — so the backoff query needs no widening, because the
+data it reads is finally true. And `_in_backoff` gained a second rule: `CONSECUTIVE_FAILURES`
+failures with no success between them triggers a shorter `UNKNOWN_FAULT_BACKOFF_HOURS` pause,
+which catches whatever we fail to recognise next time.
+
+Replayed against the real 118-call history: calls made drop from 116 to 31, wasted calls from 109
+to 26, and the success rate of calls actually made rises from **6.0% to 16.1%**. The User-Agent is
+not rotated and must not be; see the module docstring.
+
+### B-29 · `excess_return`'s reason was computed and thrown away — S2
+`measure_claim` bound it to `_why` and discarded it, so all **273** unscoreable outcome rows
+carried one sentence — "no price series for this subject" — and it was false for most of them.
+`BA` and `SPY`, with 1,293 price rows each, were both filed under "no price series"; their series
+simply ended before the claims naming them were made.
+
+**Fixed** with `UNSCOREABLE_REASONS`, distinguishing four cases: a subject whose *kind* has no
+price series (named, with the kind), a symbol absent from `prices_eod`, a feed that ends before the
+claim (**no entry price**), and a horizon that has not closed in the data. The distinction is not
+cosmetic: one is a permanent property of the subject, the other is an operational fault someone can
+fix this afternoon, and for a month they were indistinguishable.
+
+### B-30 · The live Tiingo API key was stored in the database in plain text — S1, SECURITY
+`ingestion/common.reject()` stored raw exception text. httpx puts the full request URL, query
+string included, in that text, and Tiingo authenticates with `?token=`. **1,172 rows in
+`ingest_rejects` held the live key in plain text, back to 2026-07-16.** Five adapters pass raw
+exception text to `reject()`; only Tiingo authenticates by query string, so only it leaked.
+
+This is gotcha #5 in `CLAUDE.md` and the subject of the most recent commit ("httpx prints API
+keys") — `scheduler.redact()` was applied to the scheduler path and to nothing else.
+
+**Fixed** by redacting **inside `reject()`**, not at the five call sites, so a sixth adapter cannot
+reintroduce it by forgetting. `redact` now lives in `ingestion/common.py` with `scheduler.redact`
+importing it rather than keeping a second copy — two copies would drift and the copy that drifted
+would leak a key. The 1,175 affected rows were rewritten in place (host, path and status kept, so
+they stay diagnosable) and a sweep of **all 225 text/jsonb columns in the database** found no other
+credential material.
+
+**Rotated 2026-08-24.** The old key now returns `403 Invalid token.` from Tiingo, verified directly.
+The live database is clean — a sweep of all 234 text/json columns across 57 tables found zero
+occurrences — as are `.env.example`, the compose files and all container logs. Git never held it:
+`.env` has been gitignored from the start and `git log --all -S` over the full history returns
+nothing.
+
+**It remains at rest in the backup dumps, and that is unavoidable without destroying them.** The
+dumps are `-Fc`, so the key is *compressed inside them* and a plaintext `grep` over the files finds
+nothing — the only way to see it is `pg_restore --data-only -t ingest_rejects`. Do not read a clean
+grep of a `.dump` as a clean backup. Counts at rotation time (2026-08-24):
+
+| dump | `ingest_rejects` rows holding the key |
+|---|---|
+| `rhumb-20260820T232305Z.dump` | 1,166 |
+| `rhumb-20260823T165503Z.dump` | 1,166 |
+| `rhumb-20260823T215359Z.dump` | 11 |
+
+The drop to 11 is this bug's own row-rewrite landing between the second and third snapshot; the
+remaining 11 are rejects written after it by the then-still-unpatched running image. Everything
+older than 2026-08-20 — including the whole 2026-07-16 onward window where the leak began — has
+already been deleted by the 14-day retention in `scripts/backup.sh`, so **only these three files
+exist and all three predate the rotation**. They age out on 2026-09-03 and 2026-09-06. Since the
+key they contain is now revoked, they are safe to keep; the reason to care is that a dump is
+exactly the artefact most likely to be copied offsite, and this one carries a credential the
+filename does not advertise.
+
+### B-31 · No selector asked what had gone STALE — S2
+`ingest-prices` had `--symbols-from-clusters`, `--only-missing` and `--only-missing-history`. All
+three ask what is *missing*; none asks what has gone *stale*. A feed that stopped a month ago
+therefore looked complete to every one of them — 499 symbols, 235,162 rows, newest close
+2026-07-24, while claims were being made on the 26th.
+
+**Fixed** with `backtest.symbols_stale()` and `ingest-prices --only-stale`, which puts SPY first
+because a stale benchmark makes every other symbol unscoreable no matter how current it is.
+`scripts/topup-prices.sh` paces the passes under the measured free-tier ceiling.
+
+### B-32 · The cue table was ordered by importance, not by specificity — S2
+`classify()` is first-match-wins, so the list order IS the behaviour. `trade_policy` sat **ninth**,
+behind `conflict` (second, owning "war" — which matches inside "trade war") and `regulation`
+(fourth, owning "sanction"). The two categories most likely to hold a trade-policy story were both
+evaluated first, so tariff coverage was systematically filed elsewhere.
+
+**Fixed** (founder-approved 2026-08-24) by sorting the table by how UNAMBIGUOUS each vocabulary is:
+`protocol_upgrade` first ("hard fork", "halving" have no second meaning), `monetary_policy` second,
+`trade_policy` **third**, and the metaphor-prone vocabularies last — `technology` stays bottom
+because "ai" is two letters and "chip" is a snack.
+
+Measured over the corpus: **21 events moved into `trade_policy`, every one a tariff story** —
+*"U.S. to slap 50% tariffs on Canadian goods, deepening North America trade war"* was `conflict`,
+*"Trump threatens EU with 'substantial' tariffs"* was `regulation`, *"New Republican ads slam
+Democrats opposed to Trump's tariffs"* was `election`. Zero questionable reassignments; each was
+read individually before the change was made.
+
+A fuller specificity reorder (demoting `conflict` below `supply_chain` and `energy`) was simulated
+and **rejected**: it moved another 35 events for **no additional trade_policy gain**. Five tests
+pin the ordering constraints so this cannot silently regress.
+
+`trade_policy` across the whole corpus: **30 → 86** (B-24's plurals, then this).
+
+### B-33 · `reprocess --reclassify` would have deleted 349 correct labels — S1 (latent)
+The admin command ran `UPDATE events SET category = spine.classify(title, body)` unconditionally.
+But **a category the cue table cannot produce was supplied by an adapter that knows more than the
+cue table does**: GDELT's category is the topic of the query that found the article (284 events),
+`macro` comes from the ECB and Fed feeds (39), `corporate` from 8-K item codes (26). No cue
+anywhere spells "macro" or "corporate", so a blanket reclassify would have replaced most of those
+349 labels with `other`.
+
+Never fired, because nobody had run `--reclassify` since GDELT and the news adapter started
+supplying categories. Found while applying B-32, where the same trap appeared in the migration
+script and was caught by the dry run.
+
+**Fixed:** the classifier may only overwrite its own vocabulary. The command now skips `gdelt` and
+any category outside the cue table, and reports the count it kept. A test asserts `macro` and
+`corporate` remain unproducible, so adding a cue for either forces the guard to be revisited.
+
+### B-34 · `check-source tiingo` reported OK for a revoked key — S1, SECURITY
+Found 2026-08-24 while rotating `TIINGO_API_KEY` (B-30). The probe called
+`https://api.tiingo.com/api/test`, which **does not authenticate**: measured against a
+deliberately invalid token, against the freshly revoked old key, and against the working new key,
+all three returned `200`. So the one command whose entire purpose is answering "is the key I just
+pasted in good?" answered yes unconditionally.
+
+`check-source` exists precisely because `status` (what has been ingested) and `preflight` (what is
+configured) both leave that question unanswered right after someone pastes a key in. For Tiingo it
+had never answered it either — and a rotation could have been signed off against a key that does
+not work, with the failure surfacing hours later as unscoreable claims when the Ledger stopped
+advancing.
+
+**Fixed** by probing `https://api.tiingo.com/tiingo/daily/spy` — ticker *metadata*, which 403s on a
+bad token and returns no price rows, so it does not spend the ~57-symbols/hour free-tier allowance
+(gotcha 0h). A **429 is now reported as OK**, not FAILED: it came back *through* authentication, so
+the token is good, and since the free tier is rate limited for most of the day the opposite reading
+would send an operator to re-check a key that is fine. That distinction is the whole value of the
+check — it has to separate "wrong credential" from "right credential, no quota".
+
+Two tests pin it: one forbids the `/api/test` URL from reappearing in the probe, one asserts 429 →
+OK and 403 → FAILED. Verified live after rebuild — new key OK, old key and a garbage key both
+`403 — credentials rejected`.
+
+**The general lesson, and it cost the whole exercise its first answer: a health check that cannot
+fail is not a health check.** Every probe in `_probe` should be tested against a deliberately
+*broken* credential, not only a working one. `sec_edgar` has the same shape today — it asserts
+`SEC_USER_AGENT` is merely set, never that SEC accepts it.

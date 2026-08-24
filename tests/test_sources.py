@@ -62,6 +62,47 @@ def test_redact_leaves_no_key_material_behind():
     assert "generativelanguage.googleapis.com" in out    # the host is still useful for debugging
 
 
+def test_the_scheduler_and_the_ingesters_share_one_redactor():
+    """Two copies of this would drift, and the copy that drifted would leak a key. `scheduler.redact`
+    is the ingestion helper, not a second implementation of it."""
+    from tradeos.ingestion import common
+    assert scheduler.redact is common.redact
+
+
+def test_reject_redacts_before_it_stores():
+    """The leak this test exists for: httpx puts the whole request URL in its exception message,
+    Tiingo authenticates with `?token=`, and five adapters hand raw exception text to `reject()`.
+    1,172 rows in `ingest_rejects` held the live key in plain text back to 2026-07-16. Redaction
+    happens inside `reject` so a sixth adapter cannot reintroduce it by forgetting."""
+    from tradeos.ingestion.common import reject
+
+    stored = {}
+
+    class _Cur:
+        def execute(self, _sql, params):
+            stored["row"] = params
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_a):
+            return False
+
+    class _Conn:
+        def cursor(self):
+            return _Cur()
+
+    counters = {"rejected": 0}
+    raw = ("HTTPStatusError: Client error '429 Too Many Requests' for url "
+           "'https://api.tiingo.com/tiingo/daily/aesi/prices?startDate=2026-07-20&token=LIVEKEY123'")
+    reject(_Conn(), "prices", "AESI", raw, counters)
+
+    _source, _accession, reason = stored["row"]
+    assert "LIVEKEY123" not in reason and "token=" not in reason
+    assert "429" in reason and "api.tiingo.com" in reason     # still diagnosable
+    assert counters["rejected"] == 1
+
+
 # ------------------------------------------------------------------ authorization, adversarially
 
 def test_require_admin_contract_is_user_on_success_none_on_failure():
@@ -135,3 +176,133 @@ def test_httpx_request_logging_cannot_print_an_api_key():
     src = pathlib.Path(__file__).resolve().parents[1].joinpath("tradeos", "cli.py").read_text()
     assert 'logging.getLogger("httpx").setLevel(logging.WARNING)' in src, (
         "httpx INFO logging re-enabled — any ?token= or ?key= URL will print its credential")
+
+
+def _tiingo_probe_source() -> str:
+    import pathlib
+    src = pathlib.Path(__file__).resolve().parents[1].joinpath("tradeos", "cli.py").read_text()
+    return src.split('if key == "tiingo":')[1].split('if key == "coingecko":')[0]
+
+
+def test_tiingo_probe_uses_an_endpoint_that_actually_authenticates():
+    """`check-source tiingo` exists to answer one question — is the key that was just pasted in
+    good? `/api/test` cannot answer it: measured 2026-08-24, it returns 200 for a garbage token
+    and for a revoked one alike. The probe therefore reported OK for the single case it was
+    built to catch, and a key rotation could be signed off against a key that does not work."""
+    probe = _tiingo_probe_source()
+    # Match the URL as CALLED, not the bare path — the comment above the probe names
+    # `/api/test` in order to explain why it is wrong, and must not trip its own guard.
+    assert "https://api.tiingo.com/api/test" not in probe, (
+        "tiingo probe is back on /api/test, which returns 200 for ANY token — it cannot "
+        "distinguish a working key from a revoked one")
+    assert "/tiingo/daily/" in probe, (
+        "tiingo probe must call an endpoint that 403s on a bad token")
+
+
+def test_tiingo_probe_treats_a_rate_limit_as_a_working_token(monkeypatch):
+    """A 429 came back THROUGH authentication, so the token is good. The free tier limits at
+    ~57 symbols/hour, so this is the normal state for most of the day; reporting it as FAILED
+    would send an operator to re-check a key that is fine. A 403 still has to fail."""
+    import httpx
+
+    from tradeos import cli
+
+    def _client(status: int):
+        class _Resp:
+            status_code = status
+
+            def raise_for_status(self):
+                if status >= 400:
+                    raise httpx.HTTPStatusError("boom", request=None, response=self)
+
+            def json(self):
+                return {"ticker": "SPY"}
+
+        class _Client:
+            def __init__(self, *a, **k): pass
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def get(self, *a, **k): return _Resp()
+
+        return _Client
+
+    monkeypatch.setenv("TIINGO_API_KEY", "irrelevant-to-this-test")
+
+    monkeypatch.setattr(httpx, "Client", _client(429))
+    ok, detail = cli._probe("tiingo")
+    assert ok is True, "a rate-limited response proves the token authenticated"
+    assert "rate limited" in detail
+
+    monkeypatch.setattr(httpx, "Client", _client(403))
+    ok, detail = cli._probe("tiingo")
+    assert ok is False, "a rejected token must report FAILED"
+
+
+def _openfigi_probe_source() -> str:
+    import pathlib
+    src = pathlib.Path(__file__).resolve().parents[1].joinpath("tradeos", "cli.py").read_text()
+    return src.split('if key == "openfigi":')[1].split('if key == "coingecko":')[0]
+
+
+def test_openfigi_probe_cannot_pass_without_the_key_doing_work():
+    """OpenFIGI's mapping endpoint answers KEYLESS requests too, so a 200 on an ordinary body
+    proves nothing about the key — the same trap `/api/test` set for Tiingo. Measured
+    2026-08-24: the keyless cap is 10 jobs per request and a key raises it to 100, so a body of
+    ELEVEN separates the three states cleanly (valid 200 / invalid 401 / absent 413). A probe
+    that drops back under 10 jobs would report OK for a key that is never applied."""
+    probe = _openfigi_probe_source()
+    assert "X-OPENFIGI-APIKEY" in probe, "the probe must actually send the key"
+    # Count the CUSIPs the probe posts; it must stay over the keyless ceiling.
+    listed = probe.split("cusips = [")[1].split("]")[0]
+    jobs = len([c for c in listed.split(",") if c.strip()])
+    assert jobs > 10, (
+        f"probe posts {jobs} jobs — at or under the keyless cap of 10 it would also succeed "
+        "with no key at all, so it would no longer test authentication"
+    )
+    assert "413" in probe, "a 413 means the key was not applied and must report FAILED, not OK"
+
+
+def test_openfigi_probe_reports_failure_when_the_key_was_not_applied(monkeypatch):
+    """413 is the signature of a request that was rated as keyless — the key never reached the
+    process. That is precisely the misconfiguration this command exists to surface, so it must
+    not raise_for_status into a generic 'request failed'."""
+    import httpx
+
+    from tradeos import cli
+
+    class _Resp:
+        status_code = 413
+
+        def raise_for_status(self):
+            raise AssertionError("413 must be handled before raise_for_status")
+
+        def json(self):
+            return []
+
+    class _Client:
+        def __init__(self, *a, **k): pass
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def post(self, *a, **k): return _Resp()
+
+    monkeypatch.setenv("OPENFIGI_API_KEY", "irrelevant-to-this-test")
+    monkeypatch.setattr(httpx, "Client", _Client)
+    ok, detail = cli._probe("openfigi")
+    assert ok is False, "a keyless-rated request must report FAILED"
+    assert "not applied" in detail
+
+
+def test_openfigi_client_never_puts_the_key_in_a_url():
+    """B-30: httpx puts the full request URL in its exception text, so a credential carried in a
+    query string lands in any stored error — that is how 1,172 ingest_rejects rows came to hold
+    the live Tiingo key. OpenFIGI authenticates with a HEADER and must keep doing so."""
+    import pathlib
+    src = pathlib.Path(__file__).resolve().parents[1].joinpath(
+        "tradeos", "resolution", "openfigi.py").read_text()
+    assert 'headers["X-OPENFIGI-APIKEY"] = api_key' in src, (
+        "the key must travel as a header, never in the URL"
+    )
+    assert "params=" not in src, "a params= dict would put the key in the query string"
+    assert "str(exc)" not in src, (
+        "raw httpx exception text carries the request URL; store the exception TYPE instead"
+    )

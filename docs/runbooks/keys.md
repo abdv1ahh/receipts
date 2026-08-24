@@ -86,11 +86,12 @@ mail arrives. Nothing short of a delivered message proves this one.
 
 ---
 
-## 3. OpenFIGI — unlocks 19,851 hidden holdings
+## 3. OpenFIGI — DONE 2026-08-24; unlocked 12,167 hidden holdings
 
 13F filings identify holdings by **CUSIP**, not by ticker. Without a mapping those rows exist in
 the database and appear nowhere, because the product will not display a holding it cannot name.
-That is currently 19,851 institutional holdings.
+That was 19,851 institutional holdings; it is now 7,684, and the remainder is explained in B-14
+(mostly ETPs, which the SEC ticker file does not carry — not a missing key).
 
 1. Go to <https://www.openfigi.com/api>.
 2. Click **Get API Key** and sign up (free, no card).
@@ -100,13 +101,23 @@ That is currently 19,851 institutional holdings.
 OPENFIGI_API_KEY=your_key_here
 ```
 
-It works keyless at a low rate limit too — the key mainly raises the ceiling, so the backfill
-finishes in a reasonable time rather than over days.
+It works keyless at a low rate limit too — the key mainly raises the ceiling: measured
+2026-08-24, keyless caps a request at **10** mapping jobs and the key raises that to **100**.
+
+Add it to `docker-compose.yml` for both `api` and `worker` as well as `.env` — the base compose
+file enumerates variables explicitly, so a key present only in `.env` never reaches the
+container. `check-source` will tell you: a **413** means the key did not arrive.
 
 ```bash
-docker compose exec -T api python -m tradeos.cli resolve-cusips --limit 2000
+docker compose up -d api worker                                # pick up the new variable
+docker compose exec -T api python -m tradeos.cli check-source openfigi
+docker compose exec -T api python -m tradeos.cli resolve-cusips --limit 5000
 docker compose exec -T api python -m tradeos.cli status        # the unresolved count should fall
 ```
+
+Run it as **one pass**, not several small ones. The work list re-selects any CUSIP without a
+`security_map` row, and an unresolvable CUSIP never gets one, so chunked passes re-query the
+same failures and stall. 4,044 CUSIPs took 1m41s.
 
 ---
 

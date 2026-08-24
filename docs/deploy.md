@@ -26,8 +26,8 @@ than a request handler. Budget the decision there, not on the API.
 
 ### Why not SQLite
 
-The brief suggests SQLite, and `docs/plan.md` §1 overrides it. The short version: 664,923 insider
-transactions, 51,099 stake events and 24,982 institutional holdings already exist, and the product
+The brief suggests SQLite, and `docs/plan.md` §1 overrides it. The short version: 759,698 insider
+transactions, 135,925 stake events and 24,982 institutional holdings already exist (2026-08-23), and the product
 depends on `pg_trgm` for clustering, `tsvector` for search, `jsonb` indexing on raw payloads,
 `interval` arithmetic for horizon sweeps, and concurrent access from two containers. Several of
 those have no SQLite equivalent that would not require rewriting the feature.
@@ -93,7 +93,7 @@ connected on `/integrations` rather than failing or fabricating.
 | `TIINGO_API_KEY` | End-of-day prices — **this is how claim outcomes get scored**, so the Ledger stops advancing without it | <https://www.tiingo.com/account/api/token> |
 | `REDDIT_CLIENT_ID` + `REDDIT_CLIENT_SECRET` | The only source that measures mood rather than attention | <https://www.reddit.com/prefs/apps>, type "script" |
 | `YOUTUBE_API_KEY` | Video discussion volume | Google Cloud console, YouTube Data API |
-| `OPENFIGI_API_KEY` | Maps 13F CUSIPs to tickers; 19,851 holdings are currently invisible without it | <https://www.openfigi.com/api> — works keyless at a lower rate |
+| `OPENFIGI_API_KEY` | Maps 13F CUSIPs to tickers. Set 2026-08-24; took holdings visibility from 20.5% to 69.2%. Keyless still works but caps requests at 10 jobs, so a backfill without it is ~10× slower | <https://www.openfigi.com/api> |
 
 ### Sign in with Google — optional, and unverified
 
@@ -191,11 +191,24 @@ Recorded here rather than discovered later:
 2. **No rate limiting on the public endpoints.** `/api/public/*` and `/api/ledger` are
    unauthenticated and uncached. Phase 9 territory.
 3. **Google sign-in is untested against Google.** See above.
-4. **Backups: a script exists, a schedule does not.** `scripts/backup.sh` dumps, refuses to call a
+4. **Backups: scheduled locally, still not offsite.** `scripts/backup.sh` dumps, refuses to call a
    truncated file a backup, prunes on a retention window, and with `--verify` restores into a
-   scratch database and counts rows. Nobody has installed the cron line. Measured 2026-07-26: the
-   database is 5.2 GB (4.7 GB of it `raw_filings` — the SEC payloads that cannot be refetched
-   quickly), a dump is ~2 GB and takes a few minutes, so 14 days of retention wants ~30 GB.
+   scratch database and counts rows. **Measured 2026-08-23** (the earlier figures in this file were
+   from 2026-07-26 and understated the database by half): the database is **7.89 GB**, of which
+   **7.27 GB is `raw_filings`** — the SEC payloads that cannot be refetched quickly — and a dump is
+   **4.79 GB** and takes about nine minutes, so **14 days of retention wants 67 GB, not 30**. Size
+   the volume for 67 GB or lower `KEEP_DAYS`; a dev machine running this against a 30 GB volume
+   fills it on day seven.
+
+   On the development Mac it is scheduled by a launchd agent rather than cron, because macOS cron
+   skips a run entirely if the machine is asleep at the scheduled time. **On a Linux host the cron
+   line in the script header is correct.** Either way the dump lands on the same disk as the
+   database, so it protects against a bad migration or a dropped table and not against losing the
+   drive — an offsite copy is still outstanding. Note that only ~18 MB of the 7.89 GB is genuinely
+   irreplaceable (user accounts, trades, the journal, the whole Ledger, and the RSS/GDELT/Bluesky
+   event history, which those feeds do not serve retrospectively); the other 7.5 GB is refetchable
+   from SEC EDGAR at a cost of roughly 76 hours. That asymmetry is what makes a cheap offsite tier
+   worth doing first.
 5. **This document has not been executed against a real host.** It is derived from the running
    Docker setup and provider documentation. The first person to deploy should correct it in the
    same change that discovers a mistake — a wrong command here is worse than no command.

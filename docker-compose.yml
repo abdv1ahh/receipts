@@ -32,6 +32,9 @@ services:
       REDDIT_CLIENT_ID: ${REDDIT_CLIENT_ID:-}
       REDDIT_CLIENT_SECRET: ${REDDIT_CLIENT_SECRET:-}
       YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
+      # CUSIP -> ticker mapping for 13F holdings (resolve-cusips). Optional: the client works
+      # keyless at 10 jobs/request, and a key raises that to 100.
+      OPENFIGI_API_KEY: ${OPENFIGI_API_KEY:-}
       # Billing (Slice D). Empty = test mode (no charge). Set these + add `stripe` to requirements to go live.
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
@@ -62,6 +65,7 @@ services:
       OPENAI_MODEL_FAST: ${OPENAI_MODEL_FAST:-}
       REDDIT_CLIENT_ID: ${REDDIT_CLIENT_ID:-}
       REDDIT_CLIENT_SECRET: ${REDDIT_CLIENT_SECRET:-}
+      OPENFIGI_API_KEY: ${OPENFIGI_API_KEY:-}
     depends_on:
       db:
         condition: service_healthy

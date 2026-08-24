@@ -48,6 +48,62 @@ def test_every_verdict_is_one_the_schema_allows():
             assert ledger.verdict_for(direction, excess)[0] in allowed
 
 
+# ------------------------------------------------------------------ the note must be TRUE
+#
+# All 273 unscoreable rows carried one sentence — "no price series for this subject" — and it was
+# wrong for most of them. `measure_claim` bound `excess_return`'s reason to `_why` and discarded
+# it, so a subject that is a REGION and a subject whose price feed merely stopped two days early
+# produced byte-identical diagnostics. BA and SPY have 1,293 price rows each and were both filed
+# under "no price series".
+
+def test_an_unscoreable_note_reports_the_reason_it_was_given():
+    for key, template in ledger.UNSCOREABLE_REASONS.items():
+        note = template.format(subject="EURUSD", kind="currency")
+        verdict, got = ledger.verdict_for("up", None, note)
+        assert verdict == "unscoreable"
+        assert got == note, f"{key} was replaced by a generic note"
+
+
+def test_a_stale_feed_does_not_masquerade_as_a_missing_one():
+    """The two failures that looked identical. One is a permanent property of the subject; the
+    other is an operational fault someone can fix this afternoon."""
+    missing = ledger.verdict_for("up", None, ledger.UNSCOREABLE_REASONS["no_symbol"])[1]
+    stale = ledger.verdict_for("up", None, ledger.UNSCOREABLE_REASONS["no_entry_price"])[1]
+    assert missing != stale
+    assert "feed ends" in stale and "feed ends" not in missing
+
+
+def test_every_reason_excess_return_can_return_has_a_sentence():
+    """`excess_return`'s second element is the vocabulary; a reason with no entry here would fall
+    back to the generic note and re-create the bug for that one case."""
+    from datetime import date
+
+    from tradeos.backtest.engine import Series, excess_return
+    spy = Series.from_rows([(date(2025, 1, 2), 100.0), (date(2025, 2, 3), 110.0)])
+    sym = Series.from_rows([(date(2025, 1, 2), 10.0)])
+    # series ends before the claim -> no entry price
+    assert excess_return(sym, spy, date(2025, 6, 1), 30)[1] == "no_entry_price"
+    # entry exists but the horizon has not closed in the data -> horizon open
+    assert excess_return(sym, spy, date(2024, 12, 1), 30)[1] == "horizon_open_or_delisted"
+    for reason in ("no_entry_price", "horizon_open_or_delisted"):
+        assert reason in ledger.UNSCOREABLE_REASONS
+
+
+def test_a_non_asset_subject_says_what_kind_it_was():
+    """88.7% of the impact engine's subjects are sectors, regions, commodities and currencies. The
+    note has to name the kind, or the reader cannot tell a vocabulary problem from a data gap."""
+    note = ledger.UNSCOREABLE_REASONS["not_priceable_kind"].format(subject="TECHNOLOGY",
+                                                                   kind="sector")
+    assert "TECHNOLOGY" in note and "sector" in note
+    assert ledger.verdict_for("up", None, note)[1] == note
+
+
+def test_a_scoreable_subject_ignores_the_reason_entirely():
+    """`excess_return` returns 'ok' alongside a real number; that must never reach a note."""
+    verdict, note = ledger.verdict_for("up", 0.08, "ok")
+    assert verdict == "hit" and note is None
+
+
 # ------------------------------------------------------------------ confidence buckets
 
 @pytest.mark.parametrize("confidence,expected", [

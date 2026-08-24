@@ -62,30 +62,56 @@ CATEGORIES = (
 # Deliberately a lookup table, not a classifier. It runs on every ingested item, it must never
 # depend on a model being up, and it is trivially auditable when it gets something wrong. The
 # model's job (Phase 3) is reasoning about mechanism, not tagging.
+#
+# ORDER IS BEHAVIOUR: first match wins, so this list is sorted by how UNAMBIGUOUS a category's
+# vocabulary is, not by how important the category feels. A cue that can only mean one thing is
+# safe to check early; a cue that is also a metaphor has to come after the categories it would
+# steal from. Getting that backwards is what buried trade policy for eight phases — `conflict`
+# sat second with "war", which matches inside "trade war", and `regulation` sat fourth with
+# "sanction", so the two categories most likely to contain a trade-policy story were both
+# evaluated before `trade_policy` at ninth. 20 events in the corpus were mislabelled that way,
+# every one of them a tariff story: "U.S. to slap 50% tariffs on Canadian goods, deepening North
+# America trade war" was `conflict`.
+#
+# So: `protocol_upgrade` first ("hard fork", "halving" — these words have no second meaning),
+# `trade_policy` third (a "tariff" is never anything else), and the metaphor-prone vocabularies
+# last — `labour`'s "strike", `technology`'s "ai" and "chip". Reordering was checked against the
+# whole corpus before it was made; demoting `conflict` further was measured and rejected, because
+# it moved another 35 events for no additional trade-policy gain.
 _CATEGORY_CUES: list[tuple[str, tuple[str, ...]]] = [
+    # Nothing else in the language uses these words. Free to check first, and it moves no event
+    # that any other category would have claimed.
+    ("protocol_upgrade", ("hard fork", "mainnet", "protocol upgrade", "testnet", "halving")),
     # "fed" only in unambiguous phrases — the bare word appears in "fed up", "fed into", "fed by".
     ("monetary_policy", ("interest rate", "rate cut", "rate hike", "rate decision", "central bank",
                          "federal reserve", "fomc", "ecb", "bank of england", "monetary policy",
                          "quantitative", "inflation target", "basis points", "the fed",
                          "fed watchers", "fed officials", "fed chair", "rate-setting")),
+    # Ahead of `conflict` and `regulation` deliberately: "trade war" contains "war" and a trade
+    # sanction is a trade instrument before it is a regulatory one. Both of those categories used
+    # to win and both readings were wrong.
+    ("trade_policy", ("tariff", "trade deal", "trade war", "import duty", "wto", "quota on")),
+    # "insurgen" was written as a prefix, but cues are word-bounded — `\binsurgen\b` cannot match
+    # "insurgent" any more than `\btariff\b` can match "tariffs". It matched nothing for its whole
+    # life. Spelled out as real words, which inflection then covers.
     ("conflict", ("airstrike", "invasion", "ceasefire", "militant", "missile", "troops",
-                  "war", "insurgen", "shelling", "drone strike")),
+                  "war", "insurgent", "insurgency", "shelling", "drone strike")),
     ("election", ("election", "referendum", "ballot", "voters", "parliamentary vote", "poll closes")),
     ("regulation", ("regulator", "antitrust", "lawsuit", "sanction", "ban on", "compliance order",
                     "sec charges", "investigation into", "fined")),
     # Cues are word-bounded, so no cue may carry padding whitespace — "port " compiled to a
     # pattern that could never match. Also note ordering: a dock strike hits supply_chain before
     # labour, which is the reading this product wants.
-    ("supply_chain", ("shipping", "port", "ports", "canal", "strait", "freight", "supply chain",
+    ("supply_chain", ("shipping", "port", "canal", "strait", "freight", "supply chain",
                       "export ban", "shortage", "blockade", "logistics", "dockworkers")),
     ("earnings", ("earnings", "quarterly results", "reported results", "guidance", "profit warning",
                   "revenue rose", "revenue fell")),
     ("disaster", ("earthquake", "hurricane", "typhoon", "flood", "wildfire", "eruption", "tsunami")),
-    ("protocol_upgrade", ("hard fork", "mainnet", "protocol upgrade", "testnet", "halving")),
-    ("trade_policy", ("tariff", "trade deal", "trade war", "import duty", "wto", "quota on")),
     ("energy", ("opec", "crude", "barrel", "natural gas", "pipeline", "refinery", "lng")),
     ("labour", ("strike", "walkout", "union", "layoffs", "job cuts", "unemployment")),
     ("health", ("outbreak", "pandemic", "vaccine", "who declares", "epidemic")),
+    # Last on purpose: "ai" is two letters and "chip" is a snack. The shortest, most collidable
+    # vocabulary must not get first refusal on anything.
     ("technology", ("chip", "semiconductor", "artificial intelligence", "ai", "data centre",
                     "data center", "cloud computing")),
 ]
@@ -94,12 +120,89 @@ _CATEGORY_CUES: list[tuple[str, tuple[str, ...]]] = [
 # Cues are matched on WORD BOUNDARIES, not as substrings. Plain `in` tagged a story about Fed
 # governor Kevin *Warsh* as `conflict`, because "war" is inside "Warsh" — and equally would have
 # matched "warehouse", "warning" and "software". Multi-word cues still match across the phrase.
+#
+# But a word boundary also means `\btariff\b` cannot match "tariffs": the trailing `\b` demands a
+# non-word character and `s` is a word character. Every plural fell to `other`, and the corpus
+# proved it — 37 events containing "tariffs" sat in `other` against ZERO containing "tariff",
+# because any singular was caught by the cue and never got there. The table had been patched ONCE,
+# by listing both "port" and "ports", and never generalised. So cues are now expanded to their
+# inflected forms at compile time instead: write the word once, in whichever number reads best, and
+# both are matched.
 _CUE_PATTERNS: list[tuple[str, re.Pattern[str]]] = []
+
+_SIBILANTS = ("s", "x", "z", "ch", "sh")
+
+# Cues whose OTHER number means a different thing, so inflecting them would trade a miss for a
+# confident wrong answer. This is not the "port"/"ports" habit in reverse: entries here must be
+# justified by a measurement, because the default is to inflect and an exception is a claim that
+# English is genuinely ambiguous at this word.
+#
+#   labour/strike — measured over the 4,045-event corpus, bare "strike"/"strikes" decides the
+#   category for 44 events: 33 are military ("Ukraine strikes Iranian vessels", "US strikes on
+#   Iran"), 2 are industrial, 9 neither. `conflict` is checked before `labour` but owns only the
+#   compounds "airstrike" and "drone strike", so every bare one falls through to `labour`.
+#   Inflecting it would move 30 military-strike stories from `other` into `labour` — trading
+#   honest ignorance for a wrong label, which is the trade this codebase does not make. Left
+#   uninflected, the behaviour is exactly what it was. The real fix is conflict-side vocabulary;
+#   see docs/bugs.md.
+_NO_INFLECTION: frozenset[tuple[str, str]] = frozenset({("labour", "strike")})
+
+
+def _plural(word: str) -> str:
+    """The regular plural of a word. Only the three productive English rules — this is cue hygiene,
+    not a morphology engine, and an irregular cue can always be written out in full."""
+    if len(word) > 3 and word.endswith("y") and word[-2] not in "aeiou":
+        return word[:-1] + "ies"                      # duty -> duties
+    if word.endswith(_SIBILANTS):
+        return word + "es"                            # tax -> taxes, watch -> watches
+    return word + "s"
+
+
+def _singular(word: str) -> str | None:
+    """The word's singular stem if it looks plural, else None.
+
+    Deliberately permissive, because English does not let you decide from spelling alone whether
+    "closes" is close+s or clos+es. Both candidates are offered to `_forms` and the impossible one
+    simply never matches anything, which costs a few characters of pattern and no correctness.
+    Words ending in -is (basis, crisis, analysis) are exempt: they are singular already."""
+    if len(word) < 4 or word.endswith("is"):
+        return None
+    if word.endswith("ies"):
+        return word[:-3] + "y"                        # duties -> duty
+    if word.endswith("ss"):
+        return None                                   # loss, press — not a plural
+    if word.endswith("s"):
+        return word[:-1]                              # ports -> port
+    return None
+
+
+def _forms(word: str) -> list[str]:
+    """Every spelling of one cue word that should match: as written, its singular, its plural.
+    Longest first, so the alternation prefers "tariffs" over "tariff" and the match is not cut
+    short mid-word."""
+    forms = {word, _plural(word)}
+    stem = _singular(word)
+    if stem:
+        forms.update({stem, _plural(stem)})
+    if word.endswith("es") and word[:-2].endswith(_SIBILANTS):
+        forms.add(word[:-2])                          # watches -> watch, as well as watche(s)
+    return sorted(forms, key=lambda f: (-len(f), f))
+
+
+def _cue_pattern(cue: str) -> str:
+    """One cue as a regex fragment. Every word is inflected, not just the last, because the plural
+    of "ban on" is "bans on" and the plural of "investigation into" is "investigations into" — the
+    inflected word is the FIRST one. Words are joined by `\\s+` rather than a literal space so a
+    line break or a double space between them still matches."""
+    words = [w for w in cue.split() if w]
+    return r"\s+".join(
+        "(?:" + "|".join(re.escape(f) for f in _forms(w)) + ")" for w in words)
 
 
 def _compile_cues() -> None:
     for category, cues in _CATEGORY_CUES:
-        alternation = "|".join(re.escape(c) for c in cues)
+        alternation = "|".join(
+            re.escape(c) if (category, c) in _NO_INFLECTION else _cue_pattern(c) for c in cues)
         _CUE_PATTERNS.append((category, re.compile(rf"\b(?:{alternation})\b", re.IGNORECASE)))
 
 

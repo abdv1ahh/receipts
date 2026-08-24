@@ -17,8 +17,9 @@ engine that explains market consequences. The product brief is
 `docs/state.md` has the resume instructions and what remains; `docs/progress/phase_9.md`
 §"What is NOT fixed" is the honest security list.**
 
-It now has a claim engine (`claims.py`), a self-scoring Ledger (`ledger.py`, publishing 41% of 282
-with the misses shown), an event spine (`spine.py`), personal relevance (`relevance.py`), world
+It now has a claim engine (`claims.py`), a self-scoring Ledger (`ledger.py`, publishing 43.2% of 412
+with the misses shown — measured 2026-08-23), an event spine (`spine.py`), personal relevance
+(`relevance.py`), world
 context frozen at trade time (`journal_context.py`), and surfaces at `/radar` `/globe` `/ledger`
 `/exposure` `/crypto` `/news` `/brief` `/events` `/journal` `/community` `/integrations`.
 
@@ -76,7 +77,7 @@ The app is at <http://localhost:8000>. Demo login: `demo@tradeos.app` / `<genera
 ### Tests
 
 ```bash
-make test     # 637 tests, ~1s. Offline except 17 authz tests that need the local DB
+make test     # 717 tests, ~1s. Offline except 17 authz tests that need the local DB
 make lint     # ruff; zero errors is the standard
 make dev      # reload-in-place stack; then `make web` for a UI change
 make fix      # ruff --fix
@@ -234,14 +235,22 @@ fastest:
    on `template` by design, so **verify a model change against a running instance**
    (`used_template: false`), never against the tests alone.
 
-0a. **The Ledger's headline number was never the product's.** All 282 resolved calls are
-   `convergence-v3`, the legacy smart-money signal; the impact engine has 80 open and **zero**
-   resolved. The marketing site published the signal's 41% under the heading "the accuracy record"
-   with an H2 reading "We are wrong most of the time", directly beneath a hero selling the engine.
-   Two subsystems, one number, and the one on display had never measured the thing being sold.
-   `ledger.summary()` now returns `open_by_origin` so any surface can say WHOSE record it is
+0a. **The Ledger's headline number was never the product's.** All 412 scoreable calls belong to the
+   legacy smart-money signal; the impact engine has **9 open, 133 unscoreable and zero resolved**
+   (2026-08-23). The marketing site published the signal's rate under the heading "the accuracy
+   record" with an H2 reading "We are wrong most of the time", directly beneath a hero selling the
+   engine. Two subsystems, one number, and the one on display had never measured the thing being
+   sold. `ledger.summary()` now returns `open_by_origin` so any surface can say WHOSE record it is
    showing, and a test asserts the planes are never pooled. **Never quote a hit rate without
    saying which plane produced it.**
+
+   The 412 do span two version rows — `convergence-v3` (115/282 = 40.8%) and `convergence-v4`
+   (63/130 = 48.5%) — but **these are the same scoring logic**, so pooling them is legitimate and
+   the 43.2% headline is honest. v4's `signal_definitions` changelog says so explicitly: "NO
+   BEHAVIOURAL CHANGE", re-registering identical logic after a lint pass changed the module hash.
+   That hash guard silently stopped `compute-signals` producing clusters from 2026-07-25 until it
+   was re-registered, so **a frozen sample is a symptom worth checking** when the ledger stops
+   growing. Do not present v3 and v4 to a reader as two signals.
 
 0a0. **A commodity is a RELATIONSHIP, not a location — and conflating them killed
    personalisation.** `COMMODITY_COUNTRIES["oil"]` lists six producers, `places()` treated all six
@@ -262,16 +271,17 @@ fastest:
    week of Form 4**, so 2.5 years is ~76 hours.
 
 0a2. **A point estimate without an interval invites a verdict the sample cannot support — in
-   BOTH directions.** The signal plane reads 40.8% with +15.9% average on hits and −13.5% on
-   misses, giving −1.52% expectancy. I reported that as "it does not work". It is not:
-   the 95% interval on that mean is **[−3.80%, +0.76%] and spans zero**, so on 282 calls
-   **no edge is demonstrated either way**. What IS significant is the FREQUENCY — 3.1 standard
+   BOTH directions.** The signal plane reads 43.2% with +14.29% average on hits and −12.95% on
+   misses, giving −1.18% expectancy. I reported that as "it does not work". It is not:
+   the 95% interval on that mean is **[−2.93%, +0.57%] and spans zero**, so on 412 calls
+   **no edge is demonstrated either way**. What IS significant is the FREQUENCY — 2.76 standard
    errors below a coin flip — but the wins are bigger than the losses, so the returns cancel.
    Those two statistics genuinely disagree and only one of them is conclusive.
    `ledger.mean_ci`, `proportion_z` and `sample_needed` are pure and tested; both Ledger surfaces
    publish the interval. **Never quote expectancy or a hit rate from this ledger without the
-   interval beside it.** At the measured 18% dispersion it takes ~1,470 resolved calls to detect a
-   1% per-call edge, and there are 282.
+   interval beside it.** At the measured 18.17% dispersion it takes **1,268** resolved calls to
+   detect a 1% per-call edge, and there are 412. All figures measured 2026-08-23 — note the
+   sample grew from 282 and the conclusion did not change, which is itself the point.
 
 0b2. **A formatter duplicated across files WILL drift, and the drift is silent.** `pct` lived as
    near-identical copies in three surfaces; the fourth copy omitted the ×100 and published a +10%
@@ -301,6 +311,63 @@ fastest:
    `globeMaterial` takes a THREE.Material INSTANCE; a plain `{ color }` object is silently ignored,
    and `globeMaterial()` is NOT a method on the React ref (only `pointOfView`, `controls`, `scene`,
    `camera`, `renderer` and the utilities are).
+
+0f. **A word-bounded cue cannot match its own plural, and the cue table is full of them.**
+   `\btariff\b` does not match "tariffs" — the trailing `\b` wants a non-word character and `s` is
+   one. Inside `other` there were 37 events containing "tariffs" and **zero** containing "tariff",
+   because any singular was caught and never got there. `spine._cue_pattern` now expands each cue
+   to its inflected forms, every word of a phrase (the plural of "ban on" is "bans on"), so write
+   the cue once in whichever number reads best. Do **not** patch a single word by listing both
+   forms — that was done once for "port"/"ports" and hid the general bug for eight phases.
+   `_NO_INFLECTION` is the escape hatch for a genuinely ambiguous cue and every entry needs a
+   measurement: "strikes" is military 33 times to 2 in this corpus.
+
+0f2. **The cue table's ORDER is behaviour, and it is sorted by specificity, not importance.**
+   First match wins. `trade_policy` sat ninth behind `conflict` ("war" is inside "trade war") and
+   `regulation` ("sanction"), so the two categories most likely to hold a tariff story both won
+   first — 21 events, every one a tariff story, filed as conflict/regulation/election. Order is
+   now: unambiguous vocabularies first (`protocol_upgrade`, `monetary_policy`, `trade_policy`),
+   metaphor-prone ones last (`technology` stays bottom — "ai" is two letters, "chip" is a snack).
+   Five tests pin the constraints. Demoting `conflict` further was measured and rejected: 35 more
+   moves, zero additional trade_policy.
+
+0f3. **A category the cue table cannot PRODUCE is adapter-authoritative — never reclassify it.**
+   GDELT's category is the topic of the query that found the article (284 events); `macro` comes
+   from the ECB/Fed feeds (39) and `corporate` from 8-K item codes (26), and no cue spells either
+   word. `reprocess --reclassify` used to `UPDATE ... SET category = classify(...)` unconditionally
+   and would have replaced most of those 349 labels with `other`. Any reclassification pass must
+   skip `source = 'gdelt'` and any category outside `_CATEGORY_CUES`.
+
+0g. **`reject()` and `redact()` are one thing, and the reason is a leaked key.** httpx puts the
+   full request URL in its exception message, five adapters hand raw exception text to
+   `ingestion.common.reject`, and Tiingo authenticates with `?token=` — so 1,172 rows of
+   `ingest_rejects` held the live API key in plain text for five weeks. Redaction happens INSIDE
+   `reject`, not at the call sites, and `scheduler.redact` imports it rather than keeping a second
+   copy. **Never store `str(exc)` from an HTTP client without it**, and never write a second
+   redactor: the copy that drifts is the one that leaks.
+
+0h. **Free Tiingo is ~57 unique symbols/HOUR and ~500/month, and there was no "what is stale"
+   selector.** All three symbol selectors asked what was *missing*, so a feed that stopped a month
+   ago looked complete — 499 symbols and 235,162 rows, newest close two days *before* the claims
+   naming them. Use `ingest-prices --only-stale` (SPY first: a stale benchmark makes every other
+   symbol unscoreable) and pace it with `scripts/topup-prices.sh`. A pass that ignores the ceiling
+   does not fetch 400 symbols, it fetches ~50 and spends the rest proving it is rate limited.
+
+0i. **A key in `.env` does NOT reach the container.** `docker-compose.yml` enumerates every
+   variable explicitly (`FOO: ${FOO:-}`), so a key added to `.env` alone is silently absent from
+   `api` and `worker` — `config.foo_configured()` reads the HOST's environment during tests and
+   says "connected" while the running process has nothing. `OPENFIGI_API_KEY` was missing from
+   the compose file entirely, which is a second reason 19,851 holdings stayed invisible. Add the
+   variable in BOTH services, then `docker compose up -d api worker`. `docker-compose.prod.yml`
+   uses `env_file:` and needs no such edit — only the base file enumerates.
+
+0j. **A probe against an endpoint that also serves unauthenticated callers proves nothing.** This
+   bit Tiingo (`/api/test` 200s for a garbage token) and OpenFIGI's mapping endpoint answers
+   keyless requests too. The fix is to make the request one a keyless caller CANNOT make:
+   measured 2026-08-24, OpenFIGI caps keyless at **10** mapping jobs and keyed at **100**, so
+   `check-source openfigi` posts **eleven** and reads three distinct outcomes — 200 valid,
+   401 invalid, **413 the key never arrived**. When adding a probe, ask what the unauthenticated
+   response would be; if it is also success, the probe is decorative.
 
 1. **Frontend changes need `make web`** (0.3s) under `make dev`, or a full image rebuild otherwise.
 2. **`geo` on an event is where the OUTLET sits, not what the story is about.** The single most
@@ -336,6 +403,7 @@ fastest:
 | Hacker News | none | Attention | connected |
 | CoinGecko | none | Crypto | connected |
 | Tiingo | `TIINGO_API_KEY` | EOD prices | connected |
+| OpenFIGI | `OPENFIGI_API_KEY` | 13F CUSIP → ticker; unmapped holdings are invisible | connected |
 | Reddit | `REDDIT_CLIENT_ID` + `_SECRET` | Social sentiment | **not connected** |
 | YouTube | `YOUTUBE_API_KEY` | Social sentiment | not connected |
 | X / Twitter | — | — | **no free read tier; do not attempt — Bluesky covers the need** |

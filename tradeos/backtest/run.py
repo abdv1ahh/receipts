@@ -73,6 +73,28 @@ def symbols_for_clusters_missing_history(conn: psycopg.Connection, before: date)
     return missing
 
 
+def symbols_stale(conn: psycopg.Connection, since: date) -> list[str]:
+    """Symbols already in `prices_eod` whose series stops before `since` — the top-up pass.
+
+    The other three selectors ask "what is MISSING". None of them asks "what has gone STALE", so a
+    feed that stopped a month ago looked complete to every one of them: the table held 499 symbols
+    and 235,162 rows, and the newest close was 2026-07-24 while claims were being made on the 26th.
+    `excess_return` then returned `no_entry_price` for every one of them, which the Ledger reported
+    as "no price series for this subject" — a symbol with 1,293 rows described as having none.
+
+    SPY leads the list because it is the benchmark: a stale SPY makes every other symbol
+    unscoreable no matter how current it is, so it must never be at the back of a quota-limited
+    queue."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """SELECT symbol FROM prices_eod
+               GROUP BY symbol HAVING max(day) < %s ORDER BY symbol""",
+            (since,),
+        )
+        stale = [r[0] for r in cur.fetchall()]
+    return (["SPY"] if "SPY" in stale else []) + [s for s in stale if s != "SPY"]
+
+
 def _cluster_rows(conn: psycopg.Connection):
     with conn.cursor() as cur:
         cur.execute(

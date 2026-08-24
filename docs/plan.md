@@ -29,9 +29,10 @@ alternative and the reason.
 ### 1. Do not move to SQLite — keep PostgreSQL
 
 The brief (§8) says "SQLite is entirely sufficient and needs no hosting". That was written
-without knowledge of the existing data layer. The app runs PostgreSQL 16 with 23 migrations,
-48 tables, and **664,923 insider transactions, 51,099 stake events and 24,982 institutional
-holdings** already loaded — a dataset that took hours of rate-limited SEC backfill to build.
+without knowledge of the existing data layer. The app runs PostgreSQL 16 with 33 migrations,
+61 tables, and **759,698 insider transactions, 135,925 stake events and 24,982 institutional
+holdings** already loaded (2026-08-23) — a dataset that took hours of rate-limited SEC backfill
+to build, and which has roughly doubled since this section was written, strengthening the case.
 
 Beyond the migration cost, Postgres gives the next three phases things SQLite does not:
 `pg_trgm` for near-duplicate clustering without an embedding model, `tsvector` full-text
@@ -271,7 +272,8 @@ and the marketing site reviewed separately. Ends with an honest list of what rem
 3. **API keys**, when you want the sources they unlock — all free, none urgent:
    - Reddit: <https://www.reddit.com/prefs/apps> (create a "script" app → client id + secret)
    - OpenRouter, if you want the LLM fallback: <https://openrouter.ai/keys>
-   - OpenFIGI, to resolve the 19,851 unmapped 13F holdings: <https://www.openfigi.com/api>
+   - ~~OpenFIGI, to resolve the 19,851 unmapped 13F holdings~~ — **done 2026-08-24**; 12,167
+     linked, 7,684 remain and are mostly ETPs the SEC ticker file does not carry (B-14)
 4. **Rulings on the six ASK items** in `docs/dead_code.md` (short interest, congress flag,
    Stripe price ids, share cards, `uploads/`, the misnamed test file).
 5. **Confirmation that Portfolio may be replaced by Exposure** — it works and has a real

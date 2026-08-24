@@ -161,7 +161,17 @@ def cmd_ingest_prices(args) -> None:
     client = TiingoClient(os.environ.get("TIINGO_API_KEY", ""))
     try:
         with db.connect() as conn:
-            if args.only_missing_history:
+            if args.only_stale:
+                # Default the cutoff to the freshest close anything has, so "stale" means "behind
+                # the rest of the table" without the operator having to look the date up.
+                if args.stale_before:
+                    cutoff = date.fromisoformat(args.stale_before)
+                else:
+                    with conn.cursor() as cur:
+                        cur.execute("SELECT max(day) FROM prices_eod")
+                        cutoff = cur.fetchone()[0]
+                symbols = backtest.symbols_stale(conn, cutoff) if cutoff else []
+            elif args.only_missing_history:
                 symbols = backtest.symbols_for_clusters_missing_history(conn, date.fromisoformat(args.history_before))
             elif args.only_missing:
                 symbols = backtest.symbols_for_clusters_missing(conn)  # quota-efficient free-tier top-up
@@ -254,11 +264,48 @@ def _probe(key: str) -> tuple[bool, str]:
             return (bool(did), f"resolved reuters.com to {did}" if did
                     else "could not resolve a known handle")
         if key == "tiingo":
+            # NOT `/api/test`: that endpoint does not authenticate. Measured 2026-08-24, it
+            # returns 200 for a garbage token and for a revoked one alike, so this probe
+            # reported OK for precisely the case the command exists to catch — a key just
+            # pasted in wrong. `/tiingo/daily/spy` is ticker METADATA: it 403s on a bad token,
+            # and it returns no price rows, so it does not spend the symbol allowance.
             with httpx.Client(timeout=20.0) as client:
-                r = client.get("https://api.tiingo.com/api/test",
+                r = client.get("https://api.tiingo.com/tiingo/daily/spy",
                                headers={"Authorization": f"Token {os.environ['TIINGO_API_KEY']}"})
+            if r.status_code == 429:
+                # The free tier rate-limits at ~57 symbols/hour, so a 429 here is the normal
+                # afternoon state. It came back THROUGH authentication, which means the token
+                # is good — calling that FAILED would send an operator to re-check a fine key.
+                return True, "token accepted (rate limited right now — free-tier hourly allowance)"
             r.raise_for_status()
-            return True, "token accepted by Tiingo's test endpoint"
+            return True, f"token accepted; read metadata for {r.json().get('ticker', 'SPY')}"
+        if key == "openfigi":
+            # The mapping endpoint works KEYLESS, so a 200 on an ordinary request proves nothing
+            # about the key — the same trap `/api/test` set for Tiingo above. Two things make this
+            # a real auth check. First, OpenFIGI genuinely rejects a bad key: measured 2026-08-24,
+            # a well-formed but invalid key returns 401 "Invalid API key." rather than silently
+            # falling back to the keyless tier. Second, the body deliberately carries ELEVEN jobs,
+            # one over the keyless cap of 10, so the three states are all distinct and a key that
+            # is merely well-formed cannot pass:
+            #   valid key -> 200   invalid key -> 401   absent/ignored key -> 413 (too many jobs)
+            from .resolution.openfigi import OPENFIGI_URL
+            cusips = ["037833100", "594918104", "88160R101", "02079K305", "023135106",
+                      "30303M102", "67066G104", "478160104", "46625H100", "742718109",
+                      "931142103"]
+            with httpx.Client(timeout=30.0) as client:
+                r = client.post(
+                    OPENFIGI_URL,
+                    json=[{"idType": "ID_CUSIP", "idValue": c} for c in cusips],
+                    headers={"Content-Type": "application/json",
+                             "X-OPENFIGI-APIKEY": os.environ["OPENFIGI_API_KEY"]},
+                )
+            if r.status_code == 413:
+                return False, ("413 too many jobs — the key was not applied, so the request was "
+                               "rated as keyless. Check OPENFIGI_API_KEY reached the container.")
+            r.raise_for_status()
+            mapped = sum(1 for item in r.json() if isinstance(item, dict) and item.get("data"))
+            return True, (f"key accepted at the raised 100-job limit; mapped {mapped}/{len(cusips)} "
+                          f"known CUSIPs")
         if key == "coingecko":
             with httpx.Client(timeout=20.0) as client:
                 r = client.get("https://api.coingecko.com/api/v3/ping")
@@ -435,16 +482,27 @@ def cmd_reprocess(args) -> None:
             cur.execute("DELETE FROM event_clusters WHERE NOT EXISTS "
                         "(SELECT 1 FROM events e WHERE e.cluster_id = event_clusters.id)")
             conn.commit()
+        # A category the cue table cannot PRODUCE was supplied by an adapter that knows more than
+        # the cue table does, and reclassifying it destroys that knowledge. GDELT's category is the
+        # topic of the query that found the article; `macro` comes from the ECB and Fed feeds and
+        # `corporate` from 8-K item codes, and neither word appears in any cue — so a blanket
+        # reclassify silently deleted 349 correct labels and replaced most of them with `other`.
+        # The classifier may only overwrite its own vocabulary.
+        owned = {c for c, _ in spine._CATEGORY_CUES} | {"other", None}
+        kept = 0
         clusters = set()
         for i, eid in enumerate(ids, 1):
             if args.reclassify:
                 # Re-read the stored title/body through the current cue table. This is the point
                 # of keeping raw payloads: an improved classifier is applied to history, not only
                 # to what arrives next.
-                cur.execute("SELECT title, body FROM events WHERE id = %s", (eid,))
-                title, body = cur.fetchone()
-                cur.execute("UPDATE events SET category = %s WHERE id = %s",
-                            (spine.classify(title, body), eid))
+                cur.execute("SELECT title, body, category, source FROM events WHERE id = %s", (eid,))
+                title, body, category, source = cur.fetchone()
+                if source == "gdelt" or category not in owned:
+                    kept += 1
+                else:
+                    cur.execute("UPDATE events SET category = %s WHERE id = %s",
+                                (spine.classify(title, body), eid))
             clusters.add(spine.assign_cluster(conn, eid))
             if i % 200 == 0:
                 conn.commit()
@@ -453,7 +511,8 @@ def cmd_reprocess(args) -> None:
         for cid in clusters:
             spine.score_cluster(conn, cid)
         conn.commit()
-    print(f"reprocess: {len(ids)} events -> {len(clusters)} clusters")
+    note = f", {kept} kept (adapter-supplied category)" if args.reclassify and kept else ""
+    print(f"reprocess: {len(ids)} events -> {len(clusters)} clusters{note}")
 
 
 def cmd_seed_watchlist(_args) -> None:
@@ -730,6 +789,12 @@ def main() -> None:
                          "(patient deep-history backfill; pair with --start 2024-04-01)")
     ip.add_argument("--history-before", default="2026-01-02",
                     help="cutoff date for --only-missing-history: symbols with no price row before this")
+    ip.add_argument("--only-stale", action="store_true", dest="only_stale",
+                    help="only fetch symbols ALREADY stored whose series stops before --stale-before "
+                         "(the top-up pass; SPY first, because a stale benchmark unscoreables "
+                         "everything)")
+    ip.add_argument("--stale-before", default="",
+                    help="cutoff for --only-stale; defaults to the freshest day any symbol has")
     ip.add_argument("--limit", type=int, default=0, help="cap symbols fetched this pass (0 = no cap)")
     ip.add_argument("--symbols", default="", help="comma-separated symbols if not --symbols-from-clusters")
     ip.add_argument("--start", default="2026-01-01")
