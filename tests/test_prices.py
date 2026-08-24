@@ -7,6 +7,7 @@ rate limited instead of fetching prices.
 """
 from datetime import date
 
+import httpx
 import pytest
 
 from tradeos.ingestion import prices
@@ -95,3 +96,62 @@ def test_a_future_dated_row_is_dropped():
     """Point-in-time discipline: a price dated after today would let a backtest see the future."""
     row = {"date": "2027-01-04", "adjClose": 1.0}
     assert prices._valid_row(row, date(2026, 8, 24)) is None
+
+
+# ------------------------------------------------------- the credential never reaches the URL
+
+def _mock(client: prices.TiingoClient, handler) -> prices.TiingoClient:
+    """Swap the transport UNDER the real client, so the headers, params and URL under test are the
+    ones `TiingoClient.__init__` actually built rather than a re-creation of them."""
+    client._client._transport = httpx.MockTransport(handler)
+    return client
+
+
+def test_the_credential_is_sent_as_a_header_not_in_the_query_string():
+    """B-30 was `?token=`: httpx puts the full request URL in its exception text, `reject()` stores
+    that text, and so the live key sat in 1,172 `ingest_rejects` rows for five weeks. Tiingo accepts
+    both forms, so this is a free fix — but only while nobody puts the token back in `params`."""
+    seen = {}
+
+    def _capture(request: httpx.Request) -> httpx.Response:
+        seen["url"] = str(request.url)
+        seen["auth"] = request.headers.get("Authorization")
+        return httpx.Response(200, json=[{"date": "2026-08-20", "adjClose": 1.0}])
+
+    client = _mock(prices.TiingoClient("LIVEKEY123"), _capture)
+    client.daily("AAPL", date(2026, 7, 20), date(2026, 8, 21))
+
+    assert seen["auth"] == "Token LIVEKEY123", "the token must authenticate the request"
+    assert "LIVEKEY123" not in seen["url"] and "token=" not in seen["url"]
+    assert "startDate=2026-07-20" in seen["url"], "the harmless params must survive the move"
+
+
+def test_a_failed_request_carries_no_credential_even_with_redaction_out_of_the_path():
+    """The point of B-30's second half: redaction must stop being load-bearing. `reject()` is
+    replaced here rather than mocked around it, so nothing redacts anything — and the reason text
+    still has to be clean, because there is no longer a credential in the URL to remove."""
+    captured = {}
+
+    def _unredacting_reject(_conn, _source, _accession, reason, counters):
+        counters["rejected"] += 1
+        captured["reason"] = reason
+
+    client = _mock(prices.TiingoClient("LIVEKEY123"),
+                   lambda _r: httpx.Response(500, text="Tiingo is having a day"))
+    original, prices.reject = prices.reject, _unredacting_reject
+    try:
+        out = prices.ingest_prices(_Conn(), client, ["AAPL"], date(2026, 7, 20))
+    finally:
+        prices.reject = original
+
+    assert out["rejected"] == 1
+    assert "LIVEKEY123" not in captured["reason"] and "token=" not in captured["reason"]
+    assert "500" in captured["reason"] and "api.tiingo.com" in captured["reason"], \
+        "the reject must still be diagnosable — host and status are why the row is kept"
+
+
+def test_redirects_stay_off_so_a_header_credential_cannot_be_handed_to_another_host():
+    """A query-string token only ever went where the URL pointed. A header set on the client is
+    attached to whatever host a redirect lands on, and `daily()`'s allowlist only checks the URL we
+    build — so following redirects here would hand Tiingo's key to the redirect target."""
+    assert prices.TiingoClient("k")._client.follow_redirects is False

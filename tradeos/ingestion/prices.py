@@ -4,6 +4,9 @@ A dedicated, throttled, allowlisted client (we do not widen EdgarClient). We sto
 split/dividend-ADJUSTED series (adjOpen/High/Low/Close/adjVolume) so forward returns are
 correct, and record `source = 'tiingo:adjusted'` per row. Prices are labeled demo-grade on
 the methodology page; a licensed EOD feed is the first post-funding purchase.
+
+Authentication is by HEADER, never by query string — see the comment on `TiingoClient`. That is
+B-30 closed at its root rather than at the database boundary.
 """
 from __future__ import annotations
 
@@ -23,11 +26,23 @@ TIINGO_HOST = "api.tiingo.com"
 
 
 class TiingoClient:
+    # The credential goes in a HEADER, never in the query string (B-30). httpx puts the full
+    # request URL in its exception messages, `ingest_rejects` stores that text, and Tiingo also
+    # accepts `?token=` — which is how the live key sat in 1,172 database rows for five weeks.
+    # `reject()` redacts query strings and still must, but redaction is a net under the wire, not
+    # the wire: with the token in a header there is no credential in the URL for an exception to
+    # carry in the first place, so a sixth adapter, a new log line or a traceback that never
+    # reaches `reject()` cannot leak it either.
+    #
+    # `follow_redirects=False` is load-bearing NOW in a way it was not before. A header set on the
+    # client is attached to whatever host a redirect lands on, so following one would hand the key
+    # to a third party; the host allowlist in `daily()` only checks the URL we build. Do not turn
+    # redirects on here.
     def __init__(self, api_key: str, min_interval: float = 0.12):
         if not api_key:
             raise ValueError("TIINGO_API_KEY is not set")
-        self._key = api_key
-        self._client = httpx.Client(headers={"Content-Type": "application/json"},
+        self._client = httpx.Client(headers={"Content-Type": "application/json",
+                                             "Authorization": f"Token {api_key}"},
                                     timeout=30.0, follow_redirects=False)
         self._min_interval = min_interval
         self._last = 0.0
@@ -43,16 +58,15 @@ class TiingoClient:
         url = f"https://{TIINGO_HOST}/tiingo/daily/{ticker.lower()}/prices"
         if urlparse(url).hostname != TIINGO_HOST:
             raise ValueError("Tiingo host allowlist violation")
+        params = {"startDate": start.isoformat(), "endDate": end.isoformat()}
         self._throttle()
-        resp = self._client.get(url, params={"startDate": start.isoformat(),
-                                             "endDate": end.isoformat(), "token": self._key})
+        resp = self._client.get(url, params=params)
         if resp.status_code == 404:
             return None
         if resp.status_code == 429:
             log.warning("Tiingo 429; backing off 30s")
             time.sleep(30)
-            resp = self._client.get(url, params={"startDate": start.isoformat(),
-                                                 "endDate": end.isoformat(), "token": self._key})
+            resp = self._client.get(url, params=params)
         resp.raise_for_status()
         data = resp.json()
         return data if isinstance(data, list) and data else None

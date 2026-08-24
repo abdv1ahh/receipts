@@ -453,6 +453,43 @@ key they contain is now revoked, they are safe to keep; the reason to care is th
 exactly the artefact most likely to be copied offsite, and this one carries a credential the
 filename does not advertise.
 
+**Closed at the root 2026-08-25.** Everything above treats the symptom: the credential still went
+onto the wire in the query string, and `redact()` scrubbed it back out on the way to the database.
+That leaves redaction *load-bearing* — the one control between a live key and permanent storage,
+covering a path (httpx exception text) that is only one of the places a URL can surface. A
+traceback, a debug log line, a proxy access log or an adapter that never calls `reject()` all sit
+outside it.
+
+`TiingoClient` now authenticates with **`Authorization: Token <key>`**, the same form
+`check-source tiingo` already used. Tiingo accepts both, so this cost nothing. There is no longer a
+credential in the URL for anything to leak.
+
+Proven against live Tiingo rather than argued, because "the vector moved" and "the vector is gone"
+look identical from the code. A real free-tier 429 (symbol #45 of a burst, matching the measured
+~57/hour ceiling) was driven through the real chain — `client.daily()` → httpx raises →
+`ingest_prices` catches → `reject()` → `INSERT` — with **`common.redact` replaced by the identity
+function**, so nothing on the path redacted anything:
+
+| | result |
+|---|---|
+| exception text carries the key | **no** |
+| the same request re-issued the old `?token=` way | **yes — the leak is still reproducible** |
+| stored `ingest_rejects` row (id 4019, redaction OFF) carries the key | **no** |
+| row still names host and status | yes — `api.tiingo.com`, `429` |
+| rows in the whole table containing the live key | **0** |
+
+The control row is the point: the old form still leaks on the identical request, so the header is
+what fixed it and not the rotation or the row-rewrite.
+
+**`redact()` stays, and stays inside `reject()`.** It is no longer the only thing standing between
+Tiingo and the database, but Gemini authenticates with `?key=` (gotcha #5) and the next adapter
+will too. What changed is that it is now defence in depth for Tiingo instead of the whole defence.
+
+`follow_redirects=False` on the client became load-bearing in a way it was not before: a header set
+on a client is attached to whatever host a redirect lands on, and the allowlist in `daily()` only
+checks the URL we construct. Turning redirects on would hand the key to the redirect target. A test
+pins it.
+
 ### B-31 · No selector asked what had gone STALE — S2
 `ingest-prices` had `--symbols-from-clusters`, `--only-missing` and `--only-missing-history`. All
 three ask what is *missing*; none asks what has gone *stale*. A feed that stopped a month ago

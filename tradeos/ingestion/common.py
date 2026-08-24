@@ -6,9 +6,14 @@ knowable record, which the product surfaces directly.
 
 Degrading loudly must not mean degrading *indiscreetly*: five adapters hand raw exception text to
 `reject`, and httpx puts the full request URL — query string included — in that text. Tiingo
-authenticates with `?token=`, so 1,172 reject rows had the live API key stored in plain text going
+authenticated with `?token=`, so 1,172 reject rows had the live API key stored in plain text going
 back to 2026-07-16. Redaction therefore happens INSIDE `reject`, not at the five call sites, so a
 sixth adapter cannot reintroduce it by forgetting.
+
+Tiingo now authenticates with a header and no longer puts anything secret in a URL (B-30, closed at
+the root), so this is defence in depth for that adapter rather than its only defence. It is still
+the whole defence for Gemini, which authenticates with `?key=`. Keep it, and prefer a header over a
+query parameter when adding a source — a net you never need is the one worth having.
 """
 from __future__ import annotations
 
