@@ -28,20 +28,50 @@ Demo login `demo@tradeos.app` / `<generated at seed time>`. Surfaces: `/radar` `
 overflow on all 21 app surfaces at 375 / 768 / 1280px**, plus the marketing site, checked in a real
 browser · the 3D globe verified **rendering under actual WebGL** in headed Chromium, not merely
 "no errors in headless" (headless has no GPU, which is exactly how the globe stayed broken) ·
-migrations through **033** · 61 tables · the Ledger reads 41% of 282.
+migrations through **033** · 61 tables · the Ledger reads **43.2% of 412** (see §"Measured
+figures" below — every row count in this document is dated, because undated ones went stale).
 
 **The marketing site is at <http://localhost:8000/site/>, and `/` now redirects there** for anyone
 signed out — it was previously reachable by no link from anywhere, which is why the owner could not
 find it. `docs/deploy.md` is the deployment reference; `cli preflight` is its enforcer, and
 `docs/progress/phase_9.md` §"What is NOT fixed" is the honest security list.
 
-**Bluesky is live** — 16 curated consequential accounts, keyless, ~350 events ingested and already
+**Bluesky is live** — 16 curated consequential accounts, keyless, **2,147 events** ingested as of
+2026-08-23 (55% of the whole spine, so half of what Radar ranks comes from one social source) and already
 producing scored claims on the Radar. This is the brief's answer to X, which remains unavailable and
 is now labelled as such *with the alternative named* rather than as a bare "unavailable".
 
 **Model prose is genuinely on again.** It was not, silently, for the whole of Phases 3–6 — see
 B-23 in `docs/bugs.md`. If you change anything in the model path, confirm a running instance
 returns `used_template: false` rather than trusting the suite, which runs on `template` by design.
+
+---
+
+## Measured figures
+
+**Every number here was measured against the live database on 2026-08-23. Quote them with that
+date, and re-measure before quoting them anywhere a reader will act on them.** The previous set
+sat undated in this file for four weeks while the database moved underneath it; two of the counts
+had roughly doubled and the backup script was sizing a volume from figures that were half the
+truth. Undated is how that happened, so the dates are not decoration.
+
+| Figure | Value | Note |
+|---|---:|---|
+| Database on disk | **7.89 GB** (7,892,802,583 bytes) | 61 tables, migrations through 033 |
+| `raw_filings` | **7.27 GB**, 531,898 rows | 92% of the database |
+| `insider_transactions` | **759,698** | |
+| `stake_events` | **135,925** | |
+| `fund_holdings` | **24,982** | 17,298 resolved (69.2%, 77.1% by value); 7,684 unresolved — mostly ETPs the SEC ticker file does not carry. See B-14 |
+| `events` | **3,879** | grows continuously while the worker runs |
+| `claims` | **615** | 473 signal plane, 142 impact engine |
+| `claim_outcomes` | **501+** | 178 hit · 234 miss · 61 inconclusive · 273 unscoreable |
+| `country_exposure` | **10** | all populated and sourced |
+| Ledger headline | **43.2% of 412** | z = −2.76; see §"What the product actually does now" |
+| Impact engine | **9 open, 133 unscoreable, 0 resolved** | no accuracy figure exists for it |
+| `pg_dump -Fc` output | **4.79 GB** | 14-day retention needs **67 GB** |
+
+`events`, `news_items` and the `claim_*` tables move whenever the worker runs, so treat those four
+as "as of", not as constants. The SEC tables only move during a backfill.
 
 ---
 
@@ -77,9 +107,18 @@ Every phase has a report in `docs/progress/`.
   it either; the token in the URL **fragment**, never a query string, so it cannot reach an access
   log; a reset signs out every other session. Reachable from the login screen, and both screens
   driven end to end in a browser.
-- ~~A backup schedule~~ **PARTLY DONE.** `scripts/backup.sh` exists, refuses to call a truncated
-  dump a backup, prunes on retention, and `--verify` restores into a scratch database. **Nobody has
-  installed the cron line**, which is the half that matters.
+- ~~A backup schedule~~ **DONE 2026-08-23.** `scripts/backup.sh` exists, refuses to call a truncated
+  dump a backup, prunes on retention, and `--verify` restores into a scratch database. It is now
+  scheduled by a **launchd agent** (`~/Library/LaunchAgents/app.rhumb.backup.plist`, 03:15 daily),
+  **not** by the cron line the script's header documents: macOS cron skips a run outright if the
+  machine is asleep at the scheduled time, so on a laptop the cron entry would silently never have
+  fired. launchd's `StartCalendarInterval` runs it on the next wake instead. The agent also sets
+  `PATH` explicitly, because launchd starts jobs without `/usr/local/bin`, where the Docker CLI
+  lives. On a Linux host the documented cron line is correct and should be used.
+  **Still outstanding: the backups are on the same disk as the database**, so they protect against
+  a bad migration or a dropped table but not against losing the drive. Only ~18 MB of the 7.89 GB
+  is genuinely irreplaceable (everything else is refetchable from SEC EDGAR, at ~76 hours), so an
+  offsite copy of that slice is cheap and is the obvious next step.
 - **Exercise Google sign-in against Google.** Still untested auth code until someone does.
 - **SMTP is not configured**, so verification and reset cannot actually send. The machinery is
   built and tested; it needs a provider (`SMTP_HOST`, `MAIL_FROM`) and `preflight` says so.
@@ -104,8 +143,8 @@ correct it in the same change that discovers a mistake.
   loopback, link-local and metadata addresses on every resolved IP, re-checks at send time, and
   refuses redirects.
 - ~~GDELT has never been observed ingesting.~~ **RESOLVED 2026-07-25** — it came back after the
-  backoff elapsed and it has kept flowing — **22 events** as of 2026-07-26, up from 4 the day
-  before, with gdelt-sourced claims on the Radar and in the marketing site's hero.
+  backoff elapsed and it has kept flowing — **284 events** as of 2026-08-23 (22 on 2026-07-26, up
+  from 4 the day before), with gdelt-sourced claims on the Radar and in the marketing site's hero.
 - ~~Bluesky as a real `SocialSource`~~ **DONE 2026-07-26.** 16 curated accounts, each verified
   against the live API before seeding, keyless, feeding the spine hourly. Note for anyone
   extending it: `searchPosts` 403s without auth, so network-wide search is not available.
@@ -250,8 +289,9 @@ Ordered roughly by how much time they would cost to rediscover.
 21. **`= ANY(%s::record[])` fails** — psycopg cannot bind an anonymous composite type. Use two
     parallel arrays with `unnest(%s::text[], %s::text[])`.
 
-22. The data is real and substantial: 664,923 insider transactions, 51,099 stake events, 24,982
-    institutional holdings. Weigh that in any rewrite-vs-extend call.
+22. The data is real and substantial: **759,698 insider transactions, 135,925 stake events, 24,982
+    institutional holdings** (measured 2026-08-23). Weigh that in any rewrite-vs-extend call.
+    See §"Measured figures" for the rest, and quote figures from there with their date.
 
 ---
 
@@ -262,14 +302,27 @@ So a fresh session knows what it is resuming, not just where the files are.
 **Radar** is the landing surface: interpretations ranked by personal relevance, leading with the
 consequence rather than the headline, confidence always visible, disagreements surfaced.
 
-**The Ledger** publishes **41% of 282 resolved calls**, misses first, with calibration (said 38% →
-landed 40%) — and, since 2026-07-26, **expectancy −1.52% per call with a 95% interval of
-[−3.80%, +0.76%], which spans zero**. On 282 calls the signal shows **no edge in either
-direction**; an earlier note here called it a failure, which the sample does not support. The
-frequency IS below chance (z = −3.1) while the wins exceed the losses, so returns cancel. Detecting
-a 1% per-call edge would take ~1,470 resolved calls. All 282 are the legacy `convergence-v3` signal; **the impact engine has
-80 open claims and zero resolved**, so it has no accuracy figure at all yet and no surface may imply
-otherwise. `open_by_origin` exists so every surface can say whose record it is showing.
+**The Ledger** publishes **43.2% of 412 scoreable calls** (178 hit / 234 miss), misses first — and
+**expectancy −1.18% per call with a 95% interval of [−2.93%, +0.57%], which spans zero**. On 412
+calls the signal shows **no edge in either direction**; an earlier note here called it a failure,
+which the sample does not support. The frequency IS below chance (z = −2.76) while the wins exceed
+the losses, so returns cancel. At the measured 18.17% dispersion, detecting a 1% per-call edge would
+take **1,268** resolved calls. All figures measured 2026-08-23; the earlier "41% of 282" was the
+same ledger before the sample grew, and `docs/progress/cross_check.md` had already recorded 43.2%
+of 412 on 2026-07-26 — this file simply never picked it up.
+
+All 412 belong to the signal plane, split across two version rows: **`convergence-v3` (115/282 =
+40.8%) and `convergence-v4` (63/130 = 48.5%)**. These are **the same scoring logic** — v4's own
+`signal_definitions` changelog records "NO BEHAVIOURAL CHANGE", re-registering identical logic after
+a Phase 1 lint pass changed the module hash and silently froze `compute-signals` from 2026-07-25.
+**Pooling them into one 43.2% is therefore legitimate**, and the gap between the two is sample and
+period, not model. Do not present them as two signals.
+
+**The impact engine still has zero resolved calls and no accuracy figure**, and no surface may imply
+otherwise. As of 2026-08-23 it holds **9 open and 133 unscoreable** claims — the unscoreable count
+rose from 14 on 2026-08-21 when `measure_claims` ran, so of 142 model-written claims **133 could not
+be scored at all**. That is a finding about the engine, not a gap in the ledger, and it is the
+number to watch. `open_by_origin` exists so every surface can say whose record it is showing.
 
 **The World** places events by what their claims *affect*, with 62 sourced trade corridors; 3D
 lazy-loaded behind WebGL detection, flat map otherwise.
