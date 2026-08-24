@@ -441,6 +441,16 @@ key they contain is now revoked, they are safe to keep; the reason to care is th
 exactly the artefact most likely to be copied offsite, and this one carries a credential the
 filename does not advertise.
 
+### B-31 · No selector asked what had gone STALE — S2
+`ingest-prices` had `--symbols-from-clusters`, `--only-missing` and `--only-missing-history`. All
+three ask what is *missing*; none asks what has gone *stale*. A feed that stopped a month ago
+therefore looked complete to every one of them — 499 symbols, 235,162 rows, newest close
+2026-07-24, while claims were being made on the 26th.
+
+**Fixed** with `backtest.symbols_stale()` and `ingest-prices --only-stale`, which puts SPY first
+because a stale benchmark makes every other symbol unscoreable no matter how current it is.
+`scripts/topup-prices.sh` paces the passes under the measured free-tier ceiling.
+
 ### B-32 · The cue table was ordered by importance, not by specificity — S2
 `classify()` is first-match-wins, so the list order IS the behaviour. `trade_policy` sat **ninth**,
 behind `conflict` (second, owning "war" — which matches inside "trade war") and `regulation`
@@ -480,3 +490,31 @@ script and was caught by the dry run.
 any category outside the cue table, and reports the count it kept. A test asserts `macro` and
 `corporate` remain unproducible, so adding a cue for either forces the guard to be revisited.
 
+### B-34 · `check-source tiingo` reported OK for a revoked key — S1, SECURITY
+Found 2026-08-24 while rotating `TIINGO_API_KEY` (B-30). The probe called
+`https://api.tiingo.com/api/test`, which **does not authenticate**: measured against a
+deliberately invalid token, against the freshly revoked old key, and against the working new key,
+all three returned `200`. So the one command whose entire purpose is answering "is the key I just
+pasted in good?" answered yes unconditionally.
+
+`check-source` exists precisely because `status` (what has been ingested) and `preflight` (what is
+configured) both leave that question unanswered right after someone pastes a key in. For Tiingo it
+had never answered it either — and a rotation could have been signed off against a key that does
+not work, with the failure surfacing hours later as unscoreable claims when the Ledger stopped
+advancing.
+
+**Fixed** by probing `https://api.tiingo.com/tiingo/daily/spy` — ticker *metadata*, which 403s on a
+bad token and returns no price rows, so it does not spend the ~57-symbols/hour free-tier allowance
+(gotcha 0h). A **429 is now reported as OK**, not FAILED: it came back *through* authentication, so
+the token is good, and since the free tier is rate limited for most of the day the opposite reading
+would send an operator to re-check a key that is fine. That distinction is the whole value of the
+check — it has to separate "wrong credential" from "right credential, no quota".
+
+Two tests pin it: one forbids the `/api/test` URL from reappearing in the probe, one asserts 429 →
+OK and 403 → FAILED. Verified live after rebuild — new key OK, old key and a garbage key both
+`403 — credentials rejected`.
+
+**The general lesson, and it cost the whole exercise its first answer: a health check that cannot
+fail is not a health check.** Every probe in `_probe` should be tested against a deliberately
+*broken* credential, not only a working one. `sec_edgar` has the same shape today — it asserts
+`SEC_USER_AGENT` is merely set, never that SEC accepts it.

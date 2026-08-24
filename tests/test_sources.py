@@ -178,6 +178,66 @@ def test_httpx_request_logging_cannot_print_an_api_key():
         "httpx INFO logging re-enabled — any ?token= or ?key= URL will print its credential")
 
 
+def _tiingo_probe_source() -> str:
+    import pathlib
+    src = pathlib.Path(__file__).resolve().parents[1].joinpath("tradeos", "cli.py").read_text()
+    return src.split('if key == "tiingo":')[1].split('if key == "coingecko":')[0]
+
+
+def test_tiingo_probe_uses_an_endpoint_that_actually_authenticates():
+    """`check-source tiingo` exists to answer one question — is the key that was just pasted in
+    good? `/api/test` cannot answer it: measured 2026-08-24, it returns 200 for a garbage token
+    and for a revoked one alike. The probe therefore reported OK for the single case it was
+    built to catch, and a key rotation could be signed off against a key that does not work."""
+    probe = _tiingo_probe_source()
+    # Match the URL as CALLED, not the bare path — the comment above the probe names
+    # `/api/test` in order to explain why it is wrong, and must not trip its own guard.
+    assert "https://api.tiingo.com/api/test" not in probe, (
+        "tiingo probe is back on /api/test, which returns 200 for ANY token — it cannot "
+        "distinguish a working key from a revoked one")
+    assert "/tiingo/daily/" in probe, (
+        "tiingo probe must call an endpoint that 403s on a bad token")
+
+
+def test_tiingo_probe_treats_a_rate_limit_as_a_working_token(monkeypatch):
+    """A 429 came back THROUGH authentication, so the token is good. The free tier limits at
+    ~57 symbols/hour, so this is the normal state for most of the day; reporting it as FAILED
+    would send an operator to re-check a key that is fine. A 403 still has to fail."""
+    import httpx
+
+    from tradeos import cli
+
+    def _client(status: int):
+        class _Resp:
+            status_code = status
+
+            def raise_for_status(self):
+                if status >= 400:
+                    raise httpx.HTTPStatusError("boom", request=None, response=self)
+
+            def json(self):
+                return {"ticker": "SPY"}
+
+        class _Client:
+            def __init__(self, *a, **k): pass
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def get(self, *a, **k): return _Resp()
+
+        return _Client
+
+    monkeypatch.setenv("TIINGO_API_KEY", "irrelevant-to-this-test")
+
+    monkeypatch.setattr(httpx, "Client", _client(429))
+    ok, detail = cli._probe("tiingo")
+    assert ok is True, "a rate-limited response proves the token authenticated"
+    assert "rate limited" in detail
+
+    monkeypatch.setattr(httpx, "Client", _client(403))
+    ok, detail = cli._probe("tiingo")
+    assert ok is False, "a rejected token must report FAILED"
+
+
 def _openfigi_probe_source() -> str:
     import pathlib
     src = pathlib.Path(__file__).resolve().parents[1].joinpath("tradeos", "cli.py").read_text()

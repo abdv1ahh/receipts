@@ -161,7 +161,17 @@ def cmd_ingest_prices(args) -> None:
     client = TiingoClient(os.environ.get("TIINGO_API_KEY", ""))
     try:
         with db.connect() as conn:
-            if args.only_missing_history:
+            if args.only_stale:
+                # Default the cutoff to the freshest close anything has, so "stale" means "behind
+                # the rest of the table" without the operator having to look the date up.
+                if args.stale_before:
+                    cutoff = date.fromisoformat(args.stale_before)
+                else:
+                    with conn.cursor() as cur:
+                        cur.execute("SELECT max(day) FROM prices_eod")
+                        cutoff = cur.fetchone()[0]
+                symbols = backtest.symbols_stale(conn, cutoff) if cutoff else []
+            elif args.only_missing_history:
                 symbols = backtest.symbols_for_clusters_missing_history(conn, date.fromisoformat(args.history_before))
             elif args.only_missing:
                 symbols = backtest.symbols_for_clusters_missing(conn)  # quota-efficient free-tier top-up
@@ -254,11 +264,21 @@ def _probe(key: str) -> tuple[bool, str]:
             return (bool(did), f"resolved reuters.com to {did}" if did
                     else "could not resolve a known handle")
         if key == "tiingo":
+            # NOT `/api/test`: that endpoint does not authenticate. Measured 2026-08-24, it
+            # returns 200 for a garbage token and for a revoked one alike, so this probe
+            # reported OK for precisely the case the command exists to catch — a key just
+            # pasted in wrong. `/tiingo/daily/spy` is ticker METADATA: it 403s on a bad token,
+            # and it returns no price rows, so it does not spend the symbol allowance.
             with httpx.Client(timeout=20.0) as client:
-                r = client.get("https://api.tiingo.com/api/test",
+                r = client.get("https://api.tiingo.com/tiingo/daily/spy",
                                headers={"Authorization": f"Token {os.environ['TIINGO_API_KEY']}"})
+            if r.status_code == 429:
+                # The free tier rate-limits at ~57 symbols/hour, so a 429 here is the normal
+                # afternoon state. It came back THROUGH authentication, which means the token
+                # is good — calling that FAILED would send an operator to re-check a fine key.
+                return True, "token accepted (rate limited right now — free-tier hourly allowance)"
             r.raise_for_status()
-            return True, "token accepted by Tiingo's test endpoint"
+            return True, f"token accepted; read metadata for {r.json().get('ticker', 'SPY')}"
         if key == "openfigi":
             # The mapping endpoint works KEYLESS, so a 200 on an ordinary request proves nothing
             # about the key — the same trap `/api/test` set for Tiingo above. Two things make this
@@ -769,6 +789,12 @@ def main() -> None:
                          "(patient deep-history backfill; pair with --start 2024-04-01)")
     ip.add_argument("--history-before", default="2026-01-02",
                     help="cutoff date for --only-missing-history: symbols with no price row before this")
+    ip.add_argument("--only-stale", action="store_true", dest="only_stale",
+                    help="only fetch symbols ALREADY stored whose series stops before --stale-before "
+                         "(the top-up pass; SPY first, because a stale benchmark unscoreables "
+                         "everything)")
+    ip.add_argument("--stale-before", default="",
+                    help="cutoff for --only-stale; defaults to the freshest day any symbol has")
     ip.add_argument("--limit", type=int, default=0, help="cap symbols fetched this pass (0 = no cap)")
     ip.add_argument("--symbols", default="", help="comma-separated symbols if not --symbols-from-clusters")
     ip.add_argument("--start", default="2026-01-01")

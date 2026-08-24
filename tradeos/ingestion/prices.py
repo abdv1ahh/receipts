@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 import time
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from urllib.parse import urlparse
 
 import httpx
@@ -79,16 +79,38 @@ def _valid_row(row: dict, today: date) -> tuple[date, float, float, float, float
     return day, o, h, low, c, v
 
 
+# Once the free tier's hourly ceiling is reached, every remaining symbol in the pass will 429 too —
+# `TiingoClient.daily` has already spent its one 30s retry by the time it raises. Measured
+# 2026-08-24: the ceiling is roughly 57 unique symbols in an hour, and a 400-symbol pass that
+# ignores this does not fetch 400 symbols, it fetches ~50 and then spends the rest of the quota
+# proving it is rate limited. Stopping the pass early is the difference between a top-up that
+# finishes in nine hours and one that never finishes at all.
+CONSECUTIVE_RATE_LIMITS = 3
+
+
+def _is_rate_limit(exc: Exception) -> bool:
+    return "429" in str(exc)
+
+
 def ingest_prices(conn: psycopg.Connection, client: TiingoClient, symbols: list[str], start: date) -> dict:
-    counters = {"symbols": len(symbols), "with_data": 0, "no_data": 0, "rows": 0, "rejected": 0}
-    today = datetime.utcnow().date()
+    counters = {"symbols": len(symbols), "with_data": 0, "no_data": 0, "rows": 0, "rejected": 0,
+                "rate_limited": False}
+    today = datetime.now(UTC).date()
+    consecutive = 0
     for symbol in symbols:
         try:
             rows = client.daily(symbol, start, today)
         except Exception as exc:  # one bad symbol must never kill the run
             reject(conn, "prices", symbol, f"{type(exc).__name__}: {exc}", counters)
             conn.commit()
+            consecutive = consecutive + 1 if _is_rate_limit(exc) else 0
+            if consecutive >= CONSECUTIVE_RATE_LIMITS:
+                counters["rate_limited"] = True
+                log.warning("prices: %d consecutive 429s; stopping this pass with %d symbols "
+                            "untried", consecutive, len(symbols) - symbols.index(symbol) - 1)
+                break
             continue
+        consecutive = 0
         if not rows:
             counters["no_data"] += 1
             continue

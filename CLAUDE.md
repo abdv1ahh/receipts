@@ -336,6 +336,21 @@ fastest:
    copy. **Never store `str(exc)` from an HTTP client without it**, and never write a second
    redactor: the copy that drifts is the one that leaks.
 
+0h. **Free Tiingo is ~57 unique symbols/HOUR and ~500/month, and there was no "what is stale"
+   selector.** All three symbol selectors asked what was *missing*, so a feed that stopped a month
+   ago looked complete — 499 symbols and 235,162 rows, newest close two days *before* the claims
+   naming them. Use `ingest-prices --only-stale` (SPY first: a stale benchmark makes every other
+   symbol unscoreable) and pace it with `scripts/topup-prices.sh`. A pass that ignores the ceiling
+   does not fetch 400 symbols, it fetches ~50 and spends the rest proving it is rate limited.
+
+0j. **A probe against an endpoint that also serves unauthenticated callers proves nothing.** This
+   bit Tiingo (`/api/test` 200s for a garbage token) and OpenFIGI's mapping endpoint answers
+   keyless requests too. The fix is to make the request one a keyless caller CANNOT make:
+   measured 2026-08-24, OpenFIGI caps keyless at **10** mapping jobs and keyed at **100**, so
+   `check-source openfigi` posts **eleven** and reads three distinct outcomes — 200 valid,
+   401 invalid, **413 the key never arrived**. When adding a probe, ask what the unauthenticated
+   response would be; if it is also success, the probe is decorative.
+
 1. **Frontend changes need `make web`** (0.3s) under `make dev`, or a full image rebuild otherwise.
 2. **`geo` on an event is where the OUTLET sits, not what the story is about.** The single most
    repeated mistake in this project — made three times.
