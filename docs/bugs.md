@@ -370,6 +370,35 @@ have moved 30 stories about strikes on Iran into the labour category.
 behaviour for that one cue is unchanged. `other` is the honest answer here; a confident wrong
 label is not. The real fix is conflict-side vocabulary and is not yet made.
 
+### B-27 · GDELT's `trade_policy` query had never once executed — S1
+A refusal `break`s the whole pass and `QUERIES` was walked from position zero every time, so the
+tail was unreachable. Positions three, four and five — `supply_chain`, `energy`, `trade_policy` —
+produced **zero events, ever**. GDELT's entire contribution to the corpus is 142 `conflict` and
+142 `monetary_policy` events.
+
+**Fixed** by `_next_start`, which begins each pass at the least-recently-**attempted** query
+(never-attempted first, later positions winning ties). This is self-correcting: whatever got
+starved is by definition what runs next, and a pass that dies after one request still advances the
+rotation. Recording the topic in `source_calls.endpoint` is what makes it possible — and also
+makes the starvation visible after the fact, which it never was.
+
+### B-28 · The backoff was blind to the most common refusal — S1
+GDELT refuses on volume under **either** HTTP 429 **or HTTP 200 carrying the same plain-text
+refusal with no content-type header** (measured live 2026-08-24: 429, no content-type, 444 bytes).
+The second form hit the non-JSON check, raised `ValueError`, and recorded as `status = 0` — **89 of
+118 calls, 75%**. `_in_backoff` looks for `status = 429`, so the most common way GDELT says no was
+invisible to it: 30 calls on 2026-08-21, 25 on the 22nd, zero successes, and no pause.
+
+**Fixed** in two places. `_fetch` recognises the refusal wherever it appears and raises
+`RateLimited`, which `ingest` records as 429 — so the backoff query needs no widening, because the
+data it reads is finally true. And `_in_backoff` gained a second rule: `CONSECUTIVE_FAILURES`
+failures with no success between them triggers a shorter `UNKNOWN_FAULT_BACKOFF_HOURS` pause,
+which catches whatever we fail to recognise next time.
+
+Replayed against the real 118-call history: calls made drop from 116 to 31, wasted calls from 109
+to 26, and the success rate of calls actually made rises from **6.0% to 16.1%**. The User-Agent is
+not rotated and must not be; see the module docstring.
+
 ### B-32 · The cue table was ordered by importance, not by specificity — S2
 `classify()` is first-match-wins, so the list order IS the behaviour. `trade_policy` sat **ninth**,
 behind `conflict` (second, owning "war" — which matches inside "trade war") and `regulation`
