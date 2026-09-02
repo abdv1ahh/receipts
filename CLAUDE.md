@@ -94,7 +94,7 @@ The app is at <http://localhost:8000>. Demo login: `demo@tradeos.app` / `<genera
 ### Tests
 
 ```bash
-make test     # 818 tests, ~1.4s. Offline except the DB-backed authz and Receipts integrity tests
+make test     # 834 tests, ~1.4s. Offline except the DB-backed authz and Receipts integrity tests
 make lint     # ruff; zero errors is the standard
 make dev      # reload-in-place stack; then `make web` for a UI change
 make fix      # ruff --fix
@@ -194,7 +194,7 @@ tradeos/                  the Python package (all backend code)
   watchlist_accounts.py   the consequential-accounts influence list.
   receipts/               THE PRODUCT. chain.py (pure, the wire format) calls.py scoring.py
                           record.py verification.py seed.py context.py
-  migrations/             001..034 ordered .sql; NEVER edit an applied migration, and every
+  migrations/             001..035 ordered .sql; NEVER edit an applied migration, and every
                           file MUST insert its own schema_migrations row
   (surface modules)       dashboard, brief, news, social, sentiment, crypto, events,
                           trades, insights, portfolio, community, alerts, admin,
@@ -247,6 +247,16 @@ when a phase touches it, not as a standalone refactor.
 The full list, with the reasoning, is in `docs/state.md` §"Things learned". The ones that bite
 fastest:
 
+0z1. **A RESOLVED CALL IS IMMUTABLE INCLUDING ITS ARITHMETIC** (migration 035). 034 sealed the
+   commitment and refused to change a verdict, and said nothing about the nine columns the verdict
+   is COMPUTED from: `UPDATE calls SET excess_return = 0.42 WHERE verdict = 'miss'` succeeded,
+   every hash still verified because none of those are sealed fields, and the published expectancy,
+   the interval and every proof panel had moved. The rule now is that a call is written once and
+   scored once — before resolution only the resolution columns may be filled in, after resolution
+   nothing may change — and `resolved_at` is the switch, so a verdict written without one is
+   refused. `context_snapshot` is sealed too, which 034 claimed in a comment and did not enforce.
+   Found by `/code-review`.
+
 0z. **A VERDICT ON A CALL IS PERMANENT, so never seal an operational failure as one.** The
    `calls_append_only` trigger refuses to change a verdict once written — that is the product — and
    the consequence is that "unscoreable" cannot be taken back. A symbol whose price feed is merely
@@ -254,10 +264,12 @@ fastest:
    symbols/hour, so a top-up leaves most of the table days stale while it works). Sealing that case
    would be wrong an hour later and uncorrectable forever. `calls.scoreability` returns
    `permanent`, and only the permanent case — no price series at all — is sealed at publish.
-   Everything else publishes OPEN with a visible warning. `resolve_call` draws the same line at the
-   horizon, and lets the BENCHMARK settle it: SPY is fetched first on every top-up, so if SPY has
-   data past the horizon and the symbol does not, that symbol's feed is dead and unscoreable is
-   final; if SPY has not reached it either, our feed is behind and the call stays open.
+   Everything else publishes OPEN with a visible warning. At the horizon, a MISSING EXIT PRICE
+   ALWAYS LEAVES THE CALL OPEN. An earlier version let the benchmark settle it — SPY reaches the
+   horizon, the symbol does not, therefore the symbol is dead — and `/code-review` showed that is
+   wrong: a symbol lagging SPY is the ROUTINE state of this table, because SPY is fetched first on
+   purpose. It would have sealed ordinary calls an hour before their prices arrived. A delisted
+   symbol staying open forever is visible, honest and correctable; a wrong verdict is none of those.
 
 0y. **`receipts/chain.py`'s canonical payload is a WIRE FORMAT and its field order is frozen
    forever.** Adding a sealed field, reordering two, or changing how a timestamp renders would
