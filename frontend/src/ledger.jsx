@@ -18,7 +18,29 @@ import { EmptyState, LoadError } from "./shell.jsx";
 const pct = (v) => (v == null ? "—" : `${Math.round(v * 100)}%`);
 const signed = (v) => (v == null ? "—" : `${v >= 0 ? "+" : ""}${(v * 100).toFixed(1)}%`);
 
-function Headline({ o }) {
+/** Which plane the headline number belongs to, in a sentence, from the data.
+ *
+ *  The two planes must never be pooled. All the resolved calls belong to the smart money signal;
+ *  the impact engine has written claims and resolved none of them, and its record being empty is a
+ *  fact about the product that has to stay sayable.
+ */
+function whose(l) {
+  const rows = l.open_by_origin || [];
+  const engine = rows.find((r) => r.key.startsWith("impact engine"));
+  const signal = rows.find((r) => r.key.startsWith("signal plane"));
+  if (!signal) return "";
+  if (!engine || (engine.resolved === 0 && engine.open === 0)) {
+    return "every one of them from the smart money signal.";
+  }
+  if (engine.resolved === 0) {
+    return `every one of them from the smart money signal. The impact engine has ${engine.open} `
+      + "open and none resolved, so it has no accuracy figure at all yet.";
+  }
+  return `${signal.resolved} from the smart money signal and ${engine.resolved} from the impact `
+    + "engine, measured separately under \u201cBy origin\u201d below.";
+}
+
+function Headline({ o, l }) {
   return (
     <div className="lg-head">
       <div className="lg-head-l">
@@ -27,6 +49,11 @@ function Headline({ o }) {
           <>
             <div className="lg-rate">{pct(o.hit_rate)}</div>
             <div className="lg-rate-sub">of {o.n} resolved calls were right</div>
+            {/* WHOSE record this is. CLAUDE.md's rule, learned the hard way when the marketing site
+                published the signal plane's rate under a heading about the impact engine: never
+                quote a hit rate without saying which plane produced it. Driven by open_by_origin
+                rather than typed, so it cannot go stale when the engine starts resolving. */}
+            <div className="lg-rate-whose">{whose(l)}</div>
           </>
         ) : (
           <>
@@ -182,7 +209,7 @@ export function LedgerView() {
         </div>
       </div>
 
-      <Headline o={o} />
+      <Headline o={o} l={l} />
 
       {o.n === 0 && (
         <EmptyState title="Nothing has resolved yet">
