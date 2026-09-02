@@ -720,6 +720,52 @@ def cmd_seed_admin(args) -> None:
     print(f"  otpauth: {uri}")
 
 
+def cmd_seed_house_records(_args) -> None:
+    """Import our own signal engine's resolved record as the first two callers on the board.
+
+    Nothing is invented: it reads `claims` and `claim_outcomes` and preserves their real timestamps
+    and verdicts. See `receipts/seed.py` for why the record it publishes is unflattering and why we
+    publish it anyway.
+    """
+    from .receipts.seed import seed_house_records
+    with db.connect() as conn:
+        out = seed_house_records(conn)
+    for handle, result in out.items():
+        if result.get("skipped"):
+            print(f"seed-house-records {handle}: skipped, {result['existing_calls']} calls already "
+                  f"sealed (an append only record is never re-imported)")
+        else:
+            print(f"seed-house-records {handle}: {result['imported']} calls sealed "
+                  f"({result['hit']}H/{result['miss']}M/{result['inconclusive']}I/"
+                  f"{result['unscoreable']}U), chain head {result['chain_head'][:16]}")
+
+
+def cmd_resolve_calls(args) -> None:
+    """Score every published call whose horizon has closed. The manual form of the scheduler job."""
+    from .receipts import scoring
+    with db.connect() as conn:
+        print(f"resolve-calls: {scoring.resolve_due(conn, limit=args.limit)}")
+
+
+def cmd_verify_chain(args) -> None:
+    """Recompute one caller's whole chain from the stored fields and report."""
+    from .receipts import calls as receipts_calls
+    from .receipts import chain, record
+    with db.connect() as conn:
+        caller = record.caller(args.handle, conn)
+        if not caller:
+            print(f"verify-chain: no caller {args.handle!r}")
+            raise SystemExit(2)
+        result = chain.verify_chain(receipts_calls.for_chain(caller["id"], conn))
+    if result["intact"]:
+        print(f"verify-chain {args.handle}: INTACT, {result['links']} links, "
+              f"head {result.get('head', '')[:16]}")
+    else:
+        print(f"verify-chain {args.handle}: BROKEN at seq {result['broken_at_seq']} "
+              f"({result['reason']})")
+    raise SystemExit(0 if result["intact"] else 1)
+
+
 def cmd_seed_demo(_args) -> None:
     """A ready-to-use demo account: tier=pro (full features, no charge), NO TOTP (so it logs in with
     just email + password), pre-populated with a handle, journal trades, a portfolio, and a watchlist
@@ -950,6 +996,13 @@ def main() -> None:
     sa.add_argument("--email", required=True)
     sa.set_defaults(fn=cmd_seed_admin)
     sub.add_parser("seed-demo").set_defaults(fn=cmd_seed_demo)
+    sub.add_parser("seed-house-records").set_defaults(fn=cmd_seed_house_records)
+    rc = sub.add_parser("resolve-calls", help="score published calls whose horizon has closed")
+    rc.add_argument("--limit", type=int, default=100)
+    rc.set_defaults(fn=cmd_resolve_calls)
+    vc = sub.add_parser("verify-chain", help="recompute one caller's chain and report")
+    vc.add_argument("handle")
+    vc.set_defaults(fn=cmd_verify_chain)
     ci = sub.add_parser("create-invites")
     ci.add_argument("--n", type=int, default=5)
     ci.set_defaults(fn=cmd_create_invites)

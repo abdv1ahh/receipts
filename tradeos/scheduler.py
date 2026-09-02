@@ -130,6 +130,26 @@ def _job_measure_claims(conn) -> dict:
     return {**out, "signal_claims_imported": imported["claims_made"]}
 
 
+def _job_resolve_calls(conn) -> dict:
+    """Score every published call whose horizon has closed.
+
+    The detail this returns is the whole reason it returns a dict rather than None. A job that
+    produced nothing is still recorded as a successful run, which is exactly how a month of zero
+    claim production went unnoticed in this codebase, so `resolve_due` reports counts BY VERDICT
+    and says explicitly when nothing was due. `job_runs.detail` then answers "what did it actually
+    do" instead of only "did it crash".
+    """
+    from .receipts import scoring
+    out = scoring.resolve_due(conn)
+    if out.get("nothing_due"):
+        log.info("resolve_calls: nothing due (%s)", out.get("note", ""))
+    else:
+        log.info("resolve_calls: %d due, %d resolved (%dH/%dM/%dI/%dU)", out["due"],
+                 out["resolved"], out.get("hit", 0), out.get("miss", 0),
+                 out.get("inconclusive", 0), out.get("unscoreable", 0))
+    return out
+
+
 def _job_crypto_structure(conn) -> dict:
     """Keep the derivatives cache warm so the Crypto surface is instant. Five symbols x four
     endpoints is ~7s of paced requests — fine here, unacceptable on a page load."""
@@ -194,6 +214,10 @@ JOBS = [
     ("radar_alerts", 900, _job_radar_alerts),     # check the queue every 15 min; throttles are per filter
     ("measure_claims", 21600, _job_measure_claims),  # horizons close slowly; 4x a day is plenty
     ("crypto_structure", 240, _job_crypto_structure),  # just inside the 300s cache TTL
+    # Horizons are 7, 30 and 90 days, so nothing is gained by checking more often than the price
+    # feed itself moves. Four times a day is well inside the shortest horizon and leaves the free
+    # Tiingo allowance to the ingestion jobs.
+    ("resolve_calls", 21600, _job_resolve_calls),      # every 6h
 ]
 
 

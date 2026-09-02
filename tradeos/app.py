@@ -66,6 +66,23 @@ from . import (
 )
 from . import scheduler as scheduler_mod
 from . import social as social_mod
+from .receipts import calls as receipts_calls
+from .receipts import chain as receipts_chain
+from .receipts import record as receipts_record
+from .receipts import scoring as receipts_scoring
+from .receipts import verification as receipts_verification
+
+# One sentence, one place. It appears on every public Receipts surface and on the share card, and
+# a second copy of it would be the one that drifted. The wording is deliberate: this platform
+# MEASURES public statements, which is what keeps it an analytics tool rather than an advisory
+# service. Chairman of the Board Resolution No. (10/R.M) of 2025 applies by AUDIENCE location
+# rather than by creator location, and SEC Rule 206(4)-1 treats a public scoreboard of named
+# advisers as edging toward a third party rating, so neither the copy nor the ranking may suggest
+# that a position here recommends anybody.
+RECEIPTS_DISCLAIMER = ("This platform measures publicly stated market calls. It is not investment "
+                       "advice, it is not a recommendation, and no position on the board is an "
+                       "endorsement of any person. Past performance does not predict future "
+                       "results.")
 
 SESSION_COOKIE = "tos_session"
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").lower() == "true"  # true behind TLS in prod
@@ -350,15 +367,24 @@ def _origin_ok(origin: str, host: str | None) -> bool:
 
 # Paths a stranger can reach without a session. Everything else is behind authentication, which
 # is its own limit — an attacker without an account cannot spend an account's allowance.
-_PUBLIC_PREFIXES = ("/api/public/", "/api/ledger")
+_PUBLIC_PREFIXES = ("/api/public/", "/api/ledger", "/api/receipts", "/api/board", "/r/",
+                    "/api/card/receipt/", "/api/calls/")
 # Routes that may spend model quota. Gemini's free daily allowance is shared by every user, so one
 # script exhausting it silences the AI surfaces for everybody until midnight UTC.
 _MODEL_PATHS = ("/api/assistant", "/api/analyze-chart", "/api/extract-tickers")
 # Anything that can cause an email to be sent, or that guesses at a token.
 _AUTH_TOKEN_PATHS = ("/api/auth/verify/", "/api/auth/reset/")
+# Publishing seals a row that can never be deleted, so a runaway script does permanent damage
+# rather than recoverable damage. It gets its own bucket for that reason and not for load.
+_PUBLISH_PATHS = ("/api/calls",)
 
 
-def _limit_bucket(path: str) -> str | None:
+def _limit_bucket(path: str, method: str = "GET") -> str | None:
+    # The method matters for exactly one of these. `/api/calls` is a publish when it is a POST and
+    # a public read of one call when it is a GET, and putting a public read in the publish bucket
+    # would let twenty page views an hour exhaust a limit meant for writes.
+    if method == "POST" and path.startswith(_PUBLISH_PATHS):
+        return "publish"
     if path.startswith(_PUBLIC_PREFIXES):
         return "public"
     if path.startswith(_MODEL_PATHS):
@@ -380,7 +406,7 @@ async def harden(request: Request, call_next):
 
     # Rate limiting, before any work is done. `ratelimit` is in-process and says so — see its
     # docstring for what that does and does not buy.
-    bucket = _limit_bucket(request.url.path)
+    bucket = _limit_bucket(request.url.path, request.method)
     if bucket:
         ok, retry = ratelimit.check(bucket, ratelimit.client_key(request))
         if not ok:
@@ -3021,7 +3047,8 @@ def card_svg(symbol: str) -> Response:
     with db.connect() as conn, conn.cursor() as cur:
         d = _card_data(cur, sym) or {"symbol": sym, "name": "", "score": None, "bucket": None,
                                      "headline": "Not a resolved issuer"}
-    svg = presentation.score_card_svg(d["symbol"], d["name"], d["score"], d["bucket"], d["headline"])
+    svg = presentation.score_card_svg(d["symbol"], d["name"], d["score"], d["bucket"], d["headline"],
+                                      brand=config.brand_name())
     return Response(content=svg, media_type="image/svg+xml", headers={"Cache-Control": "public, max-age=300"})
 
 
@@ -3046,6 +3073,356 @@ def share_page(symbol: str) -> str:
 <img src="{card}" alt="{e(title)}">
 <a href="/asset?symbol={e(sym)}">Open {e(sym)} on {e(brand)} &#8594;</a>
 <p>{e(brand)} shows what the smartest money is quietly doing, with backtested, probability-framed context. Not investment advice.</p>
+</body></html>'''
+
+
+# ------------------------------------------------------------------- RECEIPTS
+#
+# The public, permanent, chained record of market calls. Read `tradeos/receipts/` for the reasoning;
+# these are thin handlers over it, which is deliberate — none of the integrity logic lives in a
+# route, so none of it can be bypassed by adding a second route later.
+#
+# Note which of these are PUBLIC. A record page, the board, the methodology, chain verification and
+# the share card are readable by a stranger with no session, because the whole product argument is
+# that a reader can check a caller without taking anything on trust, including an account with us.
+
+
+class CallerReq(BaseModel):
+    handle: str
+    display_name: str
+    bio: str | None = None
+    audience_url: str | None = None
+    # Not optional and not defaulted to True. A caller states that their own regulatory and
+    # registration status in their own jurisdiction is their responsibility. This platform measures
+    # public statements; it does not license anyone to make them, and it must not read as though it
+    # does. See docs and the disclaimer copy.
+    jurisdiction_attested: bool = False
+
+
+class VerifyStartReq(BaseModel):
+    method: str
+
+
+class VerifyConfirmReq(BaseModel):
+    evidence_url: str
+
+
+class VerifyReviewReq(BaseModel):
+    approve: bool
+
+
+class CallReq(BaseModel):
+    symbol: str
+    direction: str
+    horizon_days: int
+    confidence: str
+    thesis: str
+
+
+_HANDLE_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,29}$")
+
+
+def _caller_for_user(conn, user_id: int) -> dict | None:
+    with conn.cursor() as cur:
+        cur.execute("SELECT handle FROM callers WHERE user_id = %s", (user_id,))
+        row = cur.fetchone()
+    return receipts_record.caller(row[0], conn) if row else None
+
+
+@app.post("/api/callers")
+def claim_handle(req: CallerReq, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "sign in first"}
+
+        handle = req.handle.strip().lower()
+        if not _HANDLE_RE.match(handle):
+            response.status_code = 400
+            return {"error": "a handle is 2 to 30 characters, lower case letters, digits and "
+                             "hyphens, starting with a letter or a digit."}
+        if not req.jurisdiction_attested:
+            # Refused rather than defaulted. The attestation is the whole reason the column exists.
+            response.status_code = 400
+            return {"error": "you have to confirm that your own regulatory and registration status "
+                             "in your jurisdiction is your responsibility."}
+        if _caller_for_user(conn, user["id"]):
+            response.status_code = 409
+            return {"error": "this account already holds a record."}
+
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1 FROM callers WHERE lower(handle) = %s", (handle,))
+            if cur.fetchone():
+                response.status_code = 409
+                return {"error": f"the handle {handle} is taken."}
+            cur.execute("""INSERT INTO callers (user_id, handle, display_name, bio, audience_url,
+                                                jurisdiction_attested)
+                           VALUES (%s,%s,%s,%s,%s,true) RETURNING id""",
+                        (user["id"], handle, req.display_name.strip()[:80],
+                         (req.bio or "").strip()[:500] or None,
+                         (req.audience_url or "").strip() or None))
+            cur.fetchone()
+        conn.commit()
+        return {"caller": _caller_for_user(conn, user["id"])}
+
+
+@app.get("/api/callers/me")
+def my_caller(response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "sign in first"}
+        caller = _caller_for_user(conn, user["id"])
+        return {"caller": caller,
+                "summary": receipts_record.summary(caller["id"], conn) if caller else None}
+
+
+@app.post("/api/callers/verify/start")
+def verify_start(req: VerifyStartReq, response: Response,
+                 tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "sign in first"}
+        caller = _caller_for_user(conn, user["id"])
+        if not caller:
+            response.status_code = 404
+            return {"error": "claim a handle first."}
+        out = receipts_verification.start(caller["id"], req.method, conn)
+        if "error" in out:
+            response.status_code = 400
+        return out
+
+
+@app.post("/api/callers/verify/confirm")
+def verify_confirm(req: VerifyConfirmReq, response: Response,
+                   tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "sign in first"}
+        caller = _caller_for_user(conn, user["id"])
+        if not caller:
+            response.status_code = 404
+            return {"error": "claim a handle first."}
+        out = receipts_verification.confirm(caller["id"], req.evidence_url, conn)
+        if "error" in out:
+            response.status_code = 400
+        return out
+
+
+@app.get("/api/admin/callers/pending")
+def admin_pending_verifications(response: Response,
+                                tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        if not _require_admin(conn, tos_session, response):
+            return {"error": "admin only"}
+        return {"pending": receipts_verification.pending(conn)}
+
+
+@app.post("/api/admin/callers/{verification_id}/verify")
+def admin_review_verification(verification_id: int, req: VerifyReviewReq, response: Response,
+                              tos_session: str | None = Cookie(None)) -> dict:
+    with db.connect() as conn:
+        if not _require_admin(conn, tos_session, response):
+            return {"error": "admin only"}
+        out = receipts_verification.review(verification_id, req.approve, conn)
+        if "error" in out:
+            response.status_code = 400
+        return out
+
+
+@app.post("/api/calls")
+def publish_call(req: CallReq, response: Response, tos_session: str | None = Cookie(None)) -> dict:
+    """Seal a call. Rate limited: see _limit_bucket.
+
+    Returns the sealed row INCLUDING its hashes, because the receipt is the product. A caller who
+    publishes and is shown only "saved" has been given no more than any other form would give them.
+    """
+    with db.connect() as conn:
+        user = authn.session_user(conn, tos_session)
+        if not user:
+            response.status_code = 401
+            return {"error": "sign in first"}
+        caller = _caller_for_user(conn, user["id"])
+        if not caller:
+            response.status_code = 404
+            return {"error": "claim a handle before publishing."}
+        try:
+            call = receipts_calls.publish(caller["id"], req.model_dump(), conn)
+        except receipts_calls.PublishError as exc:
+            response.status_code = 400
+            return {"error": "this call was not published.", "problems": exc.problems}
+        return {"call": call}
+
+
+@app.get("/api/calls/scoreability")
+def call_scoreability(symbol: str, response: Response,
+                      tos_session: str | None = Cookie(None)) -> dict:
+    """Live check as a symbol is typed on the publish form. Behind a session: it is a database
+    read on behalf of someone about to publish, not a public lookup."""
+    with db.connect() as conn:
+        if not authn.session_user(conn, tos_session):
+            response.status_code = 401
+            return {"error": "sign in first"}
+        return receipts_calls.scoreability(symbol, conn)
+
+
+@app.get("/api/calls/{call_id}")
+def one_call(call_id: int, response: Response) -> dict:
+    """One call with everything a sceptic needs to check it by hand. Public."""
+    with db.connect() as conn:
+        call = receipts_calls.get(call_id, conn)
+        if not call:
+            response.status_code = 404
+            return {"error": "no such call."}
+        with conn.cursor() as cur:
+            cur.execute("""SELECT c.handle, c.display_name, c.kind, c.is_house, c.verified_at,
+                                  k.context_snapshot
+                             FROM calls k JOIN callers c ON c.id = k.caller_id
+                            WHERE k.id = %s""", (call_id,))
+            handle, name, kind, is_house, verified_at, snapshot = cur.fetchone()
+        return {"call": call, "noise_floor": receipts_scoring.NOISE_FLOOR,
+                "context_snapshot": snapshot,
+                "caller": {"handle": handle, "display_name": name, "kind": kind,
+                           "is_house": is_house, "verified": verified_at is not None},
+                "disclaimer": RECEIPTS_DISCLAIMER}
+
+
+@app.get("/api/receipts/methodology")
+def receipts_methodology() -> dict:
+    """The scoring rules as structured data, so no surface ever hardcodes them and drifts."""
+    with db.connect() as conn:
+        return {**receipts_record.methodology(),
+                "universe": receipts_record.scoreable_universe(conn),
+                "disclaimer": RECEIPTS_DISCLAIMER}
+
+
+@app.get("/api/receipts/{handle}")
+def receipts_for(handle: str, response: Response) -> dict:
+    """One caller's whole record. Public, and misses come first."""
+    with db.connect() as conn:
+        caller = receipts_record.caller(handle, conn)
+        if not caller:
+            response.status_code = 404
+            return {"error": "no such record."}
+        cid = caller["id"]
+        out = {
+            "caller": caller,
+            "summary": receipts_record.summary(cid, conn),
+            "misses": receipts_record.recent_misses(cid, 10, conn),
+            "calibration": receipts_record.calibration(cid, conn),
+            "calls": receipts_calls.listing(cid, conn),
+            "chain_links": 0,
+            "disclaimer": RECEIPTS_DISCLAIMER,
+        }
+        sealed = receipts_calls.for_chain(cid, conn)
+        out["chain_links"] = len(sealed)
+        out["chain_head"] = sealed[-1]["content_hash"] if sealed else receipts_chain.GENESIS_HASH
+        if caller["is_house"]:
+            # Whose record is this. The pooled house figure is the one the banner quotes, and a
+            # surface that showed one version's rate under a sentence about the other would be
+            # repeating the exact mistake the marketing site made with the Ledger.
+            out["house"] = receipts_record.house_summary(conn)
+        return out
+
+
+@app.get("/api/receipts/{handle}/verify")
+def receipts_verify(handle: str, response: Response) -> dict:
+    """Recompute every hash in the caller's chain, live. Public, and the point of the product."""
+    with db.connect() as conn:
+        caller = receipts_record.caller(handle, conn)
+        if not caller:
+            response.status_code = 404
+            return {"error": "no such record."}
+        sealed = receipts_calls.for_chain(caller["id"], conn)
+        result = receipts_chain.verify_chain(sealed)
+        return {"handle": caller["handle"], **result,
+                "sealed_fields": list(receipts_chain.SEALED_FIELDS),
+                "caveat": receipts_record.methodology()["chain"]["does_not_prove"]}
+
+
+@app.get("/api/board")
+def receipts_board() -> dict:
+    """Every caller with their record. Public."""
+    with db.connect() as conn:
+        return {"board": receipts_record.board(conn),
+                "house": receipts_record.house_summary(conn),
+                "sample_gate": receipts_record.SAMPLE_GATE,
+                "ranking_note": ("This ranks how often past public statements turned out right, "
+                                 "measured against SPY over each caller's own stated horizons. It "
+                                 "is a measurement of the past. It is not investment advice, it is "
+                                 "not a recommendation, and a high position is not an endorsement "
+                                 "of any person or a reason to follow them."),
+                "disclaimer": RECEIPTS_DISCLAIMER}
+
+
+@app.get("/api/card/receipt/{handle}.svg")
+def receipt_card(handle: str) -> Response:
+    """The share card for a record. Public, and it may never print a rate on a gated record."""
+    with db.connect() as conn:
+        caller = receipts_record.caller(handle, conn)
+        if not caller:
+            return Response(content="<svg xmlns='http://www.w3.org/2000/svg'/>",
+                            media_type="image/svg+xml", status_code=404)
+        summary = receipts_record.summary(caller["id"], conn)
+        links = len(receipts_calls.for_chain(caller["id"], conn))
+    svg = presentation.receipt_card_svg(
+        handle=caller["handle"], display_name=caller["display_name"], counts=summary["counts"],
+        hit_rate=summary["hit_rate"], hit_rate_ci=summary["hit_rate_ci"],
+        resolved_scoreable=summary["resolved_scoreable"], links=links,
+        brand=config.brand_name(), verified=caller["verified_at"] is not None,
+        is_house=caller["is_house"])
+    return Response(content=svg, media_type="image/svg+xml",
+                    headers={"Cache-Control": "public, max-age=300"})
+
+
+@app.get("/r/{handle}", response_class=HTMLResponse)
+def receipt_share_page(handle: str) -> str:
+    """Server rendered share page with OG tags, same pattern as /s/{symbol}.
+
+    A link to a record has to render something in a feed. This page is that preview and a real
+    entry point; the app's own record surface is behind the same URL for anyone with the bundle.
+    """
+    with db.connect() as conn:
+        caller = receipts_record.caller(handle, conn)
+        summary = receipts_record.summary(caller["id"], conn) if caller else None
+    e = presentation._xml_escape
+    brand = config.brand_name()
+    if not caller:
+        return (f'<!doctype html><html lang="en"><head><meta charset="utf-8">'
+                f'<title>No such record · {e(brand)}</title>'
+                f'<meta name="viewport" content="width=device-width, initial-scale=1"></head>'
+                f'<body style="background:#05060c;color:#eaecf4;font-family:system-ui;padding:48px">'
+                f'<h1>No record here</h1><p>Nobody holds the handle {e(handle)}.</p>'
+                f'<p><a style="color:#6e8cff" href="/board">See every record</a></p></body></html>')
+
+    counts = summary["counts"]
+    if summary["gated"]:
+        line = (f'{counts["hit"]} hit, {counts["miss"]} miss, {counts["inconclusive"]} inconclusive. '
+                f'A rate is not shown below {receipts_record.SAMPLE_GATE} resolved calls.')
+    else:
+        line = (f'{summary["hit_rate"]:.1%} right on {summary["resolved_scoreable"]} resolved calls, '
+                f'measured against SPY.')
+    title = f'{caller["display_name"]} · the record · {brand}'
+    card = f"/api/card/receipt/{caller['handle']}.svg"
+    return f'''<!doctype html><html lang="en"><head><meta charset="utf-8">
+<title>{e(title)}</title>
+<meta property="og:title" content="{e(title)}">
+<meta property="og:description" content="{e(line)}">
+<meta property="og:image" content="{card}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>body{{background:#05060c;color:#eaecf4;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;display:flex;flex-direction:column;align-items:center;gap:22px;padding:44px 16px}}img{{max-width:100%;width:660px;border-radius:16px;border:1px solid #1b2130}}a{{color:#6e8cff;text-decoration:none;font-weight:600;font-size:18px}}p{{color:#8b93ab;font-size:13px;max-width:600px;text-align:center;line-height:1.6}}</style>
+</head><body>
+<img src="{card}" alt="{e(title)}">
+<a href="/record?handle={e(caller['handle'])}">Open the full record on {e(brand)} &#8594;</a>
+<p>{e(line)}</p>
+<p>{e(RECEIPTS_DISCLAIMER)}</p>
 </body></html>'''
 
 

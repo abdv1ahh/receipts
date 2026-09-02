@@ -42,6 +42,11 @@ LIMITS: dict[str, tuple[int, int]] = {
     # to host the attempt. Per-address limiting also lives in `authn`, which this does not replace
     # — a client can rotate its IP, and an inbox cannot rotate itself.
     "auth_token": (10, 900),
+    # Publishing a call. Not about load: a published call is sealed into an append-only table and
+    # can never be deleted, so a runaway script leaves permanent rows on a public record rather
+    # than a recoverable mess. Twenty an hour is far more than any honest caller publishes and far
+    # less than a loop would.
+    "publish": (20, 3600),
 }
 
 _buckets: dict[tuple[str, str], list[float]] = {}
