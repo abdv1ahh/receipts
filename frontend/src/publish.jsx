@@ -27,10 +27,17 @@ function ClaimHandle({ onClaimed }) {
   const submit = async () => {
     setBusy(true);
     setError(null);
-    const res = await claimHandle({ ...form, jurisdiction_attested: attested });
-    setBusy(false);
-    if (res.error) setError(res.error);
-    else onClaimed(res.caller);
+    // The finally is the point: a rejected fetch used to skip setBusy(false) and leave the button
+    // reading "claiming…" forever, which looks exactly like a request still in flight.
+    try {
+      const res = await claimHandle({ ...form, jurisdiction_attested: attested });
+      if (res.error) setError(res.error);
+      else onClaimed(res.caller);
+    } catch {
+      setError("That did not reach us. Nothing was claimed, so it is safe to try again.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -91,6 +98,27 @@ function Verify({ caller, onChanged }) {
   const [url, setUrl] = useState("");
   const [msg, setMsg] = useState(null);
 
+  const start = async (method) => {
+    setMsg(null);
+    try {
+      const res = await verifyStart(method);
+      if (res.code) setStarted(res);
+      else setMsg(res.error || "No code came back. Nothing has changed, so try again.");
+    } catch {
+      setMsg("That did not reach us. Nothing has changed, so try again.");
+    }
+  };
+
+  const confirm = async () => {
+    try {
+      const r = await verifyConfirm(url);
+      setMsg(r.error || r.note);
+      onChanged();
+    } catch {
+      setMsg("That did not reach us. Your link was not submitted.");
+    }
+  };
+
   if (caller.verified_at) {
     return (
       <div className="pb-verified">
@@ -108,12 +136,12 @@ function Verify({ caller, onChanged }) {
       </div>
       {!started ? (
         <div className="pb-verify-methods">
-          <button className="act" onClick={() => verifyStart("public_post").then(setStarted)}>
-            Post a code publicly
-          </button>
-          <button className="act" onClick={() => verifyStart("meta_tag").then(setStarted)}>
-            Add a tag to my site
-          </button>
+          {/* `start` only advances on a code actually coming back. Without that check a failed
+              request still flipped to the next panel and rendered an empty code box, telling the
+              caller to publish a code that had never been issued, with no way back here. */}
+          <button className="act" onClick={() => start("public_post")}>Post a code publicly</button>
+          <button className="act" onClick={() => start("meta_tag")}>Add a tag to my site</button>
+          {msg && <div className="pb-error">{msg}</div>}
         </div>
       ) : (
         <>
@@ -121,10 +149,7 @@ function Verify({ caller, onChanged }) {
           <div className="pb-verify-row">
             <input className="pb-input" value={url} onChange={(e) => setUrl(e.target.value)}
                    placeholder="https://the page where you published it" />
-            <button className="act act-on" onClick={() =>
-              verifyConfirm(url).then((r) => { setMsg(r.error || r.note); onChanged(); })}>
-              Submit
-            </button>
+            <button className="act act-on" onClick={confirm}>Submit</button>
           </div>
           {msg && <div className="pb-note">{msg}</div>}
         </>
@@ -176,11 +201,20 @@ function Form({ onPublished, onOpenCall }) {
   const submit = async () => {
     setBusy(true);
     setProblems([]);
-    const res = await publishCall({ ...spec, symbol: spec.symbol.trim().toUpperCase() });
-    setBusy(false);
-    if (res.error) { setProblems(res.problems || [res.error]); return; }
-    setReceipt(res.call);
-    onPublished();
+    try {
+      const res = await publishCall({ ...spec, symbol: spec.symbol.trim().toUpperCase() });
+      if (res.error) { setProblems(res.problems || [res.error]); return; }
+      setReceipt(res.call);
+      onPublished();
+    } catch {
+      // Deliberately careful wording. A publish that failed to REACH us sealed nothing, and a
+      // caller who believes a call might have been published when it was not is worse off than one
+      // told plainly to check their record.
+      setProblems(["That did not reach us. Check your record before publishing again, in case it "
+                   + "arrived and the reply did not."]);
+    } finally {
+      setBusy(false);
+    }
   };
 
   if (receipt) {

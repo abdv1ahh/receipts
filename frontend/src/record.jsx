@@ -166,7 +166,13 @@ function AllCalls({ calls, onOpenCall }) {
           <span className="rc-call-dir">{c.direction}</span>
           <span className="rc-call-h num">{c.horizon_days}d</span>
           <VerdictChip verdict={c.verdict || "open"} />
-          <span className="rc-call-x num">{c.excess_return == null ? "" : signed(c.excess_return)}</span>
+          {/* An unscoreable chip with no reason next to it tells a reader less than nothing, so
+              the reason sits on the row rather than one click away. */}
+          <span className="rc-call-x num">
+            {c.verdict === "unscoreable"
+              ? <span className="rc-call-why">{c.verdict_note}</span>
+              : c.excess_return == null ? "" : signed(c.excess_return)}
+          </span>
           <span className="rc-call-when num">{day(c.published_at)}</span>
         </button>
       ))}

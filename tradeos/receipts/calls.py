@@ -272,12 +272,36 @@ def _row(r: tuple) -> dict:
     }
 
 
-def listing(caller_id: int, conn: psycopg.Connection) -> list[dict]:
-    """Every call by one caller, newest first. The record page's spine."""
+# What a row in the "every call" list actually renders. The record page shows the sequence, the
+# symbol, the direction, the horizon, the verdict, the excess and the date; it does not show the
+# thesis, which is hundreds of characters per call and is read only by the misses panel, which has
+# its own bounded query. Sending the full row for every call turned a public page into a full
+# serialisation of a caller's entire history, and the house records are already 323 rows.
+_SUMMARY_FIELDS = frozenset({
+    "id", "caller_id", "seq", "symbol", "direction", "horizon_days", "confidence",
+    "benchmark_symbol", "published_at", "content_hash", "excess_return", "verdict", "resolved_at",
+    "entry_session", "exit_session",
+    # `verdict_note` stays. It is one sentence, and on an `unscoreable` row it is the whole
+    # explanation — a reader seeing that chip with no reason beside it has been told less than
+    # nothing. The weight was never here: it was `thesis`, several hundred characters per call.
+    "verdict_note",
+})
+
+
+def listing(caller_id: int, conn: psycopg.Connection, full: bool = True) -> list[dict]:
+    """Every call by one caller, newest first. The record page's spine.
+
+    `full=False` drops the fields no row in that list renders. Nothing is hidden and no call is
+    omitted: the complete row for any single call is one request away at `/api/calls/{id}`, which
+    is where the proof panel reads it from.
+    """
     with conn.cursor() as cur:
         cur.execute(sql.SQL("SELECT {cols} FROM calls WHERE caller_id = %s ORDER BY seq DESC")
                     .format(cols=_LIST_COLUMNS), (caller_id,))
-        return [_row(r) for r in cur.fetchall()]
+        rows = [_row(r) for r in cur.fetchall()]
+    if full:
+        return rows
+    return [{k: v for k, v in r.items() if k in _SUMMARY_FIELDS} for r in rows]
 
 
 def for_chain(caller_id: int, conn: psycopg.Connection) -> list[dict]:

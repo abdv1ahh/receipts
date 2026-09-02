@@ -3123,6 +3123,16 @@ class CallReq(BaseModel):
 
 _HANDLE_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,29}$")
 
+# Words the URL space already spends. `GET /api/receipts/methodology` is registered before
+# `GET /api/receipts/{handle}`, so a caller holding that handle could never have their record
+# served: the route would answer with the methodology payload and the record page would render a
+# caller that is not there. The rest are reserved before the same trap can be set for them, and
+# because a record at /r/admin reads as an official one.
+_RESERVED_HANDLES = frozenset({
+    "methodology", "verify", "board", "admin", "api", "me", "new", "settings", "support",
+    "help", "about", "login", "logout", "signup", "account", "official", "staff", "rhumb",
+})
+
 
 def _caller_for_user(conn, user_id: int) -> dict | None:
     with conn.cursor() as cur:
@@ -3144,6 +3154,9 @@ def claim_handle(req: CallerReq, response: Response, tos_session: str | None = C
             response.status_code = 400
             return {"error": "a handle is 2 to 30 characters, lower case letters, digits and "
                              "hyphens, starting with a letter or a digit."}
+        if handle in _RESERVED_HANDLES:
+            response.status_code = 400
+            return {"error": f"the handle {handle} is reserved."}
         if not req.jurisdiction_attested:
             # Refused rather than defaulted. The attestation is the whole reason the column exists.
             response.status_code = 400
@@ -3329,7 +3342,7 @@ def receipts_for(handle: str, response: Response) -> dict:
         # second time through `for_chain` would double the work of the heaviest query on this page
         # for a count and one hash. `for_chain` is still the only input to actual VERIFICATION,
         # where reading exactly the sealed fields and nothing else is the whole point.
-        listing = receipts_calls.listing(cid, conn)
+        listing = receipts_calls.listing(cid, conn, full=False)
         out = {
             "caller": caller,
             "summary": receipts_record.summary(cid, conn),

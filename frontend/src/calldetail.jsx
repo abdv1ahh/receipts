@@ -12,7 +12,7 @@
 import { useEffect, useState } from "react";
 import { fetchCall } from "./api";
 import { Icon } from "./icons.jsx";
-import { LoadError } from "./shell.jsx";
+import { EmptyState, LoadError } from "./shell.jsx";
 import { Disclaimer, VerdictChip, day, price, shortHash, signed } from "./receiptsui.jsx";
 
 function Field({ label, value, missing, mono = true, wide = false }) {
@@ -80,7 +80,15 @@ export function CallDetailView({ callId, onBack, onOpenRecord }) {
 
   if (failed) return <LoadError what="this call" onRetry={load} />;
   if (!data) return <div className="rc-skel"><div className="skel" style={{ width: 280, height: 40 }} /></div>;
-  if (data.error) return <div className="cd-page"><button className="act" onClick={onBack}>back</button><p>{data.error}</p></div>;
+  if (data.error) {
+    return (
+      <EmptyState title="No such call"
+                  action={<button className="act" onClick={onBack}>Go back</button>}>
+        This call does not exist. Nothing has been removed: a call cannot be deleted once it is
+        published, so a link that does not resolve was never a link to a real one.
+      </EmptyState>
+    );
+  }
 
   const c = data.call;
   const imported = c.excess_return != null && c.entry_price == null;

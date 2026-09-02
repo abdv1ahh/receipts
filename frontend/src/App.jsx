@@ -200,10 +200,16 @@ export default function App() {
     if (params.get("ref")) setViewState("auth");           // arrived via a referral link
   }, []);
 
-  // Browser back/forward: the URL is the source of truth, so a popstate re-selects the surface.
+  // Browser back/forward: the URL is the source of truth, so a popstate re-selects the surface AND
+  // its parameter. Keying only on `route.path` was not enough: a record page linking to another
+  // record leaves the path at "record" and moves only the query, so Back changed the URL and left
+  // the previous record on screen. The call detail's Back button makes that the normal way through
+  // this feature rather than an edge case.
   useEffect(() => {
     if (ROUTES.has(route.path) && route.path !== view) setViewState(route.path);
-  }, [route.path]);
+    setRecordHandle(route.query.get("handle") || null);
+    setCallId(route.query.get("id") || null);
+  }, [route.path, route.query.toString()]);
 
   useEffect(() => {
     document.title = `${NAV_LABELS[view] || BRAND} · ${BRAND}`;
@@ -235,12 +241,10 @@ export default function App() {
 
   // One place that changes the surface, so the URL and the rendered view can never disagree.
   const setView = (v, query) => { setViewState(v); route.go(v, query); };
-  const go = (v) => {
-    if (v === "record") setRecordHandle(null);      // the rail item means MINE, not the last one read
-    setView(v);
-    setDetail(null);
-    setNavOpen(false);
-  };
+  // The rail item for "My record" navigates to /record with no handle, and the effect above reads
+  // the parameter back out of the URL, so there is one mechanism here rather than two that have to
+  // agree with each other.
+  const go = (v) => { setView(v); setDetail(null); setNavOpen(false); };
   const openDetail = (id) => {
     setDetail("loading");
     setExplanation(null);

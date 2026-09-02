@@ -66,3 +66,23 @@ def test_guards_reject_advice_and_invented_numbers():
     allowed = allowed_numbers(ctx)
     assert numbers_guard("impact reads 72 here", allowed) is True     # traces to context
     assert numbers_guard("the stock jumped 45% today", allowed) is False  # 45 fabricated -> rejected
+
+
+def test_no_reader_facing_prose_spells_out_the_internal_codename():
+    """The display name has exactly two homes, `config.brand_name()` and `frontend/src/brand.js`,
+    and neither is optional. Three strings in the analyst put "TradeOSS" in front of every reader
+    of the Morning Brief and the News feed for the whole of the rebrand, which is precisely the
+    failure CLAUDE.md describes: for eight phases the rebrand reached only the nav bar.
+
+    Asserted against the SOURCE rather than against rendered output, because the failing path is a
+    template that only renders when the model is unavailable, and the model was unavailable for
+    three phases without anyone noticing."""
+    import inspect
+    import re
+
+    from tradeos.intelligence import analyst
+    src = inspect.getsource(analyst)
+    # String literals only: comments and docstrings legitimately name the internal codename.
+    literals = re.findall(r'f?"([^"\\]*)"', src) + re.findall(r"f?'([^'\\]*)'", src)
+    offenders = [t for t in literals if "TradeOS" in t]
+    assert not offenders, f"the internal codename is in reader-facing prose: {offenders}"

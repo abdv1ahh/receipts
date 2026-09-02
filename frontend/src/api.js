@@ -169,11 +169,23 @@ export const authLogout = () => fetch("/api/auth/logout", { method: "POST" }).th
 //
 // The public reads take no session on purpose: a stranger following a shared record link has to be
 // able to check a caller without an account, which is the whole argument.
+// A 404 from a record or a call is an ANSWER, not a failure: nobody holds that handle. `get`
+// throws on any non-2xx, which turned "no such record" into a generic error panel with a Retry
+// button that could never succeed — on the two routes most likely to be reached by a shared link
+// with a typo in it. These two resolve the body instead, so the surface can render the empty state
+// it already has. Every other status still throws.
+async function getOr404(path) {
+  const res = await fetch(path, { headers: { Accept: "application/json" } });
+  if (res.status === 404) return res.json();
+  if (!res.ok) throw new Error(`${path} -> ${res.status}`);
+  return res.json();
+}
+
 export const fetchBoard = () => get("/api/board");
-export const fetchRecord = (handle) => get(`/api/receipts/${encodeURIComponent(handle)}`);
+export const fetchRecord = (handle) => getOr404(`/api/receipts/${encodeURIComponent(handle)}`);
 export const verifyChain = (handle) => get(`/api/receipts/${encodeURIComponent(handle)}/verify`);
 export const fetchReceiptsMethodology = () => get("/api/receipts/methodology");
-export const fetchCall = (id) => get(`/api/calls/${encodeURIComponent(id)}`);
+export const fetchCall = (id) => getOr404(`/api/calls/${encodeURIComponent(id)}`);
 export const fetchMyCaller = () => get("/api/callers/me");
 export const fetchScoreability = (symbol) =>
   get(`/api/calls/scoreability?symbol=${encodeURIComponent(symbol)}`);

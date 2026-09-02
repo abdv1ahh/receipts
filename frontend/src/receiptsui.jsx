@@ -149,7 +149,17 @@ export function ChainStrip({ handle, links, head, onVerify }) {
   const run = async () => {
     setState("running");
     setStep(0);
-    const result = await onVerify(handle);
+    let result;
+    try {
+      result = await onVerify(handle);
+    } catch {
+      // This is the flagship interaction of the whole product, so it must never be the thing that
+      // hangs. `/api/receipts/{handle}/verify` sits in the public rate-limit bucket, so a 429 is a
+      // real possibility on a page that has just been shared widely, and any transient failure
+      // used to leave the panel stuck on "checking link 0" with no error and no way back.
+      setState({ failed: true });
+      return;
+    }
     // Walk the links visibly rather than flashing an answer. Verification is the moment the demo
     // turns on, and an instant green tick reads like a decoration rather than like work.
     const total = Math.max(1, result.links);
@@ -162,7 +172,8 @@ export function ChainStrip({ handle, links, head, onVerify }) {
   };
 
   const running = state === "running";
-  const done = state && state !== "running";
+  const failed = state?.failed === true;
+  const done = state && state !== "running" && !failed;
 
   return (
     <div className={`rc-chain ${done ? (state.intact ? "ok" : "broken") : ""}`}>
@@ -191,6 +202,18 @@ export function ChainStrip({ handle, links, head, onVerify }) {
             <div>
               <b>Intact. All {state.links} links recompute.</b>
               <span>{state.reason}</span>
+            </div>
+          </div>
+        )}
+        {failed && (
+          <div className="rc-chain-res broken">
+            <Icon name="alert" size={15} />
+            <div>
+              <b>The check could not be run.</b>
+              <span>
+                That is a problem reaching us, not a finding about the record.{" "}
+                <button className="rc-retry" onClick={run}>try again</button>
+              </span>
             </div>
           </div>
         )}
@@ -223,18 +246,34 @@ export function Disclaimer({ text }) {
 export function HouseBanner({ house }) {
   if (!house) return null;
   const spans = house.expectancy_ci && house.expectancy_ci[0] < 0 && house.expectancy_ci[1] > 0;
+  // Derived, never asserted. This sentence said "which is below a coin flip" unconditionally, and
+  // nothing checked the rate. It is true today at 43.2%, and the day it stopped being true this
+  // banner would have published a false statement about our own record, on the page whose whole
+  // argument is that its numbers are ones you can check. It would also have read "it was right not
+  // scored of the time" if the pooled record were ever gated.
+  const rate = house.hit_rate;
+  const versus = rate == null ? null
+    : rate < 0.5 ? "which is below a coin flip"
+    : rate > 0.5 ? "which is above a coin flip, and the interval below says how much to read into that"
+    : "which is a coin flip";
   return (
     <div className="rc-house">
       <div className="rc-house-tag">This is our own signal engine</div>
       <p>
         Across both registered versions of it, {house.resolved_scoreable} calls resolved as a hit or
-        a miss and it was right <b className="num">{pct1(house.hit_rate)}</b> of the time, which is
-        below a coin flip.{" "}
+        a miss
+        {rate == null ? (
+          <>, which is too few to state a rate on.{" "}</>
+        ) : (
+          <> and it was right <b className="num">{pct1(rate)}</b> of the time, {versus}.{" "}</>
+        )}
         {spans && <>Its expectancy interval spans zero, so no edge is shown in either direction.{" "}</>}
-        At this dispersion it would take{" "}
-        <b className="num">{house.sample_needed_1pct?.toLocaleString()}</b> resolved calls to detect
-        a 1% per call edge. We publish it because a scoreboard that only shows winners is not a
-        scoreboard.
+        {house.sample_needed_1pct != null && (
+          <>At this dispersion it would take{" "}
+            <b className="num">{house.sample_needed_1pct.toLocaleString()}</b> resolved calls to
+            detect a 1% per call edge.{" "}</>
+        )}
+        We publish it because a scoreboard that only shows winners is not a scoreboard.
       </p>
     </div>
   );

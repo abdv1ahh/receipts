@@ -21,6 +21,7 @@ try:
     import psycopg
 
     from tradeos import db
+    from tradeos.backtest.engine import Series
     from tradeos.receipts import calls, chain, record, scoring, verification
     _IMPORTS_OK = True
 except Exception:                                             # pragma: no cover
@@ -118,15 +119,15 @@ def test_a_resolved_verdict_can_never_be_changed(caller):
     caller_id, _handle, conn = caller
     published = calls.publish(caller_id, VALID, conn)
     with conn.cursor() as cur:
-        cur.execute("UPDATE calls SET verdict = 'miss', verdict_note = 'n' WHERE id = %s",
-                    (published["id"],))
+        cur.execute("""UPDATE calls SET verdict = 'miss', verdict_note = 'n', resolved_at = now()
+                        WHERE id = %s""", (published["id"],))
     conn.commit()
 
     with pytest.raises(psycopg.errors.RaiseException) as exc:
         with conn.cursor() as cur:
             cur.execute("UPDATE calls SET verdict = 'hit' WHERE id = %s", (published["id"],))
     conn.rollback()
-    assert "resolved verdict" in str(exc.value)
+    assert "immutable" in str(exc.value)
 
 
 def test_the_resolution_columns_stay_writable(caller):
@@ -136,7 +137,7 @@ def test_the_resolution_columns_stay_writable(caller):
     published = calls.publish(caller_id, VALID, conn)
     with conn.cursor() as cur:
         cur.execute("""UPDATE calls SET entry_price = 100, exit_price = 110, excess_return = 0.05,
-                                        verdict = 'hit', verdict_note = 'scored'
+                                        verdict = 'hit', verdict_note = 'scored', resolved_at = now()
                         WHERE id = %s""", (published["id"],))
     conn.commit()
     assert calls.get(published["id"], conn)["verdict"] == "hit"
@@ -386,3 +387,140 @@ def test_wallet_signature_is_not_offered(caller):
     assert "wallet_signature" not in verification.METHODS
     caller_id, _handle, conn = caller
     assert "error" in verification.start(caller_id, "wallet_signature", conn)
+
+
+# ================================================================== the measurement is sealed too
+#
+# Migration 034 sealed the commitment and refused to change a verdict, and said nothing about the
+# nine columns the verdict is COMPUTED from. /code-review found it: `UPDATE calls SET excess_return
+# = 0.42 WHERE verdict = 'miss'` succeeded, every hash still verified because none of those are
+# sealed fields, and the published expectancy, the interval and every proof panel had moved. 035
+# closes it, and these are the tests that keep it closed.
+
+def _resolve_in_place(conn, call_id, **cols):
+    sets = ", ".join(f"{k} = %s" for k in cols)
+    with conn.cursor() as cur:
+        cur.execute(f"UPDATE calls SET verdict='miss', verdict_note='n', resolved_at=now(), {sets} "  # noqa: S608
+                    f"WHERE id = %s", (*cols.values(), call_id))
+    conn.commit()
+
+
+@pytest.mark.parametrize("column, value", [
+    ("excess_return", 0.42),
+    ("entry_price", 1.0),
+    ("exit_price", 999.0),
+    ("benchmark_entry", 1.0),
+    ("benchmark_exit", 999.0),
+    ("subject_return", 0.9),
+    ("benchmark_return", -0.9),
+    ("entry_session", "2020-01-02"),
+    ("exit_session", "2020-02-02"),
+    ("verdict_note", "a kinder explanation"),
+])
+def test_no_figure_a_resolved_call_was_scored_on_can_be_rewritten(caller, column, value):
+    """The arithmetic, not only the word. A record page argues "check the numbers yourself", so a
+    number that can be edited afterwards is worse than no number."""
+    caller_id, _handle, conn = caller
+    published = calls.publish(caller_id, VALID, conn)
+    _resolve_in_place(conn, published["id"], excess_return=-0.05, entry_price=10, exit_price=9)
+
+    with pytest.raises(psycopg.errors.RaiseException) as exc:
+        with conn.cursor() as cur:
+            cur.execute(f"UPDATE calls SET {column} = %s WHERE id = %s",   # noqa: S608 — literal
+                        (value, published["id"]))
+    conn.rollback()
+    assert "immutable" in str(exc.value)
+
+
+def test_the_frozen_context_is_actually_frozen(caller):
+    """034 described context_snapshot as frozen three lines above the trigger and did not seal it.
+    Reconstructing it afterwards would always flatter whoever reconstructed it."""
+    caller_id, _handle, conn = caller
+    published = calls.publish(caller_id, VALID, conn)
+    with pytest.raises(psycopg.errors.RaiseException) as exc:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE calls SET context_snapshot = %s WHERE id = %s",
+                        ('{"n_live": 999}', published["id"]))
+    conn.rollback()
+    assert "sealed columns" in str(exc.value)
+
+
+def test_a_verdict_cannot_be_written_without_its_resolved_at(caller):
+    """`resolved_at` is the switch the seal above turns on, so a verdict written without one would
+    walk straight past it."""
+    caller_id, _handle, conn = caller
+    published = calls.publish(caller_id, VALID, conn)
+    with pytest.raises(psycopg.errors.RaiseException) as exc:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE calls SET verdict = 'hit' WHERE id = %s", (published["id"],))
+    conn.rollback()
+    assert "resolved_at" in str(exc.value)
+
+
+def test_an_unresolved_call_can_still_be_scored(caller):
+    """The boundary has to be in the right place. Sealing everything at insert would mean nothing
+    could ever be scored, which is a different way of having no record."""
+    caller_id, _handle, conn = caller
+    published = calls.publish(caller_id, VALID, conn)
+    _resolve_in_place(conn, published["id"], excess_return=-0.05)
+    row = calls.get(published["id"], conn)
+    assert row["verdict"] == "miss" and row["excess_return"] == pytest.approx(-0.05)
+
+
+def test_a_user_can_hold_only_one_caller(caller):
+    """`claim_handle` guards with a SELECT and then inserts. Two concurrent posts both passed the
+    guard and inserted under different handles, so UNIQUE (handle) did not catch it, and the user
+    ended up with two records that `_caller_for_user` returned interchangeably."""
+    caller_id, _handle, conn = caller
+    with conn.cursor() as cur:
+        cur.execute("SELECT id FROM users LIMIT 1")
+        row = cur.fetchone()
+    if not row:
+        pytest.skip("no users in this database")
+    user_id = row[0]
+    with conn.cursor() as cur:
+        cur.execute("UPDATE callers SET user_id = %s WHERE id = %s", (user_id, caller_id))
+    conn.commit()
+    try:
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            with conn.cursor() as cur:
+                cur.execute("""INSERT INTO callers (user_id, handle, display_name,
+                                                    jurisdiction_attested)
+                               VALUES (%s, %s, 'Second', true)""",
+                            (user_id, f"second-{secrets.token_hex(4)}"))
+        conn.rollback()
+    finally:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE callers SET user_id = NULL WHERE id = %s", (caller_id,))
+        conn.commit()
+
+
+# ================================================================== a missing exit price stays open
+
+def test_a_symbol_whose_feed_is_behind_is_never_sealed_unscoreable(caller, monkeypatch):
+    """The most dangerous mistake available in this module, and one an earlier version of it made.
+
+    A symbol lagging the benchmark is the ROUTINE state of this price table: the free tier paces at
+    roughly 45 symbols an hour, so a backlog of several hundred takes most of a day and SPY is
+    fetched first on purpose. Reading that as "the symbol's feed is dead" would stamp a permanent,
+    uncorrectable verdict on ordinary calls an hour before their prices arrived.
+    """
+    caller_id, _handle, conn = caller
+    published_at = datetime.now(UTC) - timedelta(days=200)
+    published = calls.publish(caller_id, VALID, conn, now=published_at)
+
+    # A symbol series that stops AFTER entry but BEFORE the horizon closes, against a full
+    # benchmark. That is exactly the shape a lagging feed has at the moment the scorer looks: an
+    # entry price exists, an exit price does not yet, and the benchmark has both.
+    real = scoring._series
+    spy = real(conn, "SPY")
+    stops = published_at.date() + timedelta(days=10)          # entry + 1, horizon is 30
+    cut = [d for d in spy.days if d <= stops]
+    short = Series(cut, {d: spy.close[d] for d in cut})
+    assert cut and cut[-1] > published_at.date(), "the fixture must still supply an entry price"
+    monkeypatch.setattr(scoring, "_series",
+                        lambda c, sym: short if sym == VALID["symbol"] else real(c, sym))
+
+    out = scoring.resolve_call(published["id"], conn)
+    assert out.get("status") == "open", out
+    assert calls.get(published["id"], conn)["verdict"] is None

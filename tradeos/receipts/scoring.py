@@ -44,9 +44,10 @@ UNSCOREABLE = {
     "no_entry_price": "our price feed for {symbol} ends before this call was published, so there "
                       "is no entry price. That is a gap in our data rather than a fault in the "
                       "call.",
-    "horizon_open_or_delisted": "{benchmark} has price data past the end of this horizon and "
-                                "{symbol} does not, so its feed has stopped and there is no exit "
-                                "price to score against.",
+    # Kept for completeness; `resolve_call` no longer reaches it, because a missing exit price
+    # always leaves the call open rather than sealing a verdict that cannot be taken back.
+    "horizon_open_or_delisted": "the price feed for {symbol} does not reach the end of the "
+                                "horizon, so there is no exit price yet.",
 }
 
 
@@ -115,21 +116,24 @@ def resolve_call(call_id: int, conn: psycopg.Connection, spy: Series | None = No
     as_of = published_at.date()
     excess, why = excess_return(sym, spy, as_of, horizon_days)
     if excess is None:
-        # `horizon_open_or_delisted` covers two situations that must NOT be treated alike, because
-        # a verdict is permanent once written and the trigger means permanent really is permanent.
+        # A missing EXIT price always leaves the call open. Never unscoreable.
         #
-        # The benchmark settles it. SPY is fetched first on every top-up precisely so it is the
-        # freshest thing in the table. If SPY reaches the end of the horizon and this symbol does
-        # not, the symbol's own feed is dead relative to the market and unscoreable is honest and
-        # final. If SPY has not reached it either, our feed is merely behind, which is our
-        # operational fault and fixes itself; the call stays OPEN and is retried in six hours.
+        # Two situations produce it and prices alone cannot tell them apart at any single moment: a
+        # feed that has not caught up yet, and a symbol that has genuinely stopped trading. An
+        # earlier version of this tried to let the benchmark settle it — SPY is fetched first on
+        # every top-up, so if SPY reached the horizon and the symbol had not, the symbol looked
+        # dead. That reasoning is wrong, and dangerously so: a symbol lagging SPY is the ROUTINE
+        # state of this table, because the free tier paces at roughly 45 symbols an hour and a
+        # backlog of several hundred takes most of a day. It would have stamped a permanent,
+        # uncorrectable `unscoreable` on ordinary calls an hour before their prices arrived.
+        #
+        # So the call stays open and is retried every six hours. A genuinely delisted symbol stays
+        # open forever, which is visible in the counts, is honest, and is correctable later. A
+        # wrong verdict is none of those, because the trigger means permanent really is permanent.
         if why == "horizon_open_or_delisted":
-            entry = entry_day_after(sym, as_of)
-            benchmark_reached = entry is not None and exit_day_for(spy, entry, horizon_days)
-            if not benchmark_reached:
-                return {"call_id": call_id, "status": "open",
-                        "reason": "the price feed has not reached the end of the horizon yet, so "
-                                  "there is nothing to score against."}
+            return {"call_id": call_id, "status": "open",
+                    "reason": "the price feed for this symbol does not reach the end of the "
+                              "horizon yet, so there is nothing to score against."}
         return _write(conn, call_id, "unscoreable",
                       UNSCOREABLE.get(why, UNSCOREABLE["no_symbol"]).format(
                           symbol=symbol, benchmark=benchmark), {})
