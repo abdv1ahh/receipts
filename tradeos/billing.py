@@ -20,10 +20,22 @@ from . import authn
 
 log = logging.getLogger("tradeos.billing")
 
+# The tier KEYS are unchanged and must stay that way: `users.tier` holds them, ENTITLEMENTS is
+# keyed on them, and the 48h delay is enforced off them. Only the display names, the prices and the
+# copy move, because the product they describe moved. Renaming a tier key would silently re-tier
+# every existing account.
+#
+# `blurb` is what each plan is FOR, in one line, because a price list of feature bullets does not
+# tell a newsletter operator why they would pay us anything.
 PLANS = {
-    "free":   {"name": "Free",   "price": 0,  "tier": "free"},
-    "retail": {"name": "Trader", "price": 29, "tier": "retail", "price_id_env": "STRIPE_PRICE_RETAIL"},
-    "pro":    {"name": "Pro",    "price": 99, "tier": "pro",    "price_id_env": "STRIPE_PRICE_PRO"},
+    "free":   {"name": "Reader", "price": 0,  "tier": "free",
+               "blurb": "Every record, the board, the methodology, and chain verification. Free "
+                        "forever, and no account needed to read."},
+    "retail": {"name": "Caller", "price": 19, "tier": "retail", "price_id_env": "STRIPE_PRICE_RETAIL",
+               "blurb": "A verified record page of your own, unlimited calls, the share card and "
+                        "the embed."},
+    "pro":    {"name": "Desk",   "price": 99, "tier": "pro",    "price_id_env": "STRIPE_PRICE_PRO",
+               "blurb": "Multiple handles, the data API, and exports."},
 }
 
 # Server-side entitlements per tier. live_signals maps to the 48h delay (decision #36); the limits

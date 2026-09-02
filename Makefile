@@ -42,6 +42,7 @@ backfill-full:
 test:
 	docker compose run --rm -T \
 	  -v "$(CURDIR)/tests:/app/tests" -v "$(CURDIR)/tradeos:/app/tradeos" \
+	  -v "$(CURDIR)/frontend/src:/app/frontend/src:ro" \
 	  api python -m pytest tests/ -q
 
 # Development stack: Python reloads in place, tests/ is mounted, and the locally built frontend is

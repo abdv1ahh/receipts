@@ -733,7 +733,7 @@ def cmd_seed_house_records(_args) -> None:
     for handle, result in out.items():
         if result.get("skipped"):
             print(f"seed-house-records {handle}: skipped, {result['existing_calls']} calls already "
-                  f"sealed (an append only record is never re-imported)")
+                  f"sealed (an append only record is never imported twice)")
         else:
             print(f"seed-house-records {handle}: {result['imported']} calls sealed "
                   f"({result['hit']}H/{result['miss']}M/{result['inconclusive']}I/"

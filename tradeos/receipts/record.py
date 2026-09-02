@@ -270,11 +270,14 @@ def methodology() -> dict:
             "proves": ("That the caller has not edited, deleted, reordered or backdated anything. "
                        "Every hash is recomputable by anyone from the fields shown on this site, "
                        "and one changed character breaks every link after it."),
-            "does_not_prove": ("That WE have not. We hold every field, so this operator could "
-                               "rewrite a call and recompute the whole chain. Making that "
-                               "impossible needs an anchor outside our control, publishing the "
-                               "chain head daily somewhere we cannot revise, and that is not "
-                               "built yet. This is not a blockchain and we do not call it one."),
+            # Written as a complete sentence because it travels: the record page shows it under
+            # the verification result, where there is no heading above it to lean on.
+            "does_not_prove": ("The chain does not prove that WE have not rewritten it. We hold "
+                               "every field, so this operator could edit a call and recompute the "
+                               "whole chain after it. Making that impossible needs an anchor "
+                               "outside our control, publishing the chain head daily somewhere we "
+                               "cannot revise, and that is not built yet. This is not a blockchain "
+                               "and we do not call it one."),
         },
     }
 

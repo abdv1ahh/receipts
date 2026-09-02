@@ -9,6 +9,10 @@
          It described the pre-rebrand product ("the AI trading terminal") for the whole of the
          ten-phase rebuild, because App.jsx sets document.title only AFTER first paint. -->
     <meta name="description" content="Rhumb reads world events and commits to what they mean — the mechanism, the assets, the horizon, the confidence — then scores itself in public and publishes the misses first." />
+    <!-- Inline rather than a file: it costs no request, cannot 404, and needs nothing in the
+         static mount. Every page load asked for /favicon.ico and got a 404, which is the one
+         console error the app could not shake. The mark is the same lozenge the sidebar uses. -->
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2305060c'/%3E%3Cpath d='M16 6l6 10-6 10-6-10z' fill='%236e8cff'/%3E%3C/svg%3E">
     <title>Rhumb — world events, and what they mean for you</title>
   </head>
   <body>

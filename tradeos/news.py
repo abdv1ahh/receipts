@@ -123,20 +123,72 @@ _GROUP = (" GROUP BY n.id, a.impact_score, a.why_it_matters, a.confidence, a.sou
 
 def ranked_news(conn: psycopg.Connection, symbol: str | None = None, category: str | None = None,
                 hours: int = 72, limit: int = 40) -> list[dict]:
-    """Impact-ranked recent news, optionally filtered to a symbol or category."""
+    """Impact-ranked recent news, optionally filtered to a symbol or category.
+
+    Kept for callers that only want the list. `ranked_news_window` is the one to use where the
+    caller can report a widened window to the reader, which is everywhere on a surface.
+    """
+    return ranked_news_window(conn, symbol, category, hours, limit)["items"]
+
+
+def ranked_news_window(conn: psycopg.Connection, symbol: str | None = None,
+                       category: str | None = None, hours: int = 72,
+                       limit: int = 40) -> dict:
+    """The same query, plus what happened to the window.
+
+    THE WINDOW IS A PREFERENCE, NOT A WALL. This surface holds thousands of items and rendered
+    completely empty whenever ingestion had been stopped for longer than the window, which on a
+    laptop is any weekend. "There is no news" and "the machine that fetches news was off" are
+    entirely different statements and the reader was being shown the first one.
+
+    So a window that returns nothing falls back to the most recent items regardless of age, and
+    says so. Widening the default instead would only move the cliff further out; a reader would
+    still meet it eventually, and would still be told the wrong thing when they did.
+    """
     sig = signal_symbols(conn)
-    where = ["n.knowable_time >= now() - make_interval(hours => %s)"]
-    params: list = [hours]
+    filters: list = []
+    params: list = []
     if symbol:
-        where.append("n.id IN (SELECT news_id FROM news_item_entities WHERE symbol=%s)")
+        filters.append("n.id IN (SELECT news_id FROM news_item_entities WHERE symbol=%s)")
         params.append(symbol.upper())
     if category:
-        where.append("n.category=%s")
+        filters.append("n.category=%s")
         params.append(category)
-    with conn.cursor() as cur:
-        cur.execute(_SELECT + " WHERE " + " AND ".join(where) + _GROUP, params)
-        rows = cur.fetchall()
-    return _rows_to_items(rows, sig)[:limit]
+
+    def _query(windowed: bool) -> list:
+        clauses = list(filters)
+        args = list(params)
+        if windowed:
+            clauses.insert(0, "n.knowable_time >= now() - make_interval(hours => %s)")
+            args.insert(0, hours)
+        where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+        with conn.cursor() as cur:
+            # Unwindowed, this reads the whole filtered table before ranking, so it is bounded in
+            # SQL rather than in Python. The windowed path is naturally bounded by the window.
+            order = "" if windowed else " ORDER BY n.knowable_time DESC LIMIT %s"
+            if not windowed:
+                args.append(max(limit * 3, 60))
+            cur.execute(_SELECT + where + _GROUP + order, args)
+            return cur.fetchall()
+
+    rows = _query(windowed=True)
+    widened = False
+    if not rows:
+        rows = _query(windowed=False)
+        widened = bool(rows)
+
+    items = _rows_to_items(rows, sig)[:limit]
+    out = {"items": items, "window_hours": hours, "widened": widened}
+    if widened and items:
+        # The reader is told the age of what they are looking at rather than left to assume it is
+        # current, which is the whole reason this fallback is allowed to exist.
+        stamps = [i.get("knowable_time") or i.get("published_at") for i in items]
+        stamps = [t for t in stamps if t]
+        out["widened_note"] = (f"Nothing was published in the last {hours} hours, so this is the "
+                               f"most recent news held rather than an empty page.")
+        out["newest"] = max(stamps) if stamps else None
+        out["oldest"] = min(stamps) if stamps else None
+    return out
 
 
 def get_item(conn: psycopg.Connection, news_id: int) -> dict | None:

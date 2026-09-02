@@ -114,7 +114,7 @@ def seed_house_records(conn: psycopg.Connection) -> dict:
             existing = cur.fetchone()[0]
         if existing:
             totals[handle] = {"skipped": True, "existing_calls": existing,
-                              "note": "already imported; an append only record is never re-imported."}
+                              "note": "already imported; an append only record is never imported twice."}
             continue
 
         rows = _source_rows(conn, model_version)

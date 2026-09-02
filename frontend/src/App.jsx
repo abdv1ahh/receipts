@@ -26,23 +26,51 @@ import { GlobeView } from "./globe.jsx";
 import { ExposureView } from "./exposure.jsx";
 import { CalendarView } from "./calendar.jsx";
 import { LedgerView } from "./ledger.jsx";
+import { BoardView } from "./board.jsx";
+import { RecordView, MyRecord } from "./record.jsx";
+import { PublishView } from "./publish.jsx";
+import { CallDetailView } from "./calldetail.jsx";
+import { ReceiptsMethodologyView } from "./methodology.jsx";
 import { ErrorBoundary, useRoute } from "./shell.jsx";
 import { Icon } from "./icons.jsx";
 
-const NAV_LABELS = { radar: "Radar", globe: "The World", ledger: "Ledger", dashboard: "Dashboard", brief: "Morning Brief", news: "News", events: "Calendar", home: "Smart Money", trending: "Social", crypto: "Crypto", journal: "Journal", exposure: "Exposure", watchlist: "Watchlist", community: "Community", alerts: "Alerts", assistant: "AI Assistant", screener: "Screener", library: "Library", methodology: "Methodology", integrations: "Integrations" };
-const NAV_ICONS = { radar: "radar", globe: "layers", ledger: "target", dashboard: "grid", brief: "sparkles", news: "news", events: "calendar", home: "signal", trending: "trending", crypto: "crypto", journal: "journal", exposure: "briefcase", watchlist: "star", community: "users", alerts: "bell", assistant: "compass", screener: "filter", library: "book", methodology: "target", integrations: "plug" };
-// A calmer rail: the essentials up front, utilities tucked into a collapsible "More".
+// Receipts is the product; everything else is supporting research. The rail says so.
+//
+// Radar, The World, Exposure, Library and Community are deliberately absent. Their code is still
+// here and still imported, and they can come back the day they have something to show — but they
+// are empty or thin right now, and a rail that leads a reader to an empty page has spent the one
+// thing this product is selling. See docs/state.md for what each of them is waiting on.
+const NAV_LABELS = {
+  // RECEIPTS
+  board: "The Board", publish: "Publish a call", record: "My record", methodology: "Methodology",
+  // RESEARCH
+  home: "Smart Money", ledger: "Ledger", events: "Calendar", crypto: "Crypto", news: "News",
+  journal: "Journal", watchlist: "Watchlist", "signal-methodology": "Signal methodology",
+  // SYSTEM
+  integrations: "Integrations", assistant: "AI Assistant", search: "Search",
+  // Reachable, but not on the rail. Everything here has a real surface behind it; they are in
+  // ROUTES and in the command palette so no door is bricked up.
+  dashboard: "Dashboard", brief: "Morning Brief", trending: "Social", alerts: "Alerts",
+  screener: "Screener", portfolios: "Shadow portfolios",
+};
+const NAV_ICONS = {
+  board: "target", publish: "signal", record: "shield", methodology: "book",
+  home: "signal", ledger: "activity", events: "calendar", crypto: "crypto", news: "news",
+  journal: "journal", watchlist: "star", "signal-methodology": "book",
+  integrations: "plug", assistant: "compass", search: "search",
+  dashboard: "grid", brief: "sparkles", trending: "trending", alerts: "bell",
+  screener: "filter", portfolios: "briefcase",
+};
 const SIDEBAR = [
-  { label: "Overview", items: ["radar", "globe", "dashboard", "brief"] },
-  { label: "Intelligence", items: ["ledger", "home", "trending", "news", "crypto", "events"] },
-  { label: "Your desk", items: ["journal", "exposure", "watchlist", "assistant", "alerts"] },
-  { label: "People", items: ["community"] },
+  { label: "Receipts", items: ["board", "publish", "record", "methodology"] },
+  { label: "Research", items: ["home", "ledger", "events", "crypto", "news", "journal", "watchlist"] },
+  { label: "System", items: ["integrations", "assistant", "search"] },
 ];
-const MORE = ["screener", "library", "integrations", "methodology"];
-// Everything reachable from the ⌘K command palette.
+const MORE = ["dashboard", "brief", "trending", "alerts", "screener", "portfolios", "signal-methodology"];
+// Everything reachable from the ⌘K command palette. Every route with a nav label appears here, so
+// a surface that is off the rail is still one keystroke away rather than lost.
 const CMD_ITEMS = [
-  ...["radar", "globe", "ledger", "dashboard", "brief", "home", "trending", "news", "crypto", "events", "journal", "exposure", "watchlist", "community", "assistant", "alerts", "screener", "library", "integrations", "methodology"]
-    .map((v) => ({ v, label: NAV_LABELS[v], icon: NAV_ICONS[v], group: "Go to" })),
+  ...Object.keys(NAV_LABELS).map((v) => ({ v, label: NAV_LABELS[v], icon: NAV_ICONS[v], group: "Go to" })),
   { v: "pricing", label: "Upgrade plan", icon: "sparkles", group: "Actions" },
   { v: "notifications", label: "Notifications", icon: "bell", group: "Actions" },
 ];
@@ -103,19 +131,30 @@ function CommandPalette({ onGo, onClose }) {
 // Which surfaces are reachable by URL. Anything not listed falls back to the dashboard, so a
 // stale bookmark lands somewhere sensible instead of a blank page.
 const ROUTES = new Set([...Object.keys(NAV_LABELS), "auth", "pricing", "notifications",
-                        "search", "asset", "profile", "library-entry", "admin", "trader",
+                        "asset", "profile", "admin", "call",
                         // Reached from an email. Without these the link fell through to the SPA
                         // catch-all and landed on the marketing page with the token ignored.
-                        "verify", "reset"]);
+                        "verify", "reset",
+                        // OFF THE RAIL BUT STILL ADDRESSABLE. These are gone from NAV_LABELS and
+                        // from the command palette, so they cannot be reached from navigation,
+                        // which is what taking them off the rail was for. They stay in ROUTES
+                        // because in-app links to them still exist — the Morning Brief and the
+                        // Dashboard both link to the Radar, and four surfaces link to library
+                        // entries — and dropping them here would turn every one of those into a
+                        // silent redirect to the Board. A door that opens onto the wrong room is
+                        // worse than a door that is not advertised.
+                        "radar", "globe", "exposure", "library", "library-entry",
+                        "community", "trader"]);
 
 export default function App() {
   const route = useRoute();
   const [minC, setMinC] = useState("medium");
   const [horizon, setHorizon] = useState(90);
-  // Radar is the product's primary surface, so an unrecognised path lands there. A signed-out
-  // stranger never reaches this: the server redirects "/" to the marketing site before the
-  // bundle is served.
-  const [view, setViewState] = useState(() => (ROUTES.has(route.path) ? route.path : "radar"));
+  // The Board is the product's landing surface, so an unrecognised path lands there. It is also
+  // the one surface guaranteed to have something on it from a cold start, because our own record
+  // is always on it. A signed-out stranger never reaches this: the server redirects "/" to the
+  // marketing site before the bundle is served.
+  const [view, setViewState] = useState(() => (ROUTES.has(route.path) ? route.path : "board"));
   const [clusters, setClusters] = useState(null);
   const [asOf, setAsOf] = useState(null);
   const [defVer, setDefVer] = useState(null);
@@ -129,6 +168,12 @@ export default function App() {
   const [assetSymbol, setAssetSymbol] = useState(null);
   const [traderHandle, setTraderHandle] = useState(
     () => new URLSearchParams(window.location.search).get("handle") || null);
+  // A record and a call both live at an address, because a record nobody can point at is not much
+  // of a record. Both read their parameter from the URL on first load, so a shared link works.
+  const [recordHandle, setRecordHandle] = useState(
+    () => new URLSearchParams(window.location.search).get("handle") || null);
+  const [callId, setCallId] = useState(
+    () => new URLSearchParams(window.location.search).get("id") || null);
   const [profile, setProfile] = useState(null); // {kind, id}
   const [librarySlug, setLibrarySlug] = useState(null);
   const [search, setSearch] = useState("");
@@ -190,7 +235,12 @@ export default function App() {
 
   // One place that changes the surface, so the URL and the rendered view can never disagree.
   const setView = (v, query) => { setViewState(v); route.go(v, query); };
-  const go = (v) => { setView(v); setDetail(null); setNavOpen(false); };
+  const go = (v) => {
+    if (v === "record") setRecordHandle(null);      // the rail item means MINE, not the last one read
+    setView(v);
+    setDetail(null);
+    setNavOpen(false);
+  };
   const openDetail = (id) => {
     setDetail("loading");
     setExplanation(null);
@@ -201,14 +251,19 @@ export default function App() {
   // The handle goes in the URL so a track record can be linked to. A record nobody can point at
   // is not much of a record.
   const openTrader = (handle) => { setTraderHandle(handle); setView("trader", { handle }); };
+  const openRecord = (handle) => { setRecordHandle(handle); setView("record", { handle }); };
+  const openCall = (id) => { setCallId(String(id)); setView("call", { id }); };
   const openProfile = (kind, id) => { setProfile({ kind, id }); setDetail(null); setView("profile", { kind, id }); };
   const openLibrary = (slug) => { setLibrarySlug(slug); setDetail(null); setView("library-entry", { slug }); };
-  const onAuthed = (u) => { setUser(u); setView("radar"); };
+  const onAuthed = (u) => { setUser(u); setView("board"); };
   const doLogout = async () => { await authLogout(); setUser(null); window.location.assign("/site/"); };
   const submitSearch = () => { if (search.trim()) { setView("search", { q: search.trim() }); setDetail(null); setNavOpen(false); } };
 
+  // "My record" is the signed-in caller's own. Reading somebody else's record uses the same route
+  // with a handle, so highlighting the rail item there would tell the reader they are looking at
+  // their own record when they are looking at ours.
   const navBtn = (v) => (
-    <button key={v} className={`nav-item ${view === v || (v === "library" && view === "library-entry") ? "on" : ""}`} onClick={() => go(v)}>
+    <button key={v} className={`nav-item ${(view === v && !(v === "record" && recordHandle)) ? "on" : ""}`} onClick={() => go(v)}>
       <Icon name={NAV_ICONS[v]} /><span>{NAV_LABELS[v]}</span>
     </button>
   );
@@ -331,11 +386,9 @@ export default function App() {
           ) : view === "trending" ? (
             <SocialView onOpenSymbol={openSymbol} onNav={go} />
           ) : view === "pricing" ? (
-            <PricingView user={user} onUpgraded={refreshUser} onLogin={() => go("auth")} />
+            <PricingView user={user} onUpgraded={refreshUser} onLogin={() => go("auth")} onNav={go} />
           ) : view === "notifications" ? (
             <NotificationsView onOpenSymbol={openSymbol} onLogin={() => go("auth")} onChanged={refreshUnread} />
-          ) : view === "methodology" ? (
-            <Methodology calibration={calibration} definitions={definitions} onBack={() => go("home")} />
           ) : view === "asset" ? (
             <AssetView symbol={assetSymbol} calibration={calibration} horizon={horizon}
                        onOpenProfile={openProfile} onBack={() => go("home")} />
@@ -363,12 +416,33 @@ export default function App() {
             <GlobeView user={user} onLogin={() => go("auth")} />
           ) : view === "ledger" ? (
             <LedgerView />
+          ) : view === "board" ? (
+            <BoardView onOpenRecord={openRecord} onNav={go} />
+          ) : view === "record" ? (
+            // "My record" with no handle resolves to the signed-in caller's own; PublishView is
+            // the surface that knows how to claim one, so it handles the not-yet-a-caller case.
+            recordHandle ? (
+              <RecordView handle={recordHandle} onOpenCall={openCall} onNav={go} />
+            ) : (
+              <MyRecord user={user} onLogin={() => go("auth")} onOpenRecord={openRecord}
+                        onNav={go} />
+            )
+          ) : view === "publish" ? (
+            <PublishView user={user} onLogin={() => go("auth")} onOpenCall={openCall}
+                         onOpenRecord={openRecord} />
+          ) : view === "call" ? (
+            <CallDetailView callId={callId} onBack={() => window.history.back()}
+                            onOpenRecord={openRecord} />
+          ) : view === "methodology" ? (
+            <ReceiptsMethodologyView />
+          ) : view === "signal-methodology" ? (
+            <Methodology calibration={calibration} definitions={definitions} onBack={() => go("home")} />
           ) : view === "integrations" ? (
             <IntegrationsView onLogin={() => go("auth")} />
           ) : view === "admin" ? (
             <AdminView user={user} />
           ) : (
-            <Dashboard user={user} onOpenSymbol={openSymbol} onNav={go} />
+            <BoardView onOpenRecord={openRecord} onNav={go} />
           )}
           </ErrorBoundary>
         </main>

@@ -70,8 +70,11 @@
 
   --sidebar-w: 244px;
   --topbar-h: 62px;
-  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
-  --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  /* The three identity faces, now loaded by main.jsx and shared with the marketing site. Each
+     keeps a real fallback stack: a font file that fails to load must degrade, never disappear. */
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --sans: "Inter Variable", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --display: "Instrument Serif", Iowan Old Style, Georgia, serif;
 }
 
 * { box-sizing: border-box; }
@@ -1669,6 +1672,339 @@ div.intg-warn { margin-top: 8px; border: 0; border-radius: 8px; padding: 7px 10p
 .rd-thread-list p { margin: 5px 0 3px; color: var(--muted); line-height: 1.55; }
 .rd-thread-note { font-size: 11px; color: var(--faint); font-style: italic; }
 
+.plan-blurb { color: var(--muted); font-size: 12.5px; line-height: 1.55; margin: 6px 0 10px; }
+.plan-feat-link { background: none; border: 0; padding: 0; color: var(--accent); font: inherit;
+                  font-size: inherit; cursor: pointer; text-decoration: underline; }
+
+/* The news window fallback. Styled as a fact rather than an error: the data is real, it is simply
+   older than the default window, and the reader is being told which. */
+.news-widened { margin-top: 10px; color: var(--muted); font-size: 12.5px; line-height: 1.55;
+                border-left: 2px solid var(--border); padding-left: 10px; }
+
+/* =====================================================================================================
+   RECEIPTS
+   -----------------------------------------------------------------------------------------------------
+   A registry, not a trading terminal. The rest of this app is a dark instrument panel; these pages
+   are a ledger book, and the difference is deliberate — the reader is checking a record, not
+   watching a market.
+
+   Three rules do most of the work:
+
+     TYPE.      Instrument Serif for the caller's name and the page heads, because it reads as a
+                document rather than as a dashboard. IBM Plex Mono with tabular figures for every
+                number, so columns align and nothing jitters when a value updates.
+     COLOUR.    Verdicts are muted and low saturation. A miss is a normal outcome of making calls in
+                public, and painting it as an alarm would teach callers to stop publishing them,
+                which would destroy the only asset this product has. The one strongest accent in
+                the palette is spent on the chain verification state and on nothing else, because
+                that is the single moment on these pages when something is proved.
+     HIERARCHY. The counts and the intervals are the largest text; the hit rate is not the hero.
+                This is the opposite of what every competitor does and it is the honest ordering.
+   ===================================================================================================== */
+
+.rc-page, .bd-page, .pb-page, .cd-page, .mt-page {
+  max-width: 940px; margin: 0 auto; padding: var(--s5) 0 var(--s8);
+  display: flex; flex-direction: column; gap: var(--s6);
+}
+.rc-skel { padding: var(--s6) 0; }
+
+.rc-name { font-family: var(--display); font-weight: 400; font-size: clamp(2rem, 4.4vw, 3.1rem);
+           line-height: 1.05; letter-spacing: -0.02em; margin: 0; color: var(--text); }
+.rc-h2 { font-family: var(--display); font-weight: 400; font-size: 1.6rem; letter-spacing: -0.01em;
+         margin: 0 0 var(--s2); color: var(--text); }
+.rc-lede { color: var(--muted); font-size: var(--fs-md); line-height: 1.65; margin: 0 0 var(--s4);
+           max-width: 66ch; }
+.rc-thin { color: var(--faint); font-size: var(--fs-sm); }
+.rc-back { background: none; border: 0; color: var(--muted); font: inherit; font-size: var(--fs-sm);
+           cursor: pointer; display: inline-flex; align-items: center; gap: 6px; padding: 0;
+           align-self: flex-start; }
+.rc-back:hover { color: var(--text); }
+
+/* ---- header ---- */
+.rc-head { display: flex; flex-direction: column; gap: var(--s2);
+           border-bottom: 1px solid var(--border); padding-bottom: var(--s4); }
+.rc-handle { color: var(--muted); font-size: var(--fs-base); letter-spacing: 0.02em; }
+.rc-head-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s3);
+                font-size: var(--fs-sm); }
+.rc-verified { color: var(--green); display: inline-flex; align-items: center; gap: 6px; }
+.rc-verified-how { color: var(--muted); }
+.rc-unverified { color: var(--faint); max-width: 60ch; line-height: 1.5; }
+.rc-audience { color: var(--accent); text-decoration: none; font-family: var(--mono); }
+.rc-kindtag, .bd-tag { font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em;
+                       text-transform: uppercase; color: var(--faint);
+                       border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; }
+.bd-tag.ours { color: var(--accent); border-color: rgba(110,140,255,0.35); }
+.rc-bio { color: var(--muted); font-size: var(--fs-md); line-height: 1.7; max-width: 66ch; margin: 0; }
+
+/* ---- the house banner. Our own record, labelled as ours, in its own words. ---- */
+.rc-house { border: 1px solid rgba(110,140,255,0.28); border-radius: var(--radius);
+            background: rgba(110,140,255,0.05); padding: var(--s4); }
+.rc-house-tag { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em;
+                text-transform: uppercase; color: var(--accent); margin-bottom: var(--s2); }
+.rc-house p { margin: 0; color: var(--text); font-size: var(--fs-md); line-height: 1.75;
+              max-width: 72ch; }
+
+/* ---- the chain strip. The one place the strongest accent is spent. ---- */
+.rc-chain { border: 1px solid var(--border); border-radius: var(--radius); padding: var(--s4);
+            display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, auto); gap: var(--s4);
+            align-items: center; background: var(--panel); transition: border-color var(--dur-2) var(--ease); }
+.rc-chain.ok { border-color: rgba(110,140,255,0.5); box-shadow: var(--glow); }
+.rc-chain.broken { border-color: rgba(255,107,129,0.45); }
+.rc-chain-l { display: flex; align-items: center; gap: var(--s4); min-width: 0; }
+.rc-chain-n { font-size: 2.4rem; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+.rc-chain-lab { color: var(--muted); font-size: var(--fs-sm); line-height: 1.5; min-width: 0; }
+.rc-chain-head { color: var(--faint); font-size: 11px; overflow-wrap: anywhere; }
+.rc-chain-r { min-width: 0; }
+.rc-verify { display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px;
+             border-radius: var(--radius-sm); border: 1px solid rgba(110,140,255,0.4);
+             background: rgba(110,140,255,0.10); color: var(--accent); font: inherit;
+             font-weight: 600; cursor: pointer; white-space: nowrap; }
+.rc-verify:hover { background: rgba(110,140,255,0.18); }
+.rc-chain-run { color: var(--accent); font-size: var(--fs-sm); min-width: 200px; }
+.rc-chain-bar { height: 3px; background: var(--border); border-radius: 2px; margin-top: 8px;
+                overflow: hidden; }
+.rc-chain-bar i { display: block; height: 100%; background: var(--accent);
+                  transition: width 40ms linear; }
+.rc-chain-res { display: flex; gap: 10px; align-items: flex-start; font-size: var(--fs-sm); }
+.rc-chain-res.ok { color: var(--accent); }
+.rc-chain-res.broken { color: var(--red); }
+.rc-chain-res b { display: block; }
+.rc-chain-res span { color: var(--muted); }
+.rc-chain-caveat { grid-column: 1 / -1; margin: 0; color: var(--faint); font-size: var(--fs-sm);
+                   line-height: 1.6; border-top: 1px solid var(--border); padding-top: var(--s3); }
+
+/* ---- counts. All five, always, and the largest thing on the page. ---- */
+.rc-counts { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--s3); }
+.rc-count { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--s3);
+            background: var(--panel); min-width: 0; }
+.rc-count b { display: block; font-family: var(--mono); font-variant-numeric: tabular-nums;
+              font-weight: 600; color: var(--text); }
+.rc-counts.lg .rc-count b { font-size: 2.1rem; line-height: 1.1; }
+.rc-counts.sm .rc-count b { font-size: 1.05rem; }
+.rc-counts.sm .rc-count { padding: 4px 6px; background: none; border: 0; }
+.rc-count span { color: var(--faint); font-size: 11px; letter-spacing: 0.05em; }
+.rc-count b.rc-hit { color: #7fb69a; }
+.rc-count b.rc-miss { color: #c98a95; }
+
+/* ---- the rate block ---- */
+.rc-rate { display: flex; flex-direction: column; gap: var(--s4); margin-top: var(--s4); }
+.rc-rate-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+                gap: var(--s4); }
+.rc-stat { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rc-stat-l { color: var(--faint); font-size: var(--fs-sm); order: 2; }
+.rc-stat-v { font-size: 1.7rem; font-weight: 600; color: var(--text); order: 1;
+             font-variant-numeric: tabular-nums; }
+.rc-stat-ci { color: var(--muted); font-size: var(--fs-sm); order: 3;
+              font-variant-numeric: tabular-nums; }
+.rc-signif { color: var(--muted); font-size: var(--fs-md); line-height: 1.75; max-width: 74ch;
+             border-left: 2px solid var(--border); padding-left: var(--s3); }
+.rc-signif b { color: var(--text); font-weight: 600; }
+
+/* A Low N chip is a neutral fact, not a warning. Same weight as any other label. */
+.rc-lown { display: flex; align-items: baseline; gap: var(--s3); flex-wrap: wrap; }
+.rc-lown-chip { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em;
+                text-transform: uppercase; color: var(--muted); border: 1px solid var(--border);
+                border-radius: 4px; padding: 2px 8px; }
+.rc-lown b { font-size: 1.7rem; font-weight: 600; color: var(--text); }
+.rc-lown span { color: var(--faint); font-size: var(--fs-sm); }
+.rc-gatewhy { color: var(--muted); font-size: var(--fs-md); line-height: 1.7; max-width: 70ch;
+              margin: var(--s2) 0 0; }
+
+/* ---- verdict chips: muted on purpose ---- */
+.rc-chip { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.06em; padding: 2px 8px;
+           border-radius: 4px; border: 1px solid var(--border); color: var(--muted);
+           white-space: nowrap; }
+.rc-hit { color: #7fb69a; border-color: rgba(127,182,154,0.35); background: rgba(127,182,154,0.08); }
+.rc-miss { color: #c98a95; border-color: rgba(201,138,149,0.35); background: rgba(201,138,149,0.08); }
+.rc-incon { color: var(--muted); }
+.rc-unsc { color: var(--faint); }
+.rc-open { color: var(--faint); border-style: dashed; }
+
+/* ---- sections, misses, calls ---- */
+.rc-section { border-top: 1px solid var(--border); padding-top: var(--s5); }
+.rc-misses, .rc-calls { display: flex; flex-direction: column; }
+.rc-miss-row, .rc-call-row {
+  display: grid; gap: var(--s3); align-items: center; width: 100%; text-align: left;
+  background: none; border: 0; border-bottom: 1px solid var(--hairline); color: var(--text);
+  font: inherit; padding: 10px 4px; cursor: pointer;
+}
+.rc-miss-row { grid-template-columns: 64px 84px 78px minmax(0, 1fr) 96px; }
+.rc-call-row { grid-template-columns: 52px 64px 54px 48px 104px 78px 96px; }
+.rc-miss-row:hover, .rc-call-row:hover { background: var(--elev); }
+.rc-miss-sym, .rc-call-sym { font-weight: 600; }
+.rc-miss-dir, .rc-call-dir { color: var(--muted); font-size: var(--fs-sm); }
+.rc-miss-x, .rc-call-x { color: #c98a95; font-variant-numeric: tabular-nums; }
+.rc-call-x { color: var(--muted); }
+.rc-miss-thesis { color: var(--muted); font-size: var(--fs-sm); overflow: hidden;
+                  text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.rc-miss-when, .rc-call-when { color: var(--faint); font-size: var(--fs-sm); text-align: right; }
+.rc-call-seq { color: var(--faint); }
+/* A chip is a label, not a cell. Without this it stretches to fill its grid track and reads as an
+   empty input box rather than as a verdict. */
+.rc-call-row .rc-chip, .bd-row .rc-chip { justify-self: start; }
+
+/* ---- calibration ---- */
+.rc-cal { width: 100%; border-collapse: collapse; font-size: var(--fs-md); }
+.rc-cal th { text-align: left; color: var(--faint); font-weight: 500; font-size: 11px;
+             letter-spacing: 0.06em; text-transform: uppercase; padding: 6px 8px;
+             border-bottom: 1px solid var(--border); }
+.rc-cal td { padding: 10px 8px; border-bottom: 1px solid var(--hairline); }
+.rc-cal-stated { text-transform: capitalize; }
+.rc-cal-ci { color: var(--faint); font-size: var(--fs-sm); }
+
+.rc-disclaimer { color: var(--faint); font-size: var(--fs-sm); line-height: 1.7; max-width: 76ch;
+                 border-top: 1px solid var(--border); padding-top: var(--s4); margin: var(--s5) 0 0; }
+
+/* ---- the board ---- */
+.bd-head { border-bottom: 1px solid var(--border); padding-bottom: var(--s4); }
+.bd-note { color: var(--muted); font-size: var(--fs-md); line-height: 1.7; max-width: 74ch;
+           margin: var(--s3) 0 0; }
+.bd-table { display: flex; flex-direction: column; }
+.bd-header, .bd-row {
+  display: grid; grid-template-columns: 44px minmax(140px, 1.3fr) minmax(0, 1.6fr) 128px 150px;
+  gap: var(--s3); align-items: center;
+}
+.bd-header { color: var(--faint); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
+             padding: 6px 8px; border-bottom: 1px solid var(--border); }
+.bd-row { background: none; border: 0; border-bottom: 1px solid var(--hairline); text-align: left;
+          color: var(--text); font: inherit; padding: var(--s3) 8px; cursor: pointer; }
+.bd-row:hover { background: var(--elev); }
+.bd-row.house { background: rgba(110,140,255,0.035); }
+.bd-rank { font-size: 1.3rem; color: var(--faint); font-variant-numeric: tabular-nums; }
+.bd-who { min-width: 0; }
+.bd-name { display: flex; align-items: center; gap: 7px; font-weight: 600; }
+.bd-handle { color: var(--muted); font-size: var(--fs-sm); }
+.bd-counts { min-width: 0; }
+.bd-rate, .bd-exp { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bd-rate b, .bd-exp b { font-family: var(--mono); font-size: 1.25rem; font-weight: 600;
+                        font-variant-numeric: tabular-nums; }
+.bd-rate-sub { color: var(--faint); font-size: 11px; }
+.bd-gated { border-top: 1px solid var(--border); padding-top: var(--s5); }
+.bd-foot { display: flex; gap: var(--s3); flex-wrap: wrap; }
+
+/* ---- publish ---- */
+.pb-head { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--s4);
+           flex-wrap: wrap; border-bottom: 1px solid var(--border); padding-bottom: var(--s4); }
+.pb-claim, .pb-form { display: flex; flex-direction: column; gap: var(--s4); max-width: 640px; }
+.pb-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          gap: var(--s4); }
+.pb-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.pb-field > span { color: var(--faint); font-size: 11px; letter-spacing: 0.08em;
+                   text-transform: uppercase; }
+.pb-field small { color: var(--faint); font-size: var(--fs-sm); line-height: 1.5; }
+.pb-field small.short { color: var(--amber); }
+.pb-input { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-sm);
+            color: var(--text); font: inherit; font-size: var(--fs-base); padding: 10px 12px;
+            width: 100%; }
+.pb-input:focus { outline: none; border-color: var(--accent); box-shadow: var(--ring); }
+textarea.pb-input { resize: vertical; line-height: 1.6; }
+.pb-seg { display: flex; gap: 6px; flex-wrap: wrap; }
+.pb-seg button { background: var(--card); border: 1px solid var(--border);
+                 border-radius: var(--radius-sm); color: var(--muted); font: inherit;
+                 font-size: var(--fs-sm); padding: 9px 14px; cursor: pointer; }
+.pb-seg button.on { border-color: var(--accent); color: var(--text); background: rgba(110,140,255,0.10); }
+.pb-score { display: flex; gap: 8px; align-items: flex-start; font-size: var(--fs-sm);
+            line-height: 1.55; border-radius: var(--radius-sm); padding: 10px 12px;
+            border: 1px solid var(--border); color: var(--muted); }
+.pb-score.ok { color: #7fb69a; border-color: rgba(127,182,154,0.3); }
+.pb-score.warn { color: var(--amber); border-color: rgba(255,194,92,0.3); }
+.pb-score.bad { color: #c98a95; border-color: rgba(201,138,149,0.3); }
+.pb-attest { display: flex; gap: 10px; align-items: flex-start; color: var(--muted);
+             font-size: var(--fs-sm); line-height: 1.6; }
+.pb-attest input { margin-top: 3px; }
+.pb-consent { border: 1px solid var(--border); border-radius: var(--radius); padding: var(--s4);
+              background: var(--panel); }
+.pb-consent b { display: block; margin-bottom: var(--s2); }
+.pb-consent ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: var(--fs-md);
+                 line-height: 1.8; }
+.pb-error { border: 1px solid rgba(255,107,129,0.35); background: rgba(255,107,129,0.06);
+            border-radius: var(--radius-sm); padding: var(--s3); color: var(--red);
+            font-size: var(--fs-sm); }
+.pb-error ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.7; }
+.pb-submit { align-self: flex-start; }
+.pb-verify, .pb-verified { border: 1px solid var(--border); border-radius: var(--radius);
+                           padding: var(--s4); background: var(--panel); }
+.pb-verified { color: var(--green); display: flex; align-items: center; gap: 8px; }
+.pb-verify-head { color: var(--muted); font-size: var(--fs-md); line-height: 1.65;
+                  margin-bottom: var(--s3); max-width: 66ch; }
+.pb-verify-methods, .pb-verify-row { display: flex; gap: var(--s3); flex-wrap: wrap; }
+.pb-verify-row .pb-input { flex: 1 1 260px; }
+.pb-code { font-family: var(--mono); font-size: var(--fs-sm); line-height: 1.7; color: var(--text);
+           background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-sm);
+           padding: var(--s3); overflow-wrap: anywhere; white-space: pre-wrap; margin: 0 0 var(--s3); }
+.pb-note { color: var(--muted); font-size: var(--fs-sm); margin-top: var(--s3); line-height: 1.6; }
+.pb-done { display: flex; flex-direction: column; gap: var(--s4); align-items: flex-start; }
+.pb-receipt { border: 1px solid rgba(110,140,255,0.4); border-radius: var(--radius);
+              padding: var(--s4); background: rgba(110,140,255,0.05); width: 100%;
+              box-shadow: var(--glow); }
+.pb-receipt-head { display: flex; align-items: center; gap: 8px; color: var(--accent);
+                   font-weight: 600; margin-bottom: var(--s3); }
+.pb-receipt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                   gap: var(--s3); margin-bottom: var(--s3); }
+.pb-receipt-grid > div { min-width: 0; }
+.pb-receipt-grid .wide { grid-column: 1 / -1; }
+.pb-receipt-grid span { display: block; color: var(--faint); font-size: 11px;
+                        letter-spacing: 0.06em; text-transform: uppercase; }
+.pb-receipt-grid b { font-family: var(--mono); font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.pb-unscoreable { color: var(--amber); font-size: var(--fs-sm); line-height: 1.6; margin: 0 0 var(--s3); }
+
+/* ---- one call ---- */
+.cd-head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--s4);
+           flex-wrap: wrap; border-bottom: 1px solid var(--border); padding-bottom: var(--s4); }
+.cd-sym { font-size: 2.2rem; font-weight: 600; }
+.cd-said { color: var(--muted); font-size: var(--fs-md); }
+.cd-said b { color: var(--text); }
+.cd-head-r { display: flex; align-items: center; gap: var(--s3); }
+.cd-x { font-size: 1.4rem; font-variant-numeric: tabular-nums; color: var(--muted); }
+.cd-by { background: none; border: 0; color: var(--muted); font: inherit; font-size: var(--fs-sm);
+         cursor: pointer; padding: 0; display: inline-flex; gap: 8px; align-items: center;
+         align-self: flex-start; }
+.cd-by:hover { color: var(--text); }
+.cd-thesis { color: var(--text); font-size: var(--fs-base); line-height: 1.8; max-width: 70ch;
+             margin: 0; }
+.cd-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+           gap: var(--s3); margin-bottom: var(--s4); }
+.cd-field { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px;
+            background: var(--panel); min-width: 0; }
+.cd-field.wide { grid-column: 1 / -1; }
+.cd-label { display: block; color: var(--faint); font-size: 11px; letter-spacing: 0.05em; }
+.cd-field b { font-size: var(--fs-md); overflow-wrap: anywhere; }
+.cd-missing { color: var(--faint); font-size: var(--fs-sm); font-style: italic; }
+.cd-imported, .cd-ctx-none { color: var(--muted); font-size: var(--fs-sm); line-height: 1.7;
+                             max-width: 72ch; }
+.cd-note { border-left: 2px solid var(--border); padding-left: var(--s3); color: var(--muted);
+           font-size: var(--fs-md); line-height: 1.7; max-width: 72ch; }
+.cd-note b { color: var(--text); text-transform: capitalize; margin-right: 6px; }
+.cd-ctx { display: flex; flex-direction: column; gap: var(--s3); }
+.cd-ctx-row { color: var(--muted); font-size: var(--fs-md); line-height: 1.7; }
+.cd-ctx-row b { color: var(--text); }
+.cd-align { font-size: var(--fs-md); color: var(--muted); border-left: 2px solid var(--border);
+            padding-left: var(--s3); line-height: 1.6; }
+.cd-align.against { border-left-color: #c98a95; }
+.cd-align.with { border-left-color: #7fb69a; }
+.cd-ctx-list { margin: 0; padding-left: 18px; color: var(--muted); font-size: var(--fs-sm);
+               line-height: 1.8; }
+
+/* ---- methodology ---- */
+.mt-section { border-top: 1px solid var(--border); padding-top: var(--s5); }
+.mt-section p { color: var(--muted); font-size: var(--fs-md); line-height: 1.8; max-width: 72ch; }
+.mt-verdicts > div { display: grid; grid-template-columns: 118px minmax(0, 1fr); gap: var(--s3);
+                     align-items: baseline; padding: 8px 0;
+                     border-bottom: 1px solid var(--hairline); }
+.mt-verdicts dt { justify-self: start; }
+.mt-verdicts dd { margin: 0; color: var(--muted); font-size: var(--fs-md); line-height: 1.7; }
+.mt-proves { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+             gap: var(--s4); }
+.mt-does, .mt-doesnot { border: 1px solid var(--border); border-radius: var(--radius);
+                        padding: var(--s4); min-width: 0; }
+.mt-does { border-color: rgba(110,140,255,0.3); }
+.mt-doesnot { border-color: rgba(255,194,92,0.28); }
+.mt-does-h { display: flex; align-items: center; gap: 8px; font-weight: 600; margin-bottom: var(--s2); }
+.mt-does .mt-does-h { color: var(--accent); }
+.mt-doesnot .mt-does-h { color: var(--amber); }
+.mt-algo, .mt-fields { font-size: var(--fs-sm) !important; color: var(--faint) !important;
+                       overflow-wrap: anywhere; }
+
 /* =====================================================================================================
    NARROW SCREENS — must stay LAST in this file
    -----------------------------------------------------------------------------------------------------
@@ -1757,3 +2093,60 @@ div.intg-warn { margin-top: 8px; border: 0; border-radius: 8px; padding: 7px 10p
    the sentence that stops a point estimate being read as a verdict. */
 .lg-signif { margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--border); font-size: 12.5px; color: var(--muted); line-height: 1.6; }
 .lg-signif b { color: var(--text); font-weight: 600; }
+
+/* =====================================================================================================
+   RECEIPTS — NARROW SCREENS. These must stay at the very END of this file.
+   -----------------------------------------------------------------------------------------------------
+   A media query adds no specificity, so a narrow-screen rule only reliably wins from below the base
+   rule it overrides. Note that this file's marked "must stay LAST" block is no longer last: a few
+   base rules were appended after it later. That is why these go at the true end of the file rather
+   than inside that block, where `.rc-counts` at 5 columns would have kept winning on a phone.
+
+   Every rule below was written against a measured overflow at 375px, not a guess. The recurring
+   cause in this codebase is a `1fr` track, which is `min-width: auto` and will not shrink below its
+   content, so the fixes are `minmax(0, 1fr)` and fewer columns rather than smaller type.
+   ===================================================================================================== */
+@media (max-width: 900px) {
+  /* Five counts across a phone gives each one 60px, which is narrower than the word
+     "inconclusive". Two rows of tidy blocks beats five columns of clipped labels. */
+  .rc-counts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+  /* The board is a five column table. On a narrow screen it becomes a stacked card per caller:
+     the rank and the name on one line, then the counts, then the two statistics side by side. */
+  .bd-header { display: none; }
+  .bd-row { grid-template-columns: 34px minmax(0, 1fr); grid-template-areas:
+              "rank who" "counts counts" "rate exp"; row-gap: var(--s2); }
+  .bd-rank { grid-area: rank; }
+  .bd-who { grid-area: who; }
+  .bd-counts { grid-area: counts; }
+  .bd-rate { grid-area: rate; }
+  .bd-exp { grid-area: exp; }
+
+  .rc-chain { grid-template-columns: minmax(0, 1fr); }
+  .mt-verdicts > div { grid-template-columns: minmax(0, 1fr); row-gap: 4px; }
+}
+
+@media (max-width: 720px) {
+  .rc-page, .bd-page, .pb-page, .cd-page, .mt-page { padding: var(--s4) 0 var(--s7); gap: var(--s5); }
+
+  /* The thesis preview is the only flexible column in a miss row, and at this width there is no
+     room for it at all. Dropping it leaves the symbol, the direction, the excess and the date,
+     which is what the row is for. */
+  .rc-miss-row { grid-template-columns: 58px minmax(0, 1fr) 76px; }
+  .rc-miss-thesis, .rc-miss-when { display: none; }
+
+  /* The call row loses the horizon and the sequence rather than compressing every column. */
+  .rc-call-row { grid-template-columns: 58px 46px minmax(0, 1fr) 74px; }
+  .rc-call-seq, .rc-call-h, .rc-call-when { display: none; }
+
+  .rc-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rc-counts.lg .rc-count b { font-size: 1.7rem; }
+
+  /* A 64 character hash cannot be made to fit, so it wraps instead of pushing the page sideways.
+     `anywhere` rather than `break-word`: only `anywhere` also shrinks the container's min-content,
+     which is the half that actually stops the overflow. */
+  .pb-receipt-grid b, .cd-field b, .rc-chain-head, .mt-fields { overflow-wrap: anywhere; }
+
+  .pb-head { align-items: flex-start; }
+  .cd-head { flex-direction: column; }
+}

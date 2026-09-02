@@ -26,13 +26,21 @@ function ReferralCard() {
   );
 }
 
-function feats(e) {
+// Every line here is a link or a fact, never an advertisement for something with no door.
+//
+// The shadow portfolios line used to read "N shadow portfolios" as a paid entitlement while no
+// route existed to that screen at all. A paid feature advertised with the door bricked up is worse
+// than one not advertised, so the line is now a button that opens it.
+function feats(e, onNav) {
   return [
-    e.live_signals ? "Live signals (no delay)" : "Signals on a 48h delay",
-    `Follow up to ${e.max_follows >= 100000 ? "unlimited" : e.max_follows} names/people`,
-    `${e.max_portfolios >= 1000 ? "Unlimited" : e.max_portfolios} shadow portfolio${e.max_portfolios === 1 ? "" : "s"}`,
-    e.realtime_alerts ? "Real-time alerts" : "Delayed alerts",
-    e.api ? "Pro data API + keys" : "No API access",
+    { text: "Read every record, the board and the methodology" },
+    { text: "Verify any chain, link by link" },
+    { text: e.live_signals ? "Publish calls with no delay on the research feeds"
+                           : "Research feeds on a 48 hour delay" },
+    { text: e.realtime_alerts ? "Alerts as they happen" : "Alerts, delayed" },
+    { text: `${e.max_portfolios >= 1000 ? "Unlimited" : e.max_portfolios} shadow portfolio${e.max_portfolios === 1 ? "" : "s"}`,
+      go: onNav && "portfolios", goLabel: "open" },
+    { text: e.api ? "Data API and keys" : "No API access" },
   ];
 }
 
@@ -70,7 +78,7 @@ function ApiKeys() {
   );
 }
 
-export function PricingView({ user, onUpgraded, onLogin }) {
+export function PricingView({ user, onUpgraded, onLogin, onNav }) {
   const [data, setData] = useState(null);
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState(null);
@@ -94,7 +102,8 @@ export function PricingView({ user, onUpgraded, onLogin }) {
     <div className="detail">
       <h2>Pricing</h2>
       <div className="meta">
-        See what smart money is doing — free. Go live, unlimited, and API-enabled as you grow.
+        Reading is free forever and needs no account. Paying is for people whose income depends on
+        being believed, and what they are buying is a record they cannot edit.
         {!data.provider_configured && <span className="fresh a" style={{ marginLeft: 8 }}>test mode · no real charge</span>}
       </div>
       {msg && <div className="warn" style={{ borderColor: "#2f4a2f", color: "var(--green)", background: "#0f2417" }}>{msg}</div>}
@@ -103,7 +112,20 @@ export function PricingView({ user, onUpgraded, onLogin }) {
           <div key={p.id} className={`plan ${current === p.id ? "plan-current" : ""} ${p.id === "pro" ? "plan-hi" : ""}`}>
             <div className="plan-name">{p.name}</div>
             <div className="plan-price">${p.price}<span className="name">/mo</span></div>
-            <ul className="plan-feats">{feats(p.entitlements).map((f, i) => <li key={i}>{f}</li>)}</ul>
+            {p.blurb && <div className="plan-blurb">{p.blurb}</div>}
+            <ul className="plan-feats">
+              {feats(p.entitlements, onNav).map((f, i) => (
+                <li key={i}>
+                  {f.text}
+                  {f.go && (
+                    <>
+                      {" "}
+                      <button className="plan-feat-link" onClick={() => onNav(f.go)}>{f.goLabel}</button>
+                    </>
+                  )}
+                </li>
+              ))}
+            </ul>
             {current === p.id
               ? <button className="act" disabled>current plan</button>
               : <button className={`act ${p.id !== "free" ? "act-on" : ""}`} disabled={busy === p.id} onClick={() => pick(p.id)}>

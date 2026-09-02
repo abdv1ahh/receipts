@@ -164,3 +164,22 @@ export const authMe = () => get("/api/auth/me");
 export const authLogin = (email, password, totp_code) => post("/api/auth/login", { email, password, totp_code: totp_code || null });
 export const authRegister = (email, password, invite_code) => post("/api/auth/register", { email, password, invite_code });
 export const authLogout = () => fetch("/api/auth/logout", { method: "POST" }).then((r) => r.json());
+
+// ------------------------------------------------------------------ Receipts
+//
+// The public reads take no session on purpose: a stranger following a shared record link has to be
+// able to check a caller without an account, which is the whole argument.
+export const fetchBoard = () => get("/api/board");
+export const fetchRecord = (handle) => get(`/api/receipts/${encodeURIComponent(handle)}`);
+export const verifyChain = (handle) => get(`/api/receipts/${encodeURIComponent(handle)}/verify`);
+export const fetchReceiptsMethodology = () => get("/api/receipts/methodology");
+export const fetchCall = (id) => get(`/api/calls/${encodeURIComponent(id)}`);
+export const fetchMyCaller = () => get("/api/callers/me");
+export const fetchScoreability = (symbol) =>
+  get(`/api/calls/scoreability?symbol=${encodeURIComponent(symbol)}`);
+
+// `post` already exists above and does exactly this; a second one would be the copy that drifts.
+export const claimHandle = (payload) => post("/api/callers", payload);
+export const publishCall = (payload) => post("/api/calls", payload);
+export const verifyStart = (method) => post("/api/callers/verify/start", { method });
+export const verifyConfirm = (evidence_url) => post("/api/callers/verify/confirm", { evidence_url });

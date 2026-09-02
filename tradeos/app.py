@@ -1454,8 +1454,9 @@ def news_feed(symbol: str | None = None, category: str | None = None, hours: int
     analyst's cited 'why it matters' when analyzed. Public info, so not tier-delayed."""
     limit = max(1, min(100, limit))
     with db.connect() as conn:
-        items = news_mod.ranked_news(conn, symbol=symbol, category=category, hours=hours, limit=limit)
-        return {"items": items, "sources": news_mod.sources_status(conn)}
+        window = news_mod.ranked_news_window(conn, symbol=symbol, category=category, hours=hours,
+                                             limit=limit)
+        return {**window, "sources": news_mod.sources_status(conn)}
 
 
 @app.get("/api/news/coverage")
@@ -2864,6 +2865,7 @@ def billing_plans(tos_session: str | None = Cookie(None)) -> dict:
         user = authn.session_user(conn, tos_session)
         sub = billing.current_subscription(conn, user["id"]) if user else {"plan": "free", "status": "active"}
     plans = [{"id": k, "name": v["name"], "price": v["price"], "tier": v["tier"],
+              "blurb": v.get("blurb"),
               "entitlements": billing.ENTITLEMENTS[v["tier"]]} for k, v in billing.PLANS.items()]
     return {"plans": plans, "current": sub, "provider_configured": billing.provider_configured(),
             "authenticated": bool(user)}
@@ -3176,7 +3178,10 @@ def my_caller(response: Response, tos_session: str | None = Cookie(None)) -> dic
             return {"error": "sign in first"}
         caller = _caller_for_user(conn, user["id"])
         return {"caller": caller,
-                "summary": receipts_record.summary(caller["id"], conn) if caller else None}
+                "summary": receipts_record.summary(caller["id"], conn) if caller else None,
+                # Served rather than typed into the client. A second copy of this sentence is the
+                # one that would drift, and it is the sentence that keeps this an analytics tool.
+                "disclaimer": RECEIPTS_DISCLAIMER}
 
 
 @app.post("/api/callers/verify/start")

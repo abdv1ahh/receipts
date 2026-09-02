@@ -201,6 +201,15 @@ export function NewsView({ onOpenSymbol }) {
         {CATS.map((c) => <button key={c} className={`j-tab ${cat === c ? "on" : ""}`} onClick={() => setCat(c)}>{CAT_TAB[c]}</button>)}
       </div>}
 
+      {/* The window is a preference, not a wall. When nothing was published inside it the server
+          falls back to the most recent news held and says so, and the reader is told the age of
+          what they are looking at rather than shown an empty page that reads as "no news". */}
+      {tab === "coverage" ? null : data?.widened && (
+        <div className="news-widened">
+          {data.widened_note} Newest here is {timeAgo(data.newest)}.
+        </div>
+      )}
+
       {tab === "coverage" ? null : data && <SourceStrip sources={data.sources} />}
       {tab === "coverage" ? null : err && <div className="err">error: {err}</div>}
 
