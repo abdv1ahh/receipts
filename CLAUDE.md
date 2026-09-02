@@ -17,11 +17,28 @@ engine that explains market consequences. The product brief is
 `docs/state.md` has the resume instructions and what remains; `docs/progress/phase_9.md`
 §"What is NOT fixed" is the honest security list.**
 
-It now has a claim engine (`claims.py`), a self-scoring Ledger (`ledger.py`, publishing 43.2% of 412
-with the misses shown — measured 2026-08-23), an event spine (`spine.py`), personal relevance
-(`relevance.py`), world
-context frozen at trade time (`journal_context.py`), and surfaces at `/radar` `/globe` `/ledger`
-`/exposure` `/crypto` `/news` `/brief` `/events` `/journal` `/community` `/integrations`.
+**RECEIPTS is now the product** (`tradeos/receipts/`, migration 034, added 2026-09-02). A public,
+permanent, chained record of market calls: a caller publishes a dated directional call BEFORE the
+outcome is known, it is sealed into a per-caller SHA256 hash chain, and a database trigger refuses
+every delete and every update to a sealed column. It resolves automatically against Tiingo prices,
+benchmarked to SPY, with a 2% noise floor and a 25 call sample gate. Anyone can hit **Verify chain**
+and watch every hash recompute. Surfaces: `/board` (the landing route) `/record` `/publish`
+`/call` `/methodology`, plus the public share page `/r/{handle}` and card
+`/api/card/receipt/{handle}.svg`.
+
+**The first two records on the board are OURS** — `@convergence-v3` (323 calls) and
+`@convergence-v4` (150), imported from the signal plane's own resolved claims by
+`cli seed-house-records`. Pooled they read **43.2% of 412**, below a coin flip, with an expectancy
+interval that spans zero. That is the point and it must never be presented as a positive result.
+
+The rest still stands behind it: a claim engine (`claims.py`), the self-scoring Ledger
+(`ledger.py`), an event spine (`spine.py`), personal relevance (`relevance.py`), world context
+frozen at trade time (`journal_context.py`), and the research surfaces `/home` `/ledger` `/events`
+`/crypto` `/news` `/journal` `/watchlist` `/integrations` `/assistant` `/search`.
+
+`/radar` `/globe` `/exposure` `/library` `/community` are **off the navigation rail** but still in
+`ROUTES` — they are empty or thin, and a rail that leads a reader to an empty page has spent the
+one thing this product is selling. They stay addressable because other surfaces link to them.
 
 **`/` is the marketing site for anyone signed out** (307 to `/site/`, decided on the presence of
 the session cookie so no database round trip is needed). The app's own landing page was deleted: it
@@ -77,7 +94,7 @@ The app is at <http://localhost:8000>. Demo login: `demo@tradeos.app` / `<genera
 ### Tests
 
 ```bash
-make test     # 717 tests, ~1s. Offline except 17 authz tests that need the local DB
+make test     # 818 tests, ~1.4s. Offline except the DB-backed authz and Receipts integrity tests
 make lint     # ruff; zero errors is the standard
 make dev      # reload-in-place stack; then `make web` for a UI change
 make fix      # ruff --fix
@@ -106,7 +123,7 @@ gitignored.
 docker compose exec -T api python -m tradeos.cli <command>
 ```
 
-All 39, checked against `--help` rather than remembered:
+All 42, checked against `--help` rather than remembered:
 
 `migrate`, `preflight`, `status` · **SEC ingestion** `ingest-form4`, `ingest-13dg`, `ingest-13f`
 `backfill-form4`, `backfill-13dg`, `backfill-13f` (`--from`/`--to` over a date range; weekends skipped, holidays 404 and
@@ -116,6 +133,7 @@ are logged past) · **resolution** `sync-tickers`, `resolve-entities`, `resolve-
 `analyze-news`, `ingest-calendar`, `ingest-bluesky` · **spine and claims** `spine`, `reprocess`, `interpret`,
 `measure-claims`, `ledger`, `import-signals` · **seeds** `seed-admin`, `seed-demo`,
 `seed-watchlist`, `seed-exposure`, `sync-library`, `create-invites` ·
+**receipts** `seed-house-records`, `resolve-calls`, `verify-chain <handle>` ·
 **operations** `scheduler`, `generate-alerts`, `capture-context`, `check-source`.
 
 `check-source <key>` makes a REAL call to one source and says whether it worked, which is the
@@ -131,7 +149,7 @@ overnight calibration backfill.
 ### Database
 
 ```bash
-docker compose exec -T db psql -U tradeos -d tradeos -c '\dt'    # 61 tables
+docker compose exec -T db psql -U tradeos -d tradeos -c '\dt'    # 64 tables
 docker compose exec -T db psql -U tradeos -d tradeos             # interactive
 ```
 
@@ -141,7 +159,7 @@ docker compose exec -T db psql -U tradeos -d tradeos             # interactive
 
 ```
 tradeos/                  the Python package (all backend code)
-  app.py                  FastAPI app: 127 routes, ~3070 lines. The one big file.
+  app.py                  FastAPI app: 141 routes, ~3510 lines. The one big file.
   db.py                   psycopg connect() + ordered .sql migration runner
   config.py               env accessors; raises ConfigError rather than defaulting secrets
   llm.py                  ONE transport for every model call: provider CHAIN + per-provider
@@ -174,7 +192,9 @@ tradeos/                  the Python package (all backend code)
   assistant_tools.py      six READ-ONLY tools; a security boundary, not a convenience layer.
   smartmoney_claims.py    convergence signals expressed as scoreable claims.
   watchlist_accounts.py   the consequential-accounts influence list.
-  migrations/             001..033 ordered .sql; NEVER edit an applied migration, and every
+  receipts/               THE PRODUCT. chain.py (pure, the wire format) calls.py scoring.py
+                          record.py verification.py seed.py context.py
+  migrations/             001..034 ordered .sql; NEVER edit an applied migration, and every
                           file MUST insert its own schema_migrations row
   (surface modules)       dashboard, brief, news, social, sentiment, crypto, events,
                           trades, insights, portfolio, community, alerts, admin,
@@ -226,6 +246,49 @@ when a phase touches it, not as a standalone refactor.
 
 The full list, with the reasoning, is in `docs/state.md` §"Things learned". The ones that bite
 fastest:
+
+0z. **A VERDICT ON A CALL IS PERMANENT, so never seal an operational failure as one.** The
+   `calls_append_only` trigger refuses to change a verdict once written — that is the product — and
+   the consequence is that "unscoreable" cannot be taken back. A symbol whose price feed is merely
+   BEHIND is perfectly scoreable and our data is late (the free Tiingo tier paces at ~45 to 57
+   symbols/hour, so a top-up leaves most of the table days stale while it works). Sealing that case
+   would be wrong an hour later and uncorrectable forever. `calls.scoreability` returns
+   `permanent`, and only the permanent case — no price series at all — is sealed at publish.
+   Everything else publishes OPEN with a visible warning. `resolve_call` draws the same line at the
+   horizon, and lets the BENCHMARK settle it: SPY is fetched first on every top-up, so if SPY has
+   data past the horizon and the symbol does not, that symbol's feed is dead and unscoreable is
+   final; if SPY has not reached it either, our feed is behind and the call stays open.
+
+0y. **`receipts/chain.py`'s canonical payload is a WIRE FORMAT and its field order is frozen
+   forever.** Adding a sealed field, reordering two, or changing how a timestamp renders would
+   invalidate every chain ever published. A test pins the order. Note the fields are LENGTH
+   PREFIXED rather than delimited: a caller writes their own thesis, and with a plain separator they
+   could type the separator into it and make two different calls serialise identically — a
+   collision they control, and so a forged link. Same lesson as the prompt fence in `claims.py`.
+
+0x. **Probe each link of the model chain ALONE.** `llm.complete` falls through to the next
+   provider on failure, so a probe using the configured chain answers for the fallback and reports
+   OK for a dead key. That is exactly how the `openai` slot answered HTTP 410
+   `github_models_retirement_brownout` for five weeks while every surface looked fine — Gemini was
+   covering it. `check-source llm_gemini` and `check-source llm_openai` each force ONE provider.
+   And a source not in `sources.CATALOG` is invisible to the operator no matter how badly it is
+   failing: the whole chain was missing from the registry, which is why the integration page
+   structurally could not report the outage.
+
+0w. **A time window on a read is a preference, not a wall.** `/api/news` queried a fixed 72 hours
+   and rendered completely empty whenever ingestion had been stopped longer than that, which on a
+   laptop is any weekend — while holding 3,690 items. Widening the default only moves the cliff.
+   `news.ranked_news_window` falls back to the most recent rows and SAYS SO, with the age of what
+   you are looking at, and does not widen when a filter genuinely matches nothing.
+
+0v. **A route taken off the sidebar must stay in `ROUTES`.** Radar, The World, Exposure, Library
+   and Community are off the rail because they are empty. They are still addressable, because the
+   Morning Brief and the Dashboard link to the Radar and four surfaces link to library entries;
+   dropping them from `ROUTES` would turn every one of those links into a silent redirect to the
+   Board. A door that opens onto the wrong room is worse than a door that is not advertised. The
+   opposite failure also happened here and is guarded by a test: `portfolios.jsx` was imported and
+   rendered but absent from `ROUTES`, so a whole paid feature was unreachable while the pricing
+   page advertised it.
 
 0. **`EXPLAIN_PROVIDER` is a comma-separated CHAIN, and only `llm.py` may parse it.** Production
    runs `gemini,openai`. Six call sites once gated their model call on
@@ -419,7 +482,12 @@ fastest:
 | Reddit | `REDDIT_CLIENT_ID` + `_SECRET` | Social sentiment | **not connected** |
 | YouTube | `YOUTUBE_API_KEY` | Social sentiment | not connected |
 | X / Twitter | — | — | **no free read tier; do not attempt — Bluesky covers the need** |
-| LLM | `GEMINI_API_KEY` (+ optional `OPENAI_*`) | All AI prose | connected (Gemini free tier) |
+| Binance (public derivatives) | none | Crypto positioning: funding, open interest, crowding | connected |
+| FINRA | none | short interest, ingested as context, CLI only and parked | connected |
+| LLM link 1 — Gemini | `GEMINI_API_KEY` | All AI prose | connected, and **at the edge of its daily quota** |
+| LLM link 2 — OpenAI-compatible | `OPENAI_BASE_URL` + `_API_KEY` + `_MODEL` | the fallback for all AI prose | **DEAD: GitHub Models answers HTTP 410. Needs a Groq key** |
+| Stripe | `STRIPE_SECRET_KEY` + `_WEBHOOK_SECRET` | billing | not connected (free launch mode) |
+| Sentry | `SENTRY_DSN` | error tracking | not connected |
 
 `tradeos/sources.py` is the registry of record and the integration page reads it — a source missing
 from it is invisible to the operator no matter how well it runs. GDELT was exactly that for three

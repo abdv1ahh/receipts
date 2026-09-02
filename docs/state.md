@@ -1,5 +1,66 @@
 # docs/state.md — where the work stands
 
+## Updated 2026-09-02: RECEIPTS SHIPPED, and it is now the product
+
+Branch `receipts`, five commits, **818 tests**, lint clean, all 20 mechanical acceptance criteria
+verified against the live system. `CLAUDE.md` §"What this is" is the short version; this section is
+what a fresh session needs to know that is not in the code.
+
+**What it is.** A public, permanent, chained record of market calls. A caller publishes a dated
+directional call before the outcome is known; it is sealed into a per-caller SHA256 hash chain and
+written to a table whose trigger refuses deletes and refuses updates to sealed columns. It resolves
+automatically against Tiingo end-of-day prices, benchmarked to SPY, with a 2% noise floor. Below 25
+resolved scoreable calls no hit rate is published at all.
+
+**Verified against the live database, not asserted.** DELETE refused; every sealed column refused
+on UPDATE; a resolved verdict refused on rewrite; the resolution columns still writable; a caller
+who has published cannot be deleted. Corrupting one `content_hash` on `@convergence-v3` made
+`/api/receipts/convergence-v3/verify` return `intact: false` at exactly `seq 100`, and restoring it
+returned to intact over all 323 links.
+
+**The house record is ours and it is unflattering, on purpose.** `seed-house-records` imported the
+signal plane's own resolved claims — nothing invented, real `created_at` as `published_at`, real
+verdicts from `claim_outcomes`, sealed in true chronological order:
+
+| caller | calls | hit | miss | inconclusive | rate |
+|---|---:|---:|---:|---:|---:|
+| `@convergence-v3` | 323 | 115 | 167 | 41 | 40.8% of 282 |
+| `@convergence-v4` | 150 | 63 | 67 | 20 | 48.5% of 130 |
+| **pooled (the house figure)** | **473** | **178** | **234** | **61** | **43.2% of 412** |
+
+z = −2.76, expectancy −1.18% with a 95% interval of [−2.93%, +0.57%] that spans zero, and 1,268
+resolved calls needed to detect a 1% per-call edge against the 412 held. **Never present that as a
+positive result.** `record.house_summary` pools the two versions and its docstring says why that is
+legitimate (same scoring logic, v4's own changelog records "NO BEHAVIOURAL CHANGE").
+
+**The gate is not demonstrated by the seed.** Both house records sit above 25 resolved calls, so
+neither shows the Low N state. It appears the moment a human caller claims a handle, which is what
+happens live in the demo. `/api/card/receipt/{handle}.svg` for a gated caller was verified to show
+counts and the words Low N and no percentage at all.
+
+### The one thing that is blocked
+
+**The model chain has no working fallback.** `EXPLAIN_PROVIDER=gemini,openai`; the `openai` slot
+points at GitHub Models, which answers **HTTP 410 `github_models_retirement_brownout`** on every
+request. Gemini works but is at the edge of its free daily quota — it answered normally and then
+429'd within the same minute during this session. Both links are now in `sources.CATALOG` with live
+probes, so the integration page reports it instead of hiding it.
+
+**To fix it, three environment variables in BOTH `.env` and `docker-compose.yml`** (the base compose
+file enumerates every variable it passes; a key in `.env` alone does not reach the container):
+
+```
+OPENAI_BASE_URL=https://api.groq.com/openai/v1
+OPENAI_API_KEY=<a free Groq key, no card, from https://console.groq.com/keys>
+OPENAI_MODEL=<a currently available Groq model>
+```
+
+Then `docker compose up -d api worker` and confirm with `cli check-source llm_openai`.
+No code change is needed: `llm._openai` already speaks to whatever `OPENAI_BASE_URL` names, and
+`tests/test_llm.py` already exercises Groq and OpenRouter base URLs.
+
+### Prior state
+
 Updated: 2026-07-26. **All ten phases (0–9) are complete**, plus a cross-check pass the owner asked
 for after reporting that "the website does not even load, the globe does not even load" and that
 they could not find the marketing site. **That pass is written up in
