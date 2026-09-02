@@ -306,3 +306,78 @@ def test_openfigi_client_never_puts_the_key_in_a_url():
     assert "str(exc)" not in src, (
         "raw httpx exception text carries the request URL; store the exception TYPE instead"
     )
+
+
+# ------------------------------------------------------------------ the registry's own coverage
+#
+# The rule in CLAUDE.md is that an external dependency is not done until it has a CATALOG entry,
+# because the integration page is the only place an operator looks to find out why a panel is
+# empty. Six services were missing from it, and the consequence was not cosmetic: the model
+# provider chain's fallback answered HTTP 410 for five weeks and the page whose entire job is to
+# report that outage structurally could not see it. These tests are the guard against the same
+# gap reopening.
+
+def test_every_external_service_the_code_talks_to_is_in_the_catalog():
+    keys = {s["key"] for s in sources.catalog()}
+    for key in ("binance", "finra", "llm_gemini", "llm_openai", "stripe", "sentry"):
+        assert key in keys, f"{key} is talked to in code but invisible on the integration page"
+
+
+def test_the_model_chain_is_reported_link_by_link(monkeypatch):
+    """Both links, separately. One entry for 'the LLM' would have gone on reading 'connected' on
+    Gemini's key while the fallback was dead, which is precisely the outage that went unseen."""
+    monkeypatch.setenv("GEMINI_API_KEY", "g")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    assert sources.by_key("llm_gemini")["state"] == sources.CONNECTED
+    assert sources.by_key("llm_openai")["state"] == sources.NEEDS_KEY
+
+    monkeypatch.setenv("OPENAI_API_KEY", "k")
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://api.groq.com/openai/v1")
+    assert sources.by_key("llm_openai")["state"] == sources.CONNECTED
+
+
+def test_an_openai_compatible_key_without_a_base_url_is_not_configured(monkeypatch):
+    """The slot is a protocol, not a vendor, so the endpoint is as load-bearing as the key. A key
+    with no base URL would be sent to whatever the last operator pointed it at."""
+    monkeypatch.setenv("OPENAI_API_KEY", "k")
+    monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+    assert sources.by_key("llm_openai")["state"] == sources.NEEDS_KEY
+
+
+def test_the_llm_probe_asks_each_provider_alone(monkeypatch):
+    """A probe that used the configured chain would fall through to the fallback and report OK for
+    a dead Gemini key. Each link has to be asked by name."""
+    from tradeos import cli
+    seen = []
+
+    def fake_complete(prompt, max_tokens=400, json_mode=False, provider=None, role="deep"):
+        seen.append(provider)
+        return "alive", ""
+
+    monkeypatch.setattr("tradeos.llm.complete", fake_complete)
+    monkeypatch.setattr("tradeos.llm.model_id", lambda p=None, role="deep": "m")
+    assert cli._probe("llm_gemini")[0] is True
+    assert cli._probe("llm_openai")[0] is True
+    assert seen == ["gemini", "openai"]
+
+
+def test_a_model_failure_names_the_status_code_and_nothing_else():
+    """HTTP 410 is 'this endpoint is retired' and 401 is 'your key is wrong'; an operator reading
+    'HTTPStatusError' cannot tell them apart. The URL stays out of it — Gemini authenticates with
+    ?key= and str(exc) would carry the credential."""
+    import httpx
+
+    from tradeos import llm
+    llm.reset_cooldowns()
+
+    def boom(p, prompt, image, max_tokens, json_mode, role):
+        req = httpx.Request("POST", "https://models.github.ai/inference?key=SECRET")
+        raise httpx.HTTPStatusError("410", request=req, response=httpx.Response(410, request=req))
+
+    import unittest.mock as mock
+    with mock.patch.object(llm, "_call", boom), mock.patch.dict(
+            "os.environ", {"GEMINI_API_KEY": "g", "EXPLAIN_PROVIDER": "gemini"}):
+        out, why = llm.complete("hi")
+    assert out is None
+    assert "HTTP 410" in why
+    assert "SECRET" not in why and "models.github.ai" not in why

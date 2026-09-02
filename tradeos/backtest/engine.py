@@ -67,6 +67,21 @@ def entry_day_after(sym: Series, as_of_day: date) -> date | None:
     return _first_gt(sym.days, as_of_day)
 
 
+def exit_day_for(sym: Series, entry: date, horizon_days: int) -> date | None:
+    """The session a horizon closes on: the first session at or after entry + horizon_days.
+
+    The companion to `entry_day_after`, and public for the same reason. `excess_return` already
+    picks these two days internally, but a caller that has to SHOW its arithmetic — an investor
+    checking a resolved call with a calculator — needs the days themselves, not only the number
+    that came out. Without this they would each re-derive it, and the third copy is always the one
+    that disagrees.
+
+    Note the horizon is in CALENDAR days, matching `excess_return`, so a 30 day horizon closes on
+    the first session on or after the thirtieth day rather than thirty sessions later.
+    """
+    return _first_ge(sym.days, entry + timedelta(days=horizon_days))
+
+
 def group_episodes(clusters: list[tuple[date, int, str]], gap_days: int = EPISODE_GAP_DAYS):
     """clusters = [(as_of_day, cluster_id, bucket)]. Returns a list of episodes (each a list of
     those tuples). A new episode starts when the gap from the previous cluster exceeds gap_days.

@@ -52,25 +52,76 @@ OUT="${BACKUP_DIR}/rhumb-${STAMP}.dump"
 
 mkdir -p "$BACKUP_DIR"
 
+# The floor a dump must clear to count as a backup. Two parts, and the second one is the point:
+#
+#   ABS_FLOOR   catches the empty file. It has to stay small enough that a legitimately tiny dump
+#               of a fresh or demo-seeded database still passes, so on its own it would happily
+#               accept a multi-gigabyte dump that got truncated at 40% of the real database.
+#   MIN_PCT     catches THAT. The most recent dump still on disk is by definition one that passed
+#               this check (a failed one is deleted below), so it is a usable reference for what
+#               this database's dump weighs. A new dump smaller than MIN_PCT of it is a
+#               truncation, not a backup.
+#
+# 95 rather than a rounder 80, and the number is measured rather than picked. Consecutive good
+# dumps in ./backups grow by well under 0.1% a day (4,794,949,429 -> 4,796,633,340 over twelve
+# days), so this database has never shrunk between runs and 95% leaves fifty times the observed
+# day-to-day movement as headroom. The truncated run of 2026-08-28 came in at 4,309,987,328, which
+# is 89.9% of the dump before it: an 80% floor would have waved it through, which is the whole
+# failure this is here to stop. If a deliberate shrink ever happens, a bulk delete or a dropped
+# table, set MIN_PCT for that one run rather than lowering it permanently.
+#
+# With no prior dump there is nothing to compare against and the floor falls back to ABS_FLOOR.
+ABS_FLOOR="${ABS_FLOOR:-100000}"
+MIN_PCT="${MIN_PCT:-95}"
+
+prior_size() {
+  # Most recent surviving dump other than the one we are writing now. Sorted by modification
+  # time rather than by name so a manually copied file cannot jump the queue on its timestamp.
+  local newest
+  newest="$(find "$BACKUP_DIR" -name 'rhumb-*.dump' -type f ! -name "$(basename "$OUT")" \
+              -exec ls -t {} + 2>/dev/null | head -n 1)"
+  [ -n "$newest" ] && wc -c < "$newest" | tr -d ' '
+}
+
+fail() {
+  # Everything that must happen on a bad dump happens HERE, so it happens on EVERY bad dump.
+  echo "[backup] FAILED: $1" >&2
+  rm -f "$OUT"
+  exit 1
+}
+
 echo "[backup] dumping ${DB_NAME} -> ${OUT}"
 # -Fc (custom format): compressed, and restorable table-by-table with pg_restore, which matters
 # when the thing you actually want back is one table rather than the whole database.
-docker compose exec -T "$DB_SERVICE" pg_dump -U "$DB_USER" -d "$DB_NAME" -Fc > "$OUT"
+#
+# The exit status is captured EXPLICITLY rather than left to `set -e`. The shell creates ${OUT}
+# for the redirect before pg_dump runs, so when pg_dump fails — a stopped Docker daemon is the
+# common case — `set -e` used to abort the script right here, past the redirect and before the
+# size check and the `rm -f`. That left a zero byte file on disk looking exactly like a backup,
+# and printed nothing about it. Three of the last four nightly runs ended that way.
+DUMP_STATUS=0
+docker compose exec -T "$DB_SERVICE" pg_dump -U "$DB_USER" -d "$DB_NAME" -Fc > "$OUT" || DUMP_STATUS=$?
 
-SIZE=$(wc -c < "$OUT" | tr -d ' ')
-# A dump that is technically a file but holds nothing is the failure mode that goes unnoticed for
-# months, so refuse to call it a backup. A real dump of THIS database is 4.8 GB (2026-08-23), so
-# this 100 KB floor only catches the empty-file case. It is deliberately not raised to something
-# proportional, because the same script has to accept a legitimately small dump of a fresh or
-# demo-seeded database — a floor sized for production would reject those. It follows that a
-# partial dump measured in megabytes would still pass: if you want that caught, `--verify` is the
-# check that actually proves the file restores.
-if [ "$SIZE" -lt 100000 ]; then
-  echo "[backup] FAILED: ${OUT} is only ${SIZE} bytes — refusing to treat that as a backup" >&2
-  rm -f "$OUT"
-  exit 1
+SIZE=$(wc -c < "$OUT" 2>/dev/null | tr -d ' ' || echo 0)
+SIZE="${SIZE:-0}"
+
+if [ "$DUMP_STATUS" -ne 0 ]; then
+  fail "pg_dump exited ${DUMP_STATUS} and left ${SIZE} bytes; is the database up? (docker compose ps)"
 fi
-echo "[backup] wrote ${SIZE} bytes"
+
+PRIOR="$(prior_size || true)"
+if [ -n "${PRIOR:-}" ] && [ "$PRIOR" -gt 0 ]; then
+  FLOOR=$(( PRIOR * MIN_PCT / 100 ))
+  FLOOR_WHY="${MIN_PCT}% of the previous dump (${PRIOR} bytes)"
+else
+  FLOOR="$ABS_FLOOR"
+  FLOOR_WHY="the absolute floor, because there is no previous dump to compare against"
+fi
+
+if [ "$SIZE" -lt "$FLOOR" ]; then
+  fail "${OUT} is ${SIZE} bytes, under ${FLOOR} — ${FLOOR_WHY}. Refusing to call that a backup."
+fi
+echo "[backup] wrote ${SIZE} bytes (floor was ${FLOOR}: ${FLOOR_WHY})"
 
 if [ "${1:-}" = "--verify" ]; then
   # The only backup worth anything is one that has been restored. This restores into a scratch

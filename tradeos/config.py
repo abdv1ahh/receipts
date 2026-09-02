@@ -58,6 +58,30 @@ def openfigi_configured() -> bool:
     return bool(os.environ.get("OPENFIGI_API_KEY"))
 
 
+def gemini_configured() -> bool:
+    """The first link in the EXPLAIN_PROVIDER chain. Free tier, per-model daily allowance."""
+    return bool(os.environ.get("GEMINI_API_KEY"))
+
+
+def openai_compat_configured() -> bool:
+    """The second link in the chain. Deliberately named for the PROTOCOL rather than the vendor:
+    the slot has been pointed at GitHub Models and can be pointed at Groq, OpenRouter or OpenAI
+    itself without a code change, because `llm._openai` speaks to whatever `OPENAI_BASE_URL`
+    names. A base URL without a key is not configured — the request would 401."""
+    return bool(os.environ.get("OPENAI_API_KEY") and os.environ.get("OPENAI_BASE_URL"))
+
+
+def stripe_configured() -> bool:
+    """Billing. Absent, `billing.py` reports the free launch mode rather than failing a checkout."""
+    return bool(os.environ.get("STRIPE_SECRET_KEY"))
+
+
+def sentry_configured() -> bool:
+    """Error tracking. `app.py` only initialises it when the DSN is present AND the SDK is
+    installed, and logs a warning for the DSN-without-SDK case rather than starting up blind."""
+    return bool(os.environ.get("SENTRY_DSN"))
+
+
 def brand_name() -> str:
     """The public product name. A single config value so the display name can change without a
     refactor — nothing renames modules, tables or the package for branding."""

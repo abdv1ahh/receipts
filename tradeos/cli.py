@@ -306,6 +306,65 @@ def _probe(key: str) -> tuple[bool, str]:
             mapped = sum(1 for item in r.json() if isinstance(item, dict) and item.get("data"))
             return True, (f"key accepted at the raised 100-job limit; mapped {mapped}/{len(cusips)} "
                           f"known CUSIPs")
+        if key == "binance":
+            from .ingestion.derivatives import BASE, UA
+            with httpx.Client(timeout=20.0, headers=UA) as client:
+                r = client.get(f"{BASE}/fapi/v1/premiumIndex", params={"symbol": "BTCUSDT"})
+            r.raise_for_status()
+            return True, f"public funding rate for BTCUSDT is {r.json().get('lastFundingRate')}"
+        if key == "finra":
+            # Through the real FinraClient rather than a hand-rolled request: FINRA answers a
+            # request without its Accept and User-Agent headers with something that is not JSON,
+            # so a bare probe fails while the adapter works. A probe that does not exercise the
+            # adapter is testing the probe.
+            client = FinraClient()
+            try:
+                row = next(client.since(date.today() - timedelta(days=120), page=1), None)
+            finally:
+                client.close()
+            if row is None:
+                return False, "the query succeeded but returned no rows for the last 120 days"
+            return True, (f"keyless query returned short interest for "
+                          f"{row.get('symbolCode', '?')} settled {row.get('settlementDate', '?')}")
+        if key in ("llm_gemini", "llm_openai"):
+            # A model provider is only proved by a COMPLETION. Listing models would 200 on a key
+            # with no remaining allowance, and out-of-quota is the failure mode that actually
+            # happens here — the free tier's ceiling is per model and per day.
+            #
+            # The chain is overridden to this ONE provider on purpose. `llm.text()` with the
+            # configured chain falls through to the next link on failure, so probing Gemini would
+            # silently answer for the fallback and report OK for a dead key. Each link is asked
+            # separately, which is the whole reason this entry exists: the fallback slot answered
+            # HTTP 410 for five weeks while the surfaces looked fine, because Gemini covered it.
+            from . import llm
+            prov = "gemini" if key == "llm_gemini" else "openai"
+            llm.reset_cooldowns()
+            out, why = llm.complete("Reply with exactly one word: alive", max_tokens=16,
+                                    provider=prov)
+            if out:
+                return True, f"{llm.model_id(prov)} answered {out.strip()[:40]!r}"
+            return False, f"{llm.model_id(prov)}: {why}"
+        if key == "stripe":
+            with httpx.Client(timeout=20.0) as client:
+                r = client.get("https://api.stripe.com/v1/balance",
+                               auth=(os.environ["STRIPE_SECRET_KEY"], ""))
+            r.raise_for_status()
+            mode = "test" if os.environ["STRIPE_SECRET_KEY"].startswith("sk_test") else "LIVE"
+            return True, f"key accepted in {mode} mode"
+        if key == "sentry":
+            # Sentry has no cheap authenticated read, so this checks the two things that actually
+            # break it: a DSN the SDK can parse, and the SDK being installed at all. A DSN set
+            # without the package is the silent case app.py warns about at startup.
+            try:
+                import sentry_sdk  # noqa: F401
+            except ImportError:
+                return False, ("SENTRY_DSN is set but the sentry_sdk package is not installed, so "
+                               "no error will ever be reported. Add it to requirements.txt.")
+            from urllib.parse import urlparse as _urlparse
+            u = _urlparse(os.environ["SENTRY_DSN"])
+            if not (u.scheme in ("http", "https") and u.username and u.hostname):
+                return False, "SENTRY_DSN is not a parseable Sentry DSN"
+            return True, f"sentry_sdk installed and the DSN parses (project host {u.hostname})"
         if key == "coingecko":
             with httpx.Client(timeout=20.0) as client:
                 r = client.get("https://api.coingecko.com/api/v3/ping")

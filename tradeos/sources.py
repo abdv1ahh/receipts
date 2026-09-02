@@ -83,6 +83,57 @@ CATALOG: list[dict] = [
         "feeds": [], "jobs": [],
     },
     {
+        "key": "binance", "label": "Binance public derivatives", "kind": "market",
+        "powers": "the Crypto positioning read — funding rate, open interest, long/short crowding",
+        "state": CONNECTED, "env": [], "signup_url": None,
+        "note": "Free and keyless public endpoints (fapi.binance.com), verified 2026-07-25. Reads "
+                "POSITIONING, not price: funding is what longs pay shorts on a perpetual, so a "
+                "persistently positive rate measures crowding rather than direction.",
+        "feeds": [], "jobs": ["crypto_structure"],
+    },
+    {
+        "key": "finra", "label": "FINRA short interest", "kind": "market",
+        "powers": "consolidated short interest, ingested as context",
+        "state": CONNECTED, "env": [], "signup_url": None,
+        "note": "Free and keyless. Ingested and stored with a settlement date and a publication "
+                "knowable_time roughly eight business days later, so point-in-time discipline "
+                "holds. Nothing scores it yet: weighting it into convergence is a logged version "
+                "bump behind ENABLE_SHORT_INTEREST (decision #31). Listed here because it is a "
+                "live external dependency, and an operator watching a feed go quiet should be able "
+                "to see it here rather than deduce it. There is no scheduler job: it runs from the "
+                "CLI (`ingest-short-interest`) and has not been run on this instance, so the "
+                "feed_health row it would write does not exist yet and this entry will show no "
+                "last success. That is the true state, not a fault.",
+        "feeds": ["finra:consolidated"], "jobs": [],
+    },
+    {
+        "key": "llm_gemini", "label": "Gemini (model provider 1)", "kind": "model",
+        "powers": "every AI prose surface: the impact engine, the news analyst, chart reads, the "
+                  "journal coach, the assistant",
+        "state": None, "env": ["GEMINI_API_KEY"],
+        "signup_url": "https://aistudio.google.com/apikey",
+        "note": "Free tier. First link in the EXPLAIN_PROVIDER chain. The allowance is per MODEL "
+                "and per day, so a working key can still exhaust; llm.py cools a provider for 120s "
+                "after persistent 429s and falls through to the next link.",
+        "feeds": [], "jobs": [],
+    },
+    {
+        "key": "llm_openai", "label": "OpenAI-compatible (model provider 2, fallback)",
+        "kind": "model",
+        "powers": "the fallback for every AI prose surface when Gemini is out of quota or cooling",
+        "state": None, "env": ["OPENAI_BASE_URL", "OPENAI_API_KEY", "OPENAI_MODEL"],
+        "signup_url": "https://console.groq.com/keys",
+        "note": "Second link in the EXPLAIN_PROVIDER chain, and the reason this entry exists: the "
+                "slot pointed at GitHub Models, which now answers HTTP 410 "
+                "'github_models_retirement_brownout' on every request, and this page could not say "
+                "so because the chain was not in this registry at all. It is named for the "
+                "PROTOCOL, not a vendor — Groq, OpenRouter and OpenAI itself all speak it, so "
+                "repointing it is three environment variables and no code. Groq's free tier needs "
+                "no card. Set OPENAI_BASE_URL, OPENAI_API_KEY and OPENAI_MODEL in BOTH .env and "
+                "docker-compose.yml, which enumerates every variable it passes through.",
+        "feeds": [], "jobs": [],
+    },
+    {
         "key": "tiingo", "label": "Tiingo", "kind": "market",
         "powers": "end-of-day prices, which is how claim outcomes get scored",
         "state": None, "env": ["TIINGO_API_KEY"], "signup_url": "https://www.tiingo.com/account/api/token",
@@ -174,6 +225,28 @@ CATALOG: list[dict] = [
                 "than quietly dropped.",
         "feeds": [], "jobs": [],
     },
+    {
+        "key": "stripe", "label": "Stripe", "kind": "platform",
+        "powers": "subscription billing — checkout, the customer portal, and the webhook that "
+                  "moves a user between tiers",
+        "state": None, "env": ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"],
+        "signup_url": "https://dashboard.stripe.com/test/apikeys",
+        "note": "Unset, the app runs in free launch mode: the pricing page still renders and every "
+                "signup gets the paid tier, rather than a checkout button that 500s. The webhook "
+                "handler verifies the Stripe signature and refuses an unsigned payload, so the "
+                "webhook secret is not optional once the secret key is set. Test mode throughout.",
+        "feeds": [], "jobs": [],
+    },
+    {
+        "key": "sentry", "label": "Sentry", "kind": "platform",
+        "powers": "server-side error tracking",
+        "state": None, "env": ["SENTRY_DSN"], "signup_url": "https://sentry.io",
+        "note": "Free tier. Optional by design and initialised with traces_sample_rate 0.0, so it "
+                "reports errors and not performance traces. A DSN set without the sentry_sdk "
+                "package installed logs a warning at startup rather than being silently ignored, "
+                "which is the state this entry exists to make visible.",
+        "feeds": [], "jobs": [],
+    },
 ]
 
 def _fill_rss_feeds() -> None:
@@ -197,6 +270,10 @@ _DYNAMIC = {
     "reddit": config.reddit_configured,
     "youtube": config.youtube_configured,
     "openfigi": lambda: bool(config.openfigi_configured()),
+    "llm_gemini": config.gemini_configured,
+    "llm_openai": config.openai_compat_configured,
+    "stripe": config.stripe_configured,
+    "sentry": config.sentry_configured,
 }
 
 

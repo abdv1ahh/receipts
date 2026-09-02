@@ -270,6 +270,15 @@ def complete(prompt: str, image: tuple[bytes, str] | None = None, max_tokens: in
             log.warning("provider %s refused the prompt: %s", p, exc)
             problems.append(f"{p} refused the prompt (safety filter)")
             continue
+        except httpx.HTTPStatusError as exc:
+            # The STATUS CODE, and nothing else from the exception. It is the difference between
+            # "the key is wrong" (401), "the model name is wrong" (404) and "this endpoint has
+            # been retired" (410), and an operator reading a bare exception class name cannot tell
+            # those apart. Never `str(exc)`: httpx puts the full request URL in there, and Gemini
+            # authenticates with ?key=, so the message would carry the credential.
+            log.warning("provider %s failed (HTTP %d)", p, exc.response.status_code)
+            problems.append(f"{p} failed (HTTP {exc.response.status_code})")
+            continue
         except Exception as exc:
             log.warning("provider %s failed (%s)", p, type(exc).__name__)
             problems.append(f"{p} failed ({type(exc).__name__})")

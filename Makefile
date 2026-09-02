@@ -60,11 +60,11 @@ site:
 # Ruff is the linter. It is deliberately NOT the formatter here — see the note in pyproject.toml.
 lint:
 	docker compose run --rm -T --user root -v "$(CURDIR):/src" -w /src \
-	  api sh -c "pip install --quiet --root-user-action=ignore ruff && python -m ruff check tradeos tests"
+	  api sh -c "pip install --quiet --root-user-action=ignore 'ruff==0.16.5' && python -m ruff check tradeos tests"
 
 fix:
 	docker compose run --rm -T --user root -v "$(CURDIR):/src" -w /src \
-	  api sh -c "pip install --quiet --root-user-action=ignore ruff && python -m ruff check --fix tradeos tests"
+	  api sh -c "pip install --quiet --root-user-action=ignore 'ruff==0.16.5' && python -m ruff check --fix tradeos tests"
 
 up:
 	docker compose up -d --build
