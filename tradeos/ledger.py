@@ -131,7 +131,12 @@ def verdict_for(direction: str, excess: float | None,
     return ("hit" if went_up == predicted_up else "miss"), None
 
 
-def _series(conn, symbol: str) -> Series:
+def price_series(conn, symbol: str) -> Series:
+    """Every daily close this database holds for one symbol, oldest first.
+
+    Public because Receipts scores against the same prices this Ledger does, and two loaders would
+    eventually disagree about what "the price series" means. One definition, both planes.
+    """
     with conn.cursor() as cur:
         cur.execute("SELECT day, close FROM prices_eod WHERE symbol = %s ORDER BY day", (symbol,))
         return Series.from_rows(cur.fetchall())
@@ -142,7 +147,7 @@ def measure_claim(conn, claim_id: int, spy: Series | None = None) -> dict:
 
     Only ever reads prices STRICTLY AFTER the claim was made, which is what makes the resulting
     hit rate mean anything."""
-    spy = spy if spy is not None else _series(conn, "SPY")
+    spy = spy if spy is not None else price_series(conn, "SPY")
     with conn.cursor() as cur:
         cur.execute("SELECT created_at, horizon_days, affected FROM claims WHERE id = %s", (claim_id,))
         row = cur.fetchone()
@@ -172,7 +177,7 @@ def measure_claim(conn, claim_id: int, spy: Series | None = None) -> dict:
                 why = UNSCOREABLE_REASONS["not_priceable_kind"].format(
                     subject=subject or "an unnamed subject", kind=kind or "non-asset subject")
             else:
-                sym = _series(conn, subject)
+                sym = price_series(conn, subject)
                 if not sym.days:
                     why = UNSCOREABLE_REASONS["no_symbol"]
                 else:
@@ -219,7 +224,7 @@ def _exit_day(sym: Series, entry, horizon_days: int):
 
 def measure_due(conn, limit: int = 200) -> dict:
     """Score every open claim whose horizon has elapsed. The scheduler's job."""
-    spy = _series(conn, "SPY")
+    spy = price_series(conn, "SPY")
     if not spy.days:
         return {"error": "no SPY prices; run ingest-prices first (SPY is the benchmark)"}
     with conn.cursor() as cur:

@@ -13,6 +13,7 @@ Skips cleanly with no database, like the other integrity tests.
 """
 from __future__ import annotations
 
+import pathlib
 import re
 import secrets
 
@@ -243,3 +244,50 @@ def test_publishing_and_reading_a_call_are_limited_separately():
     assert _limit_bucket("/api/receipts/someone", "GET") == "public"
     assert _limit_bucket("/api/board", "GET") == "public"
     assert _limit_bucket("/r/someone", "GET") == "public"
+
+
+# ------------------------------------------------------------------ what may become a link
+#
+# Found by /security-review on this change. `audience_url` was stored with no scheme validation and
+# rendered as the href of a link on a PUBLIC record page. React escapes an attribute value but does
+# not restrict the SCHEME, so `javascript:` survived to something any visitor could click, in the
+# app's own origin, where a same-origin fetch carries the session cookie. Every other user-supplied
+# URL in this feature was already checked; this was the one that reached an href without it.
+
+def test_a_non_https_audience_link_is_refused(client, monkeypatch):
+    """Refused at the write path, not coerced. A value quietly rewritten is a caller believing they
+    said something they did not say, and this one ends up on a public page."""
+    import tradeos.app as app_mod
+
+    monkeypatch.setattr(app_mod.authn, "session_user", lambda conn, token: {"id": -1, "tier": "pro"})
+    monkeypatch.setattr(app_mod, "_caller_for_user", lambda conn, uid: None)
+    for bad in ("javascript:alert(1)", "JaVaScRiPt:alert(1)", "data:text/html,<script>x</script>",
+                "http://example.com", "//example.com"):
+        r = client.post("/api/callers", json={"handle": "probe-scheme", "display_name": "P",
+                                              "audience_url": bad, "jurisdiction_attested": True})
+        assert r.status_code == 400, f"{bad!r} was accepted"
+        assert "https" in r.json()["error"]
+
+
+def test_the_record_page_refuses_to_render_a_link_it_did_not_vet():
+    """The second lock, in the component. The server refuses these on the way in; this is what
+    stops a row written by a path that does not exist yet from becoming a link."""
+    src = (pathlib.Path(__file__).resolve().parents[1]
+           / "frontend" / "src" / "record.jsx").read_text()
+    assert "function httpsOnly(url)" in src
+    assert "href={httpsOnly(caller.audience_url)}" in src
+    assert "href={httpsOnly(caller.verification_evidence_url)}" in src
+    assert "href={caller.audience_url}" not in src
+
+
+def test_the_share_page_escapes_every_interpolation():
+    """The card path was the one value on /r/{handle} that was not escaped. It is safe today only
+    because of a regex three hundred lines away in a different function."""
+    import inspect
+
+    import tradeos.app as app_mod
+    src = inspect.getsource(app_mod.receipt_share_page)
+    assert 'card = e(f"/api/card/receipt/' in src
+    # Nothing else may be interpolated raw into an attribute on that page.
+    for raw in ('content="{title}"', 'content="{line}"', 'href="/record?handle={caller'):
+        assert raw not in src

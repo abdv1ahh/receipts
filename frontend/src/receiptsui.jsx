@@ -10,13 +10,17 @@
 // support unless someone deliberately routes around this component.
 import { useState } from "react";
 import { Icon } from "./icons.jsx";
+import { money, pct } from "./format.js";
 
-// An absent value says what it is rather than showing a dash. The rest of the app renders "—"
-// here, which is fine on a dashboard and wrong on a record: "not scored" and "not held" are
-// different facts, and a reader checking a track record is entitled to know which one they are
-// looking at instead of decoding a typographic mark.
-export const pct1 = (v) => (v == null ? "not scored" : `${(v * 100).toFixed(1)}%`);
-export const signed = (v) => (v == null ? "not scored" : `${v >= 0 ? "+" : ""}${(v * 100).toFixed(2)}%`);
+// The shared formatter, configured, never reimplemented. This file was about to hold the fifth
+// `pct` in the codebase, and the fourth one is the copy that dropped the x100 and published a +10%
+// trade to other people as "+0.1%". The differences here are real and they are ARGUMENTS: a rate
+// is unsigned, a proof panel wants two decimals, and an absent value says what it IS rather than
+// showing a dash, because "not scored" and "not held" are different facts and a reader checking a
+// track record is entitled to know which one they are looking at.
+export const pct1 = (v) => pct(v, { dp: 1, sign: false, empty: "not scored" });
+export const signed = (v) => pct(v, { dp: 2, empty: "not scored" });
+export const price = (v) => money(v, { dp: 2, empty: null });
 export const shortHash = (h) => (h ? `${h.slice(0, 10)}…${h.slice(-6)}` : "not held");
 export const day = (iso) => (iso ? String(iso).slice(0, 10) : "not held");
 
@@ -151,7 +155,6 @@ export function ChainStrip({ handle, links, head, onVerify }) {
     const total = Math.max(1, result.links);
     const ticks = Math.min(28, total);
     for (let i = 1; i <= ticks; i += 1) {
-      // eslint-disable-next-line no-await-in-loop
       await new Promise((r) => setTimeout(r, 26));
       setStep(Math.round((i / ticks) * total));
     }

@@ -28,6 +28,7 @@ import psycopg
 
 from .. import ledger
 from ..backtest.engine import Series, entry_day_after, excess_return, exit_day_for
+from ..ledger import price_series as _series
 
 # One definition, not a second 2%. Bound to the Ledger's floor so the two planes of this product
 # can never drift into scoring the same move differently.
@@ -43,15 +44,10 @@ UNSCOREABLE = {
     "no_entry_price": "our price feed for {symbol} ends before this call was published, so there "
                       "is no entry price. That is a gap in our data rather than a fault in the "
                       "call.",
-    "horizon_open_or_delisted": "the price feed for {symbol} does not reach the end of the "
-                                "horizon, so there is no exit price yet.",
+    "horizon_open_or_delisted": "{benchmark} has price data past the end of this horizon and "
+                                "{symbol} does not, so its feed has stopped and there is no exit "
+                                "price to score against.",
 }
-
-
-def _series(conn: psycopg.Connection, symbol: str) -> Series:
-    with conn.cursor() as cur:
-        cur.execute("SELECT day, close FROM prices_eod WHERE symbol = %s ORDER BY day", (symbol,))
-        return Series.from_rows(cur.fetchall())
 
 
 def entry_exit_sessions(published_at: datetime, horizon_days: int, symbol: str,
@@ -119,15 +115,21 @@ def resolve_call(call_id: int, conn: psycopg.Connection, spy: Series | None = No
     as_of = published_at.date()
     excess, why = excess_return(sym, spy, as_of, horizon_days)
     if excess is None:
-        if why == "horizon_open_or_delisted" and sym.last_day and spy.last_day:
-            # Two very different situations arrive here wearing one label. If the feed simply has
-            # not reached the horizon yet, the call is still OPEN and must stay open; sealing it
-            # unscoreable would be permanent, and the trigger means permanent really is permanent.
+        # `horizon_open_or_delisted` covers two situations that must NOT be treated alike, because
+        # a verdict is permanent once written and the trigger means permanent really is permanent.
+        #
+        # The benchmark settles it. SPY is fetched first on every top-up precisely so it is the
+        # freshest thing in the table. If SPY reaches the end of the horizon and this symbol does
+        # not, the symbol's own feed is dead relative to the market and unscoreable is honest and
+        # final. If SPY has not reached it either, our feed is merely behind, which is our
+        # operational fault and fixes itself; the call stays OPEN and is retried in six hours.
+        if why == "horizon_open_or_delisted":
             entry = entry_day_after(sym, as_of)
-            if entry and exit_day_for(sym, entry, horizon_days) is None \
-                    and min(sym.last_day, spy.last_day) < entry:
+            benchmark_reached = entry is not None and exit_day_for(spy, entry, horizon_days)
+            if not benchmark_reached:
                 return {"call_id": call_id, "status": "open",
-                        "reason": "the price feed has not reached the horizon yet."}
+                        "reason": "the price feed has not reached the end of the horizon yet, so "
+                                  "there is nothing to score against."}
         return _write(conn, call_id, "unscoreable",
                       UNSCOREABLE.get(why, UNSCOREABLE["no_symbol"]).format(
                           symbol=symbol, benchmark=benchmark), {})

@@ -12,12 +12,21 @@
 // The hit rate is not the hero. That is deliberate and it is the opposite of what every competitor
 // does, because a rate without its interval beside it is the number that misleads.
 import { useEffect, useState } from "react";
-import { fetchRecord, verifyChain } from "./api";
+import { fetchMyCaller, fetchRecord, verifyChain } from "./api";
 import { Icon } from "./icons.jsx";
 import { EmptyState, LoadError } from "./shell.jsx";
 import {
   ChainStrip, Counts, Disclaimer, HouseBanner, Rate, VerdictChip, day, signed,
 } from "./receiptsui.jsx";
+
+/** A URL, or null if it is not one we are willing to put in an href.
+ *
+ *  https only. Not a scheme blocklist: `javascript:` is the obvious one and `data:` and `vbs:` are
+ *  the ones a blocklist forgets. The server refuses anything else on the way in; this is the second
+ *  lock, so that a row written by a path that does not exist yet still cannot become a link. */
+function httpsOnly(url) {
+  return typeof url === "string" && /^https:\/\//i.test(url) ? url : null;
+}
 
 function Header({ caller }) {
   return (
@@ -35,10 +44,11 @@ function Header({ caller }) {
                 ? " as ours"
                 : ` by ${String(caller.verification_method).replace("_", " ")}`}
             </span>
-            {caller.verification_evidence_url && (
+            {httpsOnly(caller.verification_evidence_url) && (
               <>
                 {" · "}
-                <a href={caller.verification_evidence_url} target="_blank" rel="noreferrer noopener">
+                <a href={httpsOnly(caller.verification_evidence_url)} target="_blank"
+                   rel="noreferrer noopener">
                   evidence
                 </a>
               </>
@@ -50,9 +60,14 @@ function Header({ caller }) {
             this handle is the person who publishes elsewhere.
           </span>
         )}
-        {caller.audience_url && (
-          <a className="rc-audience" href={caller.audience_url} target="_blank" rel="noreferrer noopener">
-            {caller.audience_url.replace(/^https?:\/\//, "")}
+        {/* Checked here as well as at the write path. React escapes an attribute value but does
+            not restrict the SCHEME, so `javascript:` in an href survives to something a reader can
+            click, on a page whose whole purpose is to be shared. A row written by any future path
+            cannot reach an anchor unvetted. */}
+        {httpsOnly(caller.audience_url) && (
+          <a className="rc-audience" href={httpsOnly(caller.audience_url)}
+             target="_blank" rel="noreferrer noopener">
+            {caller.audience_url.replace(/^https:\/\//, "")}
           </a>
         )}
         {caller.kind === "algorithm" && <span className="rc-kindtag">algorithm</span>}
@@ -250,8 +265,7 @@ export function MyRecord({ user, onLogin, onOpenRecord, onNav }) {
 
   useEffect(() => {
     if (!user) return;
-    import("./api").then(({ fetchMyCaller }) =>
-      fetchMyCaller().then(setState).catch(() => setState({ caller: null })));
+    fetchMyCaller().then(setState).catch(() => setState({ caller: null }));
   }, [user]);
 
   useEffect(() => {

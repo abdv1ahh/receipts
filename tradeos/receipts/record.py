@@ -22,7 +22,8 @@ from psycopg import sql
 
 from .. import ledger
 from ..backtest.engine import wilson_interval
-from . import chain
+from . import calls as calls_mod
+from . import chain, scoring
 
 SAMPLE_GATE = 25
 
@@ -64,9 +65,21 @@ def _stats(conn: psycopg.Connection, scope_sql: sql.SQL, params: tuple) -> dict:
     """
     with conn.cursor() as cur:
         cur.execute(_COUNT_SQL.format(scope=scope_sql), params)
-        hit, miss, inconclusive, unscoreable, open_calls = cur.fetchone()
+        counts = cur.fetchone()
         cur.execute(_FOLLOWED_SQL.format(scope=scope_sql), params)
         followed = [float(r[0]) for r in cur.fetchall()]
+    return _compute(counts, followed)
+
+
+def _compute(counts: tuple, followed: list[float]) -> dict:
+    """The statistics themselves, pure, over one caller's rows.
+
+    Separated from the fetch so the board can read every caller in two grouped queries and still
+    run exactly this code per caller. The alternative is a second implementation of the gate and
+    the intervals for the list view, which is how a board and a record page come to disagree about
+    the same caller.
+    """
+    hit, miss, inconclusive, unscoreable, open_calls = counts
 
     scoreable = hit + miss
     gated = scoreable < SAMPLE_GATE
@@ -201,13 +214,31 @@ def board(conn: psycopg.Connection) -> list[dict]:
                          FROM callers ORDER BY created_at""")
         rows = cur.fetchall()
 
+    # Two queries for the whole board rather than two per caller.
+    with conn.cursor() as cur:
+        cur.execute("""SELECT caller_id,
+                              count(*) FILTER (WHERE verdict = 'hit'),
+                              count(*) FILTER (WHERE verdict = 'miss'),
+                              count(*) FILTER (WHERE verdict = 'inconclusive'),
+                              count(*) FILTER (WHERE verdict = 'unscoreable'),
+                              count(*) FILTER (WHERE verdict IS NULL)
+                         FROM calls GROUP BY caller_id""")
+        counts = {r[0]: r[1:] for r in cur.fetchall()}
+        cur.execute("""SELECT caller_id,
+                              CASE WHEN direction = 'up' THEN excess_return ELSE -excess_return END
+                         FROM calls
+                        WHERE verdict IN ('hit', 'miss') AND excess_return IS NOT NULL""")
+        followed: dict[int, list[float]] = {}
+        for cid, value in cur.fetchall():
+            followed.setdefault(cid, []).append(float(value))
+
     entries = []
     for cid, handle, name, kind, is_house, verified_at, method, audience in rows:
         entries.append({
             "id": cid, "handle": handle, "display_name": name, "kind": kind,
             "is_house": is_house, "verified": verified_at is not None,
             "verification_method": method, "audience_url": audience,
-            "summary": summary(cid, conn),
+            "summary": _compute(counts.get(cid, (0, 0, 0, 0, 0)), followed.get(cid, [])),
         })
 
     ranked = sorted((e for e in entries if not e["summary"]["gated"]),
@@ -229,8 +260,6 @@ def methodology() -> dict:
     the drift is invisible: the page still reads correctly, it is just no longer true. Everything
     here is read from the same constants the scorer uses.
     """
-    from . import calls as calls_mod
-    from . import scoring
     return {
         "entry": ("A call enters at the close of the first trading session strictly after it was "
                   "published. Never the session in progress: by the time a call is published, most "
@@ -289,10 +318,10 @@ def scoreable_universe(conn: psycopg.Connection) -> dict:
     would be wrong within a week.
     """
     with conn.cursor() as cur:
-        cur.execute("""SELECT count(DISTINCT symbol), max(day) FROM prices_eod""")
-        symbols, newest = cur.fetchone()
-        cur.execute("SELECT max(day) FROM prices_eod WHERE symbol = 'SPY'")
-        spy_newest = cur.fetchone()[0]
+        cur.execute("""SELECT count(DISTINCT symbol), max(day),
+                              max(day) FILTER (WHERE symbol = 'SPY')
+                         FROM prices_eod""")
+        symbols, newest, spy_newest = cur.fetchone()
     return {"symbols": symbols or 0,
             "newest_close": newest.isoformat() if newest else None,
             "benchmark_newest_close": spy_newest.isoformat() if spy_newest else None}

@@ -13,9 +13,7 @@ import { useEffect, useState } from "react";
 import { fetchCall } from "./api";
 import { Icon } from "./icons.jsx";
 import { LoadError } from "./shell.jsx";
-import { Disclaimer, VerdictChip, day, shortHash, signed } from "./receiptsui.jsx";
-
-const money = (v) => (v == null ? null : `$${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+import { Disclaimer, VerdictChip, day, price, shortHash, signed } from "./receiptsui.jsx";
 
 function Field({ label, value, missing, mono = true, wide = false }) {
   return (
@@ -128,15 +126,17 @@ export function CallDetailView({ callId, onBack, onOpenRecord }) {
         </div>
 
         <div className="cd-grid">
-          <Field label="entry session" value={day(c.entry_session)} missing="not scored yet" />
-          <Field label="exit session" value={day(c.exit_session)} missing="not scored yet" />
-          <Field label="entry price" value={money(c.entry_price)}
+          <Field label="entry session" value={c.entry_session ? day(c.entry_session) : null}
+                 missing="not scored yet" />
+          <Field label="exit session" value={c.exit_session ? day(c.exit_session) : null}
+                 missing="not scored yet" />
+          <Field label="entry price" value={price(c.entry_price)}
                  missing={imported ? "not stored at the time" : "not scored yet"} />
-          <Field label="exit price" value={money(c.exit_price)}
+          <Field label="exit price" value={price(c.exit_price)}
                  missing={imported ? "not stored at the time" : "not scored yet"} />
-          <Field label="benchmark at entry" value={money(c.benchmark_entry)}
+          <Field label="benchmark at entry" value={price(c.benchmark_entry)}
                  missing={imported ? "not stored at the time" : "not scored yet"} />
-          <Field label="benchmark at exit" value={money(c.benchmark_exit)}
+          <Field label="benchmark at exit" value={price(c.benchmark_exit)}
                  missing={imported ? "not stored at the time" : "not scored yet"} />
           <Field label="the symbol moved" value={c.subject_return == null ? null : signed(c.subject_return)}
                  missing={imported ? "not stored at the time" : "not scored yet"} />

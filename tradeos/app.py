@@ -3149,6 +3149,16 @@ def claim_handle(req: CallerReq, response: Response, tos_session: str | None = C
             response.status_code = 400
             return {"error": "you have to confirm that your own regulatory and registration status "
                              "in your jurisdiction is your responsibility."}
+        audience = (req.audience_url or "").strip()
+        if audience and not audience.lower().startswith("https://"):
+            # HTTPS only, and refused rather than coerced. This value is rendered as the `href` of
+            # a link on a PUBLIC record page, and React escapes attribute values without
+            # restricting the scheme, so `javascript:` would survive to an anchor anybody could
+            # click. `receipts.verification.confirm` applies the identical rule to its evidence
+            # URL; this one was the only user-supplied URL in the feature that reached an href
+            # without it.
+            response.status_code = 400
+            return {"error": "the link to your audience has to be an https address."}
         if _caller_for_user(conn, user["id"]):
             response.status_code = 409
             return {"error": "this account already holds a record."}
@@ -3162,8 +3172,7 @@ def claim_handle(req: CallerReq, response: Response, tos_session: str | None = C
                                                 jurisdiction_attested)
                            VALUES (%s,%s,%s,%s,%s,true) RETURNING id""",
                         (user["id"], handle, req.display_name.strip()[:80],
-                         (req.bio or "").strip()[:500] or None,
-                         (req.audience_url or "").strip() or None))
+                         (req.bio or "").strip()[:500] or None, audience or None))
             cur.fetchone()
         conn.commit()
         return {"caller": _caller_for_user(conn, user["id"])}
@@ -3316,18 +3325,21 @@ def receipts_for(handle: str, response: Response) -> dict:
             response.status_code = 404
             return {"error": "no such record."}
         cid = caller["id"]
+        # `listing` is newest first, so its first row carries the chain head. Reading the calls a
+        # second time through `for_chain` would double the work of the heaviest query on this page
+        # for a count and one hash. `for_chain` is still the only input to actual VERIFICATION,
+        # where reading exactly the sealed fields and nothing else is the whole point.
+        listing = receipts_calls.listing(cid, conn)
         out = {
             "caller": caller,
             "summary": receipts_record.summary(cid, conn),
             "misses": receipts_record.recent_misses(cid, 10, conn),
             "calibration": receipts_record.calibration(cid, conn),
-            "calls": receipts_calls.listing(cid, conn),
-            "chain_links": 0,
+            "calls": listing,
+            "chain_links": len(listing),
+            "chain_head": listing[0]["content_hash"] if listing else receipts_chain.GENESIS_HASH,
             "disclaimer": RECEIPTS_DISCLAIMER,
         }
-        sealed = receipts_calls.for_chain(cid, conn)
-        out["chain_links"] = len(sealed)
-        out["chain_head"] = sealed[-1]["content_hash"] if sealed else receipts_chain.GENESIS_HASH
         if caller["is_house"]:
             # Whose record is this. The pooled house figure is the one the banner quotes, and a
             # surface that showed one version's rate under a sentence about the other would be
@@ -3414,7 +3426,10 @@ def receipt_share_page(handle: str) -> str:
         line = (f'{summary["hit_rate"]:.1%} right on {summary["resolved_scoreable"]} resolved calls, '
                 f'measured against SPY.')
     title = f'{caller["display_name"]} · the record · {brand}'
-    card = f"/api/card/receipt/{caller['handle']}.svg"
+    # Escaped like everything else here. The handle regex makes a quote impossible to store today,
+    # but that regex lives three hundred lines away in a different function, and a second way to
+    # create a caller would break this silently.
+    card = e(f"/api/card/receipt/{caller['handle']}.svg")
     return f'''<!doctype html><html lang="en"><head><meta charset="utf-8">
 <title>{e(title)}</title>
 <meta property="og:title" content="{e(title)}">
