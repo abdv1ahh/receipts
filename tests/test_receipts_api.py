@@ -65,6 +65,11 @@ def thin_caller():
         conn.commit()
         receipts_calls.publish(caller_id, VALID, conn)
         yield caller_id, handle
+        # Roll back FIRST. A test that fails inside a cursor leaves the transaction aborted, and
+        # every statement below then errors with "current transaction is aborted" — so the teardown
+        # silently does nothing and the scratch caller is left on the public board. That happened:
+        # six of them accumulated before this line existed.
+        conn.rollback()
         with conn.cursor() as cur:
             cur.execute("ALTER TABLE calls DISABLE TRIGGER calls_append_only_trg")
             cur.execute("DELETE FROM calls WHERE caller_id = %s", (caller_id,))

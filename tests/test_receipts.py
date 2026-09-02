@@ -57,6 +57,11 @@ def caller():
             caller_id = cur.fetchone()[0]
         conn.commit()
         yield caller_id, handle, conn
+        # Roll back FIRST. A test that fails inside a cursor leaves the transaction aborted, and
+        # every statement below then errors with "current transaction is aborted" — so the teardown
+        # silently does nothing and the scratch caller is left on the public board. That happened:
+        # six of them accumulated before this line existed.
+        conn.rollback()
         with conn.cursor() as cur:
             # The trigger refuses this, which is the point of it. An operator can switch it off;
             # nobody else can, and the methodology page says so.
