@@ -5,7 +5,11 @@ services:
       POSTGRES_USER: tradeos
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}   # local dev only; production uses a managed secret
       POSTGRES_DB: tradeos
-    ports: ["5432:5432"]
+    # Bound to the loopback interface ONLY. The nightly backup now connects to this port
+    # from the host instead of going through `docker compose exec`, so the port has to be
+    # published — but published on 0.0.0.0, as it was, this database was reachable from
+    # every machine on the local network with the plain-text password three lines above.
+    ports: ["127.0.0.1:5432:5432"]
     volumes: [pgdata:/var/lib/postgresql/data]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U tradeos"]
