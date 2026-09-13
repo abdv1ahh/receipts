@@ -150,6 +150,56 @@ def _job_resolve_calls(conn) -> dict:
     return out
 
 
+def _job_ingest_prices(conn) -> dict:
+    """Keep end-of-day prices current. NEW — there was no price job here at all.
+
+    That absence is why prices went stale. Ingestion was CLI-only, driven by a paced shell script
+    an operator had to remember to run, because free Tiingo allows one symbol per request at ~50
+    requests an hour: 500 symbols could not be refreshed inside a scheduler tick, so nobody tried.
+    Measured 2026-09-09, the consequence was 0 of 500 symbols holding a bar at the latest session.
+
+    Alpaca removes the constraint rather than managing it — many symbols per request, 200 requests
+    a minute — so 500 symbols is five calls and this becomes an ordinary job.
+
+    The work list is `symbols_stale`, which is ordered OLDEST-DATA-FIRST. If a tick is cut short,
+    the symbols it skipped are the freshest ones and they sort to the front next time. SPY leads
+    regardless, because a stale benchmark unscoreables everything else.
+    """
+    from datetime import timedelta
+
+    from . import config
+    from .backtest.run import symbols_stale
+    from .ingestion.prices_alpaca import AlpacaClient, ingest_prices_alpaca
+
+    if not config.alpaca_configured():
+        # A source that no-ops because it is unkeyed still records status ok in job_runs, and
+        # `sources.health()` deliberately does not count that as a successful fetch. Say which
+        # key is missing rather than leaving a silent zero.
+        return {"skipped": "ALPACA_API_KEY_ID / ALPACA_API_SECRET_KEY not set"}
+
+    with conn.cursor() as cur:
+        cur.execute("SELECT max(day) FROM prices_eod")
+        newest = cur.fetchone()[0]
+    if newest is None:
+        return {"skipped": "prices_eod is empty; run a backfill first"}
+
+    symbols = symbols_stale(conn, newest)
+    if not symbols:
+        return {"nothing_due": True, "note": f"every symbol already reaches {newest}"}
+
+    key_id, secret = config.alpaca_credentials()
+    client = AlpacaClient(key_id, secret)
+    try:
+        # Reach back a fortnight rather than to `newest`: a symbol that was halted or thinly traded
+        # can have a gap, and re-requesting a few extra sessions is free in a batched call.
+        out = ingest_prices_alpaca(conn, client, symbols, newest - timedelta(days=14))
+    finally:
+        client.close()
+    log.info("ingest_prices: %d symbols, %d batches, %d rows (rate_limited=%s)",
+             out["symbols"], out["batches"], out["rows"], out["rate_limited"])
+    return out
+
+
 def _job_crypto_structure(conn) -> dict:
     """Keep the derivatives cache warm so the Crypto surface is instant. Five symbols x four
     endpoints is ~7s of paced requests — fine here, unacceptable on a page load."""
@@ -213,6 +263,9 @@ JOBS = [
     ("reinterpret", 7200, _job_reinterpret),      # developing stories -> every 2h, 3 at a time
     ("radar_alerts", 900, _job_radar_alerts),     # check the queue every 15 min; throttles are per filter
     ("measure_claims", 21600, _job_measure_claims),  # horizons close slowly; 4x a day is plenty
+    # Daily bars change once a day, but a pass can be cut short, so check every 6h. Batched
+    # against Alpaca this is ~5 requests for the whole table.
+    ("ingest_prices", 21600, _job_ingest_prices),
     ("crypto_structure", 240, _job_crypto_structure),  # just inside the 300s cache TTL
     # Horizons are 7, 30 and 90 days, so nothing is gained by checking more often than the price
     # feed itself moves. Four times a day is well inside the shortest horizon and leaves the free

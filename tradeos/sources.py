@@ -134,10 +134,26 @@ CATALOG: list[dict] = [
         "feeds": [], "jobs": [],
     },
     {
-        "key": "tiingo", "label": "Tiingo", "kind": "market",
-        "powers": "end-of-day prices, which is how claim outcomes get scored",
+        "key": "alpaca", "label": "Alpaca Market Data", "kind": "market",
+        "powers": "end-of-day prices — the price source, and how claim and call outcomes get scored",
+        "state": None, "env": ["ALPACA_API_KEY_ID", "ALPACA_API_SECRET_KEY"],
+        "signup_url": "https://app.alpaca.markets/signup",
+        "note": ("Free tier: 200 requests/minute, unlimited history, and MANY SYMBOLS PER REQUEST, "
+                 "which is the whole reason it replaced Tiingo — 500 symbols is five calls, not "
+                 "500. The free feed is IEX rather than the consolidated tape, so a daily close "
+                 "can differ from the official close by a few basis points; that is far below the "
+                 "2% noise floor outcomes are scored against, and it is measured in "
+                 "docs/analysis/alpaca_vs_tiingo.md."),
+        "feeds": [], "jobs": ["ingest_prices"],
+    },
+    {
+        "key": "tiingo", "label": "Tiingo (price fallback)", "kind": "market",
+        "powers": "end-of-day prices — FALLBACK only; Alpaca above is the price source",
         "state": None, "env": ["TIINGO_API_KEY"], "signup_url": "https://www.tiingo.com/account/api/token",
-        "note": "Free tier is enough for daily bars on the names we track.",
+        "note": ("Kept as a fallback, not deleted, until Alpaca is proven against real data. "
+                 "Free tier is ~50 requests/hour and ONE symbol per request, which is why a "
+                 "500-symbol top-up could never finish and price staleness became "
+                 "alphabetically biased."),
         "feeds": [], "jobs": [],
     },
     {

@@ -23,6 +23,11 @@ services:
       UPLOADS_DIR: /app/uploads
       SEC_USER_AGENT: ${SEC_USER_AGENT}
       TIINGO_API_KEY: ${TIINGO_API_KEY:-}
+      # Alpaca is the price source; Tiingo above is kept as a fallback. Both halves of the
+      # Alpaca credential are required — a key id without its secret is an anonymous client
+      # that 403s on every bar. Free key: https://app.alpaca.markets/signup
+      ALPACA_API_KEY_ID: ${ALPACA_API_KEY_ID:-}
+      ALPACA_API_SECRET_KEY: ${ALPACA_API_SECRET_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-flash-latest}
       GEMINI_MODEL_FAST: ${GEMINI_MODEL_FAST:-gemini-flash-lite-latest}
@@ -59,6 +64,11 @@ services:
       DATABASE_URL: postgresql://tradeos:${POSTGRES_PASSWORD}@db:5432/tradeos
       SEC_USER_AGENT: ${SEC_USER_AGENT}
       TIINGO_API_KEY: ${TIINGO_API_KEY:-}
+      # Alpaca is the price source; Tiingo above is kept as a fallback. Both halves of the
+      # Alpaca credential are required — a key id without its secret is an anonymous client
+      # that 403s on every bar. Free key: https://app.alpaca.markets/signup
+      ALPACA_API_KEY_ID: ${ALPACA_API_KEY_ID:-}
+      ALPACA_API_SECRET_KEY: ${ALPACA_API_SECRET_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-flash-latest}
       GEMINI_MODEL_FAST: ${GEMINI_MODEL_FAST:-gemini-flash-lite-latest}

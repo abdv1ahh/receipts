@@ -52,6 +52,33 @@ def tiingo_configured() -> bool:
     return bool(os.environ.get("TIINGO_API_KEY"))
 
 
+def alpaca_configured() -> bool:
+    """End-of-day prices via Alpaca — the replacement for Tiingo as the price source.
+
+    BOTH halves are required. A key id without its secret is not a half-working configuration, it
+    is an unauthenticated client that will 403 on every bar, so this reports False rather than
+    letting a pass start and fail 500 times."""
+    return bool(os.environ.get("ALPACA_API_KEY_ID") and os.environ.get("ALPACA_API_SECRET_KEY"))
+
+
+def alpaca_credentials() -> tuple[str, str]:
+    """(key id, secret key). Raises rather than returning a blank, because a blank credential
+    reaches Alpaca as an anonymous request and comes back 403 — an error that reads like an
+    outage instead of like a missing key."""
+    key_id = os.environ.get("ALPACA_API_KEY_ID", "")
+    secret = os.environ.get("ALPACA_API_SECRET_KEY", "")
+    if not key_id or not secret:
+        missing = " and ".join(n for n, v in
+                               (("ALPACA_API_KEY_ID", key_id), ("ALPACA_API_SECRET_KEY", secret))
+                               if not v)
+        raise ConfigError(
+            f"{missing} is not set. Free key: https://app.alpaca.markets/signup — and note that "
+            "docker-compose.yml enumerates every variable it passes, so a value in .env alone "
+            "does not reach the container (see docs/runbooks/ and CLAUDE.md §0i)."
+        )
+    return key_id, secret
+
+
 def openfigi_configured() -> bool:
     """CUSIP -> ticker mapping for 13F holdings. Works keyless at a low rate limit; a free key
     raises it."""

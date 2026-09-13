@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import os
 from datetime import UTC, date, datetime, time, timedelta
@@ -28,6 +29,7 @@ from .ingestion import form13f, schedule13
 from .ingestion.edgar_client import EdgarClient
 from .ingestion.finra import FinraClient, ingest_short_interest
 from .ingestion.prices import TiingoClient, ingest_prices
+from .ingestion.prices_alpaca import AlpacaClient, ingest_prices_alpaca
 from .ingestion.runner import ingest_day as ingest_form4_day
 from .library import sync_library
 from .resolution.entities import backfill_insider_entities
@@ -187,6 +189,108 @@ def cmd_ingest_prices(args) -> None:
         client.close()
 
 
+def _price_worklist(conn, args) -> list[str]:
+    """The symbols a price pass should fetch, in the order it should fetch them.
+
+    Shared by the Tiingo and Alpaca commands so the two cannot drift about what "stale" means.
+    Every branch returns a list ordered by STALENESS, never by symbol — see the note above
+    `_STALENESS_ORDER` in `backtest/run.py` for the measured damage the alphabetical version did.
+    """
+    if args.only_stale:
+        # Default the cutoff to the freshest close anything has, so "stale" means "behind the rest
+        # of the table" without the operator having to look the date up.
+        if args.stale_before:
+            cutoff = date.fromisoformat(args.stale_before)
+        else:
+            with conn.cursor() as cur:
+                cur.execute("SELECT max(day) FROM prices_eod")
+                cutoff = cur.fetchone()[0]
+        return backtest.symbols_stale(conn, cutoff) if cutoff else []
+    if args.only_missing_history:
+        return backtest.symbols_for_clusters_missing_history(conn, date.fromisoformat(args.history_before))
+    if args.only_missing:
+        return backtest.symbols_for_clusters_missing(conn)
+    if args.symbols_from_clusters:
+        return backtest.symbols_for_clusters(conn)
+    return [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
+
+
+def cmd_ingest_prices_alpaca(args) -> None:
+    """The default price path. Batched, so 500 symbols is five requests rather than 500."""
+    start = date.fromisoformat(args.start)
+    key_id, secret = config.alpaca_credentials()
+    client = AlpacaClient(key_id, secret)
+    try:
+        with db.connect() as conn:
+            symbols = _price_worklist(conn, args)
+            if args.limit:
+                symbols = symbols[: args.limit]
+            counters = ingest_prices_alpaca(conn, client, symbols, start)
+        print(f"ingest-prices-alpaca: {counters}")
+    finally:
+        client.close()
+
+
+def cmd_compare_prices(args) -> None:
+    """Measure Alpaca against the Tiingo series already in this database, before trusting it.
+
+    This exists because swapping a price source without measuring it would replace a known
+    limitation with an unknown one. The free Alpaca tier serves the IEX feed rather than the
+    consolidated tape (see `prices_alpaca` module docstring), so some divergence is EXPECTED; the
+    question is whether it is small enough to be irrelevant beside the 2% noise floor the scorer
+    already applies.
+
+    Reads Tiingo rows straight from `prices_eod` — no Tiingo API call and no quota spent — and
+    compares them day by day against a live Alpaca fetch over the same window.
+    """
+    symbols = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
+    start, end = date.fromisoformat(args.start), date.fromisoformat(args.end)
+    key_id, secret = config.alpaca_credentials()
+    client = AlpacaClient(key_id, secret)
+    try:
+        with db.connect() as conn:
+            alpaca = client.daily_batch(symbols, start, end)
+            rows, worst, diffs = [], None, []
+            for sym in symbols:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """SELECT day, close FROM prices_eod
+                            WHERE symbol = %s AND day BETWEEN %s AND %s AND source LIKE 'tiingo%%'
+                            ORDER BY day""",
+                        (sym, start, end))
+                    tiingo = {d: float(c) for d, c in cur.fetchall()}
+                alp = {}
+                for bar in alpaca.get(sym, []):
+                    raw = bar.get("t")
+                    if isinstance(raw, str) and bar.get("c"):
+                        alp[datetime.fromisoformat(raw.replace("Z", "+00:00")).date()] = float(bar["c"])
+                shared = sorted(set(tiingo) & set(alp))
+                exact = sum(1 for d in shared if tiingo[d] == alp[d])
+                per = [abs(alp[d] - tiingo[d]) / tiingo[d] * 100 for d in shared if tiingo[d]]
+                diffs.extend(per)
+                for d in shared:
+                    if tiingo[d]:
+                        pct = abs(alp[d] - tiingo[d]) / tiingo[d] * 100
+                        if worst is None or pct > worst[2]:
+                            worst = (sym, d, pct, tiingo[d], alp[d])
+                rows.append({"symbol": sym, "days": len(shared), "exact": exact,
+                             "mad_pct": (sum(per) / len(per)) if per else None,
+                             "tiingo_only": len(set(tiingo) - set(alp)),
+                             "alpaca_only": len(set(alp) - set(tiingo))})
+        overall = (sum(diffs) / len(diffs)) if diffs else None
+        print(json.dumps({"symbols": rows,
+                          "overall_mean_abs_pct_diff": overall,
+                          "total_days_compared": len(diffs),
+                          "worst": {"symbol": worst[0], "day": worst[1].isoformat(),
+                                    "pct": worst[2], "tiingo": worst[3], "alpaca": worst[4]}
+                                   if worst else None,
+                          "verdict": ("PASS" if overall is not None and overall <= 0.5 else
+                                      "FAIL - exceeds the 0.5% gate" if overall is not None else
+                                      "NO OVERLAP - nothing compared")}, indent=2, default=str))
+    finally:
+        client.close()
+
+
 def cmd_ingest_short_interest(args) -> None:
     client = FinraClient()
     try:
@@ -263,6 +367,34 @@ def _probe(key: str) -> tuple[bool, str]:
                 did = social_bluesky.resolve_did(client, "reuters.com")
             return (bool(did), f"resolved reuters.com to {did}" if did
                     else "could not resolve a known handle")
+        if key == "alpaca":
+            # Ask for ONE bar of SPY. A bad or missing credential returns 401/403 here — unlike
+            # OpenFIGI and Tiingo's /api/test, this endpoint does not answer unauthenticated
+            # callers at all, so a 200 genuinely proves the key works. Cheap: one bar, one symbol.
+            # `config` is rebound by a local import later in this function, which makes
+            # the module-level name unusable here (ruff F823). Alias it.
+            from . import config as _config
+            from .ingestion.prices_alpaca import ALPACA_BARS_URL
+            key_id, secret = _config.alpaca_credentials()
+            with httpx.Client(timeout=20.0, follow_redirects=False) as client:
+                r = client.get(ALPACA_BARS_URL,
+                               headers={"APCA-API-KEY-ID": key_id,
+                                        "APCA-API-SECRET-KEY": secret,
+                                        "Accept": "application/json"},
+                               params={"symbols": "SPY", "timeframe": "1Day",
+                                       "start": "2026-01-02", "limit": 1, "adjustment": "all"})
+            if r.status_code in (401, 403):
+                return False, (f"HTTP {r.status_code} — the credential was rejected. Check BOTH "
+                               "ALPACA_API_KEY_ID and ALPACA_API_SECRET_KEY, and remember that "
+                               "docker-compose.yml enumerates env vars, so a value in .env alone "
+                               "does not reach the container until `docker compose up -d api worker`.")
+            if r.status_code == 429:
+                return True, "credential accepted (rate limited right now — 200 requests/minute)"
+            r.raise_for_status()
+            bars = (r.json().get("bars") or {}).get("SPY") or []
+            if not bars:
+                return False, "authenticated, but the response carried no SPY bar"
+            return True, f"credential accepted; read a SPY bar dated {bars[0].get('t', '?')[:10]}"
         if key == "tiingo":
             # NOT `/api/test`: that endpoint does not authenticate. Measured 2026-08-24, it
             # returns 200 for a garbage token and for a revoked one alike, so this probe
@@ -904,6 +1036,24 @@ def main() -> None:
     ip.add_argument("--symbols", default="", help="comma-separated symbols if not --symbols-from-clusters")
     ip.add_argument("--start", default="2026-01-01")
     ip.set_defaults(fn=cmd_ingest_prices)
+
+    ipa = sub.add_parser("ingest-prices-alpaca",
+                         help="daily bars from Alpaca; batched, so 500 symbols is 5 requests")
+    for a in ("--symbols-from-clusters", "--only-missing", "--only-missing-history", "--only-stale"):
+        ipa.add_argument(a, action="store_true", dest=a[2:].replace("-", "_"))
+    ipa.add_argument("--history-before", default="2026-01-02")
+    ipa.add_argument("--stale-before", default="")
+    ipa.add_argument("--limit", type=int, default=0)
+    ipa.add_argument("--symbols", default="")
+    ipa.add_argument("--start", default="2026-01-01")
+    ipa.set_defaults(fn=cmd_ingest_prices_alpaca)
+
+    cp = sub.add_parser("compare-prices",
+                        help="measure Alpaca against the Tiingo rows already stored, before switching")
+    cp.add_argument("--symbols", required=True, help="comma-separated")
+    cp.add_argument("--start", default="2026-06-01")
+    cp.add_argument("--end", default="2026-09-01")
+    cp.set_defaults(fn=cmd_compare_prices)
 
     si = sub.add_parser("ingest-short-interest")
     si.add_argument("--start", default="2026-05-01")

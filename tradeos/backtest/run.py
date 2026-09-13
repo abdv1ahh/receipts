@@ -22,16 +22,61 @@ def load_series(conn: psycopg.Connection, symbol: str) -> Series:
         return Series.from_rows(cur.fetchall())
 
 
+# ---------------------------------------------------------------------------------------------
+# WORK-LIST ORDERING. Every selector below returns symbols ORDERED BY STALENESS, oldest data first,
+# and none of them may order by symbol. This is a correctness property, not a performance one.
+#
+# All four used to end in `ORDER BY symbol` or `sorted(...)`. A free-tier pass cannot finish the
+# list — Tiingo allowed ~50 requests an hour against 500 symbols — so every run walked the alphabet
+# and died in the same place. Measured 2026-09-09: 0 of 500 symbols had a bar at the latest NYSE
+# session, 39 symbols reached 2026-09-02 in one contiguous alphabetical block ending at `PEB-PH`,
+# and the 79 stalest were the alphabetical tail from `PFX` to `YEXT`. Symbols late in the alphabet
+# were not unlucky, they were systematically never reached, and the table's own calendar reported
+# 99% fresh because it measured against the newest day it happened to hold.
+#
+# Ordering by staleness makes a truncated run leave the data EVENLY stale instead of biased: the
+# symbols a cut-short pass skips are by construction the freshest ones, and they sort to the front
+# of the next run.
+#
+# THE TIE-BREAK MATTERS AS MUCH AS THE SORT. Symbols with identical staleness — every symbol with
+# no data at all, or a whole block stuck on the same date — would fall back to whatever order the
+# planner returns, and `sorted()` would reintroduce exactly the bias this removes. `md5(symbol)`
+# is deterministic, so a run is reproducible, and uniformly distributed over the alphabet, so a
+# truncated pass through one staleness tier takes an unbiased sample of it.
+_STALENESS_ORDER = "ORDER BY last_day ASC NULLS FIRST, md5(symbol)"
+
+
+def _spy_first(symbols: list[str]) -> list[str]:
+    """SPY leads any work list it appears in.
+
+    It is the benchmark: a stale SPY makes every other symbol unscoreable no matter how current
+    that symbol is, so it must never sit behind 400 others in a queue that might be cut short.
+    This is the one deliberate exception to staleness ordering, and it is safe because it moves
+    exactly one symbol."""
+    if "SPY" not in symbols:
+        return symbols
+    return ["SPY"] + [s for s in symbols if s != "SPY"]
+
+
 def symbols_for_clusters(conn: psycopg.Connection) -> list[str]:
-    """Distinct exchange-listed symbols behind any computed cluster, plus SPY (benchmark)."""
+    """Distinct exchange-listed symbols behind any computed cluster, plus SPY (benchmark).
+
+    Ordered by staleness, never by symbol — see the note above `_STALENESS_ORDER`."""
     with conn.cursor() as cur:
         cur.execute(
-            """SELECT DISTINCT m.symbol FROM signal_clusters c
-               JOIN security_map m ON m.entity_id = c.issuer_entity AND m.source = 'sec_company_tickers'
-               WHERE m.symbol IS NOT NULL"""
+            f"""SELECT m.symbol, max(p.day) AS last_day
+                  FROM signal_clusters c
+                  JOIN security_map m ON m.entity_id = c.issuer_entity
+                                     AND m.source = 'sec_company_tickers'
+                  LEFT JOIN prices_eod p ON p.symbol = m.symbol
+                 WHERE m.symbol IS NOT NULL
+                 GROUP BY m.symbol
+                 {_STALENESS_ORDER.replace("symbol", "m.symbol")}"""  # noqa: S608 - no user input
         )
-        symbols = sorted({r[0] for r in cur.fetchall()})
-    return symbols + ["SPY"]
+        symbols = [r[0] for r in cur.fetchall()]
+    if "SPY" not in symbols:
+        symbols.append("SPY")
+    return _spy_first(symbols)
 
 
 def symbols_for_clusters_missing(conn: psycopg.Connection) -> list[str]:
@@ -42,14 +87,17 @@ def symbols_for_clusters_missing(conn: psycopg.Connection) -> list[str]:
             """SELECT DISTINCT m.symbol FROM signal_clusters c
                JOIN security_map m ON m.entity_id = c.issuer_entity AND m.source = 'sec_company_tickers'
                WHERE m.symbol IS NOT NULL
-                 AND NOT EXISTS (SELECT 1 FROM prices_eod p WHERE p.symbol = m.symbol)"""
+                 AND NOT EXISTS (SELECT 1 FROM prices_eod p WHERE p.symbol = m.symbol)
+               ORDER BY md5(m.symbol)"""
         )
-        missing = sorted({r[0] for r in cur.fetchall()})
+        # Every symbol here has NO data, so all are equally (maximally) stale and the md5
+        # tie-break is what carries the whole ordering. Without it this is alphabetical again.
+        missing = [r[0] for r in cur.fetchall()]
     with conn.cursor() as cur:
         cur.execute("SELECT 1 FROM prices_eod WHERE symbol = 'SPY' LIMIT 1")
         if not cur.fetchone():
             missing.append("SPY")
-    return missing
+    return _spy_first(missing)
 
 
 def symbols_for_clusters_missing_history(conn: psycopg.Connection, before: date) -> list[str]:
@@ -62,15 +110,16 @@ def symbols_for_clusters_missing_history(conn: psycopg.Connection, before: date)
             """SELECT DISTINCT m.symbol FROM signal_clusters c
                JOIN security_map m ON m.entity_id = c.issuer_entity AND m.source = 'sec_company_tickers'
                WHERE m.symbol IS NOT NULL
-                 AND NOT EXISTS (SELECT 1 FROM prices_eod p WHERE p.symbol = m.symbol AND p.day < %s)""",
+                 AND NOT EXISTS (SELECT 1 FROM prices_eod p WHERE p.symbol = m.symbol AND p.day < %s)
+               ORDER BY md5(m.symbol)""",
             (before,),
         )
-        missing = sorted({r[0] for r in cur.fetchall()})
+        missing = [r[0] for r in cur.fetchall()]
     with conn.cursor() as cur:
         cur.execute("SELECT 1 FROM prices_eod WHERE symbol = 'SPY' AND day < %s LIMIT 1", (before,))
         if not cur.fetchone():
             missing.append("SPY")
-    return missing
+    return _spy_first(missing)
 
 
 def symbols_stale(conn: psycopg.Connection, since: date) -> list[str]:
@@ -84,15 +133,20 @@ def symbols_stale(conn: psycopg.Connection, since: date) -> list[str]:
 
     SPY leads the list because it is the benchmark: a stale SPY makes every other symbol
     unscoreable no matter how current it is, so it must never be at the back of a quota-limited
-    queue."""
+    queue.
+
+    ORDERED OLDEST-DATA-FIRST. This selector produced the measured alphabetical bias: it ended in
+    `ORDER BY symbol`, so every quota-limited pass worked A->Z and stopped in the same place. See
+    the note above `_STALENESS_ORDER`."""
     with conn.cursor() as cur:
         cur.execute(
-            """SELECT symbol FROM prices_eod
-               GROUP BY symbol HAVING max(day) < %s ORDER BY symbol""",
+            f"""SELECT symbol, max(day) AS last_day FROM prices_eod
+                 GROUP BY symbol HAVING max(day) < %s
+                 {_STALENESS_ORDER}""",  # noqa: S608 - constant, no user input
             (since,),
         )
         stale = [r[0] for r in cur.fetchall()]
-    return (["SPY"] if "SPY" in stale else []) + [s for s in stale if s != "SPY"]
+    return _spy_first(stale)
 
 
 def _cluster_rows(conn: psycopg.Connection):
