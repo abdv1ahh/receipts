@@ -77,3 +77,35 @@ def test_the_import_writes_its_key_to_a_column_not_the_mechanism():
     src = inspect.getsource(SMC.build)
     assert "source_ref" in src
     assert 'f"{body}' not in src, "the dedup key is being concatenated into the mechanism again"
+
+
+def test_model_version_comes_from_the_cluster_not_from_max_version():
+    """A claim must be stamped with the definition that PRODUCED its cluster.
+
+    `_definition_version()` used to answer `SELECT max(version) FROM signal_definitions` with no
+    name filter, and the scheduler calls this every cycle. Registering any definition numbered 5 —
+    under any name at all — would therefore have restamped new claims `convergence-v5` when v3
+    logic produced them, and these claims are the rows `seed-house-records` imports into `calls`,
+    which the append-only trigger seals permanently. A mislabelled claim is recoverable; a
+    mislabelled sealed call is not.
+
+    The fix is provenance, not a name filter: each cluster already records its definition, so the
+    query joins it.
+    """
+    import inspect
+    src = inspect.getsource(SMC.build)
+    assert "max(version)" not in src, "the version is being guessed globally again"
+    assert "JOIN signal_definitions d ON d.id = c.definition_id" in src
+    assert 'f"{defn_name}-v{defn_version}"' in src
+    assert not hasattr(SMC, "_definition_version"), \
+        "the global max(version) helper is back; it cannot see which definition made a cluster"
+
+
+def test_the_import_reports_every_version_it_actually_wrote():
+    """With more than one signal definition registered, a single `model_version` in the return
+    value would have to pick one and be wrong about the rest. It reports the set instead, and the
+    set is built from claims actually inserted rather than from what was available to insert."""
+    import inspect
+    src = inspect.getsource(SMC.build)
+    assert "versions_written.add(model_version)" in src
+    assert '"model_versions": sorted(versions_written)' in src

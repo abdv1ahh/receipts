@@ -1,0 +1,6584 @@
+{
+ "definition": "convergence_insider-v2",
+ "code_hash": "ea6b6a98227b95b4909b57a75ce35b464dbed49797d402a791b15b8f697cb266",
+ "include_routine": false,
+ "params": {
+  "gate": {
+   "min_voices": 2,
+   "min_source_classes": 1
+  },
+  "buckets": {
+   "low_max": 3.0,
+   "medium_max": 6.0
+  },
+  "magnitude": {
+   "insider_cap": 1.5,
+   "insider_divisor": 6.0
+  },
+  "window_days": 90,
+  "base_weights": {
+   "insider_purchase": 1.0
+  },
+  "independence": {
+   "secondary_weight": 0.25
+  },
+  "half_life_days": {
+   "insider": 14.0
+  },
+  "transaction_codes": [
+   "P"
+  ],
+  "liquidity_floor_usd": 2000000.0,
+  "liquidity_window_days": 90,
+  "insider_classification": {
+   "rule": "cohen_malloy_pomorski_2012",
+   "counted": [
+    "opportunistic",
+    "unclassified"
+   ],
+   "lookback_years": 3,
+   "excluded_from_gate": [
+    "routine"
+   ]
+  }
+ },
+ "gate_clusters": 251688,
+ "published_clusters": 25504,
+ "floor_rejected": 195461,
+ "clusters_without_symbol": 30723,
+ "floor_verification": {
+  "checked": 300,
+  "mismatches": 0,
+  "examples": []
+ },
+ "episodes": 457,
+ "distinct_symbols": 359,
+ "distinct_issuers": 359,
+ "episode_gap_days": 14,
+ "label_counts": {
+  "unclassified": 49799,
+  "opportunistic": 10882,
+  "routine": 27
+ },
+ "span": [
+  "2024-07-02",
+  "2026-08-12"
+ ],
+ "rows": [
+  {
+   "issuer": 209,
+   "as_of": "2024-07-02",
+   "symbol": "SPG",
+   "score": 7.905681,
+   "bucket": "high",
+   "voices": 11,
+   "distinct_insiders": 11,
+   "dollars": 380981.29,
+   "classifications": {
+    "unclassified": 11
+   },
+   "clusters_in_episode": 510
+  },
+  {
+   "issuer": 506,
+   "as_of": "2024-08-16",
+   "symbol": "TPL",
+   "score": 4.112336,
+   "bucket": "medium",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 83553.31,
+   "classifications": {
+    "unclassified": 39
+   },
+   "clusters_in_episode": 329
+  },
+  {
+   "issuer": 506,
+   "as_of": "2026-01-08",
+   "symbol": "TPL",
+   "score": 2.557902,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 50829.76,
+   "classifications": {
+    "opportunistic": 65
+   },
+   "clusters_in_episode": 100
+  },
+  {
+   "issuer": 382,
+   "as_of": "2025-02-18",
+   "symbol": "AIG",
+   "score": 1.025731,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 820788.82952,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 382,
+   "as_of": "2026-02-03",
+   "symbol": "AIG",
+   "score": 0.93809,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 3407.542517,
+   "classifications": {
+    "unclassified": 6
+   },
+   "clusters_in_episode": 40
+  },
+  {
+   "issuer": 1498,
+   "as_of": "2024-12-18",
+   "symbol": "SAIC",
+   "score": 1.253102,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 81401.565,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 142
+  },
+  {
+   "issuer": 1498,
+   "as_of": "2025-12-16",
+   "symbol": "SAIC",
+   "score": 0.907567,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 210711.4,
+   "classifications": {
+    "unclassified": 1,
+    "opportunistic": 1
+   },
+   "clusters_in_episode": 77
+  },
+  {
+   "issuer": 1760,
+   "as_of": "2024-12-30",
+   "symbol": "ACHR",
+   "score": 3.12999,
+   "bucket": "medium",
+   "voices": 8,
+   "distinct_insiders": 8,
+   "dollars": 30139675.54,
+   "classifications": {
+    "unclassified": 8
+   },
+   "clusters_in_episode": 53
+  },
+  {
+   "issuer": 526,
+   "as_of": "2024-07-22",
+   "symbol": "CW",
+   "score": 1.410715,
+   "bucket": "low",
+   "voices": 5,
+   "distinct_insiders": 5,
+   "dollars": 51409.020000000004,
+   "classifications": {
+    "unclassified": 5
+   },
+   "clusters_in_episode": 53
+  },
+  {
+   "issuer": 526,
+   "as_of": "2025-01-06",
+   "symbol": "CW",
+   "score": 4.600353,
+   "bucket": "medium",
+   "voices": 7,
+   "distinct_insiders": 7,
+   "dollars": 68731.12,
+   "classifications": {
+    "opportunistic": 4,
+    "unclassified": 3
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 3715,
+   "as_of": "2025-01-08",
+   "symbol": "PLAY",
+   "score": 1.168391,
+   "bucket": "low",
+   "voices": 5,
+   "distinct_insiders": 5,
+   "dollars": 2758173.4485,
+   "classifications": {
+    "unclassified": 6
+   },
+   "clusters_in_episode": 19
+  },
+  {
+   "issuer": 1506,
+   "as_of": "2025-11-17",
+   "symbol": "TREX",
+   "score": 1.031255,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 481431.78,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 40
+  },
+  {
+   "issuer": 7258,
+   "as_of": "2026-03-31",
+   "symbol": "VCX",
+   "score": 0.060345,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 3195.111028,
+   "classifications": {
+    "unclassified": 5
+   },
+   "clusters_in_episode": 9
+  },
+  {
+   "issuer": 309,
+   "as_of": "2025-04-11",
+   "symbol": "DAL",
+   "score": 1.805891,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 601174.0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 607,
+   "as_of": "2026-03-10",
+   "symbol": "FIS",
+   "score": 1.022855,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1060367.45,
+   "classifications": {
+    "unclassified": 1,
+    "opportunistic": 1
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 2092,
+   "as_of": "2024-11-18",
+   "symbol": "BHVN",
+   "score": 0.259564,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 2220906.0,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 26
+  },
+  {
+   "issuer": 531,
+   "as_of": "2025-04-25",
+   "symbol": "JBHT",
+   "score": 1.166878,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 10399220.2208,
+   "classifications": {
+    "unclassified": 4,
+    "opportunistic": 2
+   },
+   "clusters_in_episode": 16
+  },
+  {
+   "issuer": 172,
+   "as_of": "2025-08-01",
+   "symbol": "UPS",
+   "score": 1.925302,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1433292.6312,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1270,
+   "as_of": "2024-09-23",
+   "symbol": "LKQ",
+   "score": 0.210991,
+   "bucket": "low",
+   "voices": 4,
+   "distinct_insiders": 4,
+   "dollars": 600551.6599999999,
+   "classifications": {
+    "unclassified": 4
+   },
+   "clusters_in_episode": 25
+  },
+  {
+   "issuer": 1270,
+   "as_of": "2025-08-27",
+   "symbol": "LKQ",
+   "score": 1.727731,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 338346.5,
+   "classifications": {
+    "opportunistic": 1,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1265,
+   "as_of": "2024-07-29",
+   "symbol": "LW",
+   "score": 1.851965,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 831766.5,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 1265,
+   "as_of": "2024-12-23",
+   "symbol": "LW",
+   "score": 1.725549,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 392250.33999999997,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 1265,
+   "as_of": "2026-04-07",
+   "symbol": "LW",
+   "score": 0.932087,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 2629555.0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 70
+  },
+  {
+   "issuer": 953,
+   "as_of": "2024-07-29",
+   "symbol": "LINE",
+   "score": 4.946077,
+   "bucket": "medium",
+   "voices": 6,
+   "distinct_insiders": 6,
+   "dollars": 1228500.0,
+   "classifications": {
+    "unclassified": 6
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 953,
+   "as_of": "2025-03-03",
+   "symbol": "LINE",
+   "score": 2.409736,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 2453373.2758,
+   "classifications": {
+    "unclassified": 4
+   },
+   "clusters_in_episode": 63
+  },
+  {
+   "issuer": 904,
+   "as_of": "2024-07-30",
+   "symbol": "ALLE",
+   "score": 2.00471,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 811454.9794000001,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 904,
+   "as_of": "2025-02-21",
+   "symbol": "ALLE",
+   "score": 1.016718,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 2057166.25,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 7
+  },
+  {
+   "issuer": 234,
+   "as_of": "2024-08-05",
+   "symbol": "NSC",
+   "score": 1.795826,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 739056.7,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 160
+  },
+  {
+   "issuer": 234,
+   "as_of": "2025-11-06",
+   "symbol": "NSC",
+   "score": 1.551148,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1199723.5,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1389,
+   "as_of": "2025-02-28",
+   "symbol": "CLF",
+   "score": 1.645439,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 208348.5,
+   "classifications": {
+    "unclassified": 1,
+    "opportunistic": 1
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 999,
+   "as_of": "2024-08-19",
+   "symbol": "DAR",
+   "score": 1.120631,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 151489.84,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 52
+  },
+  {
+   "issuer": 3398,
+   "as_of": "2024-08-05",
+   "symbol": "BBBY-WT",
+   "score": 1.457074,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 155900.0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 1339,
+   "as_of": "2024-08-09",
+   "symbol": "RIG",
+   "score": 2.80032,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 31380000.0,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 89
+  },
+  {
+   "issuer": 1339,
+   "as_of": "2025-10-01",
+   "symbol": "RIG",
+   "score": 3.383962,
+   "bucket": "medium",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 36600000.0,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 103
+  },
+  {
+   "issuer": 668,
+   "as_of": "2024-08-05",
+   "symbol": "CDW",
+   "score": 1.755484,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 486828.9,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 668,
+   "as_of": "2026-05-29",
+   "symbol": "CDW",
+   "score": 1.616246,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 2505137.85,
+   "classifications": {
+    "unclassified": 1,
+    "opportunistic": 1
+   },
+   "clusters_in_episode": 56
+  },
+  {
+   "issuer": 546,
+   "as_of": "2025-11-03",
+   "symbol": "VRSK",
+   "score": 2.521138,
+   "bucket": "low",
+   "voices": 4,
+   "distinct_insiders": 4,
+   "dollars": 574462.5,
+   "classifications": {
+    "unclassified": 4
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 546,
+   "as_of": "2026-02-24",
+   "symbol": "VRSK",
+   "score": 2.563684,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 449280.0,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1115,
+   "as_of": "2024-08-06",
+   "symbol": "MBLY",
+   "score": 2.164299,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 10533138.4939,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 560,
+   "as_of": "2026-05-08",
+   "symbol": "MKL",
+   "score": 1.788951,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 371065.71,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 61
+  },
+  {
+   "issuer": 1240,
+   "as_of": "2024-08-05",
+   "symbol": "MTDR",
+   "score": 1.5704,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 139170.0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 262
+  },
+  {
+   "issuer": 1240,
+   "as_of": "2025-09-09",
+   "symbol": "MTDR",
+   "score": 1.014376,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 350110.0,
+   "classifications": {
+    "opportunistic": 2,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 109
+  },
+  {
+   "issuer": 1240,
+   "as_of": "2026-03-10",
+   "symbol": "MTDR",
+   "score": 1.180843,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 38326.47,
+   "classifications": {
+    "opportunistic": 1,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 131
+  },
+  {
+   "issuer": 947,
+   "as_of": "2025-01-07",
+   "symbol": "UMBF",
+   "score": 0.064196,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 47888.386188,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 19
+  },
+  {
+   "issuer": 947,
+   "as_of": "2025-03-05",
+   "symbol": "UMBF",
+   "score": 1.422861,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 47811.848702999996,
+   "classifications": {
+    "opportunistic": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 947,
+   "as_of": "2025-08-05",
+   "symbol": "UMBF",
+   "score": 1.448737,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 47812.500186000005,
+   "classifications": {
+    "opportunistic": 2
+   },
+   "clusters_in_episode": 79
+  },
+  {
+   "issuer": 947,
+   "as_of": "2025-12-12",
+   "symbol": "UMBF",
+   "score": 0.22844,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 47813.63094,
+   "classifications": {
+    "opportunistic": 2
+   },
+   "clusters_in_episode": 101
+  },
+  {
+   "issuer": 1266,
+   "as_of": "2024-11-14",
+   "symbol": "CROX",
+   "score": 1.258978,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 351923.96,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 53
+  },
+  {
+   "issuer": 1266,
+   "as_of": "2025-08-14",
+   "symbol": "CROX",
+   "score": 1.86219,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 403204.422,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 63
+  },
+  {
+   "issuer": 226,
+   "as_of": "2026-06-11",
+   "symbol": "ECL",
+   "score": 1.30147,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 2455679.6,
+   "classifications": {
+    "opportunistic": 2,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 44
+  },
+  {
+   "issuer": 1104,
+   "as_of": "2024-08-08",
+   "symbol": "AGCO",
+   "score": 1.622089,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 282674.2,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 888,
+   "as_of": "2024-08-06",
+   "symbol": "MGM",
+   "score": 3.069793,
+   "bucket": "medium",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 7312533.73,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 242,
+   "as_of": "2025-11-03",
+   "symbol": "KMI",
+   "score": 1.914955,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 26077343.2304,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 60
+  },
+  {
+   "issuer": 1139,
+   "as_of": "2025-08-15",
+   "symbol": "RHP",
+   "score": 1.758009,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1820356.208,
+   "classifications": {
+    "opportunistic": 2,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 25
+  },
+  {
+   "issuer": 1139,
+   "as_of": "2025-10-06",
+   "symbol": "RHP",
+   "score": 0.133264,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1010492.688,
+   "classifications": {
+    "opportunistic": 1,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 15
+  },
+  {
+   "issuer": 106,
+   "as_of": "2025-10-31",
+   "symbol": "BX",
+   "score": 1.065584,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 2038397.777092,
+   "classifications": {
+    "opportunistic": 3,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 262,
+   "as_of": "2024-09-10",
+   "symbol": "APO",
+   "score": 0.992805,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 346710.2458,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 40
+  },
+  {
+   "issuer": 262,
+   "as_of": "2025-05-13",
+   "symbol": "APO",
+   "score": 1.03971,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 67775597.445,
+   "classifications": {
+    "unclassified": 1,
+    "opportunistic": 1
+   },
+   "clusters_in_episode": 39
+  },
+  {
+   "issuer": 2018,
+   "as_of": "2024-11-18",
+   "symbol": "XRAY",
+   "score": 1.685717,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 310469.9894,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 49
+  },
+  {
+   "issuer": 2018,
+   "as_of": "2026-03-04",
+   "symbol": "XRAY",
+   "score": 1.868261,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 774724.435,
+   "classifications": {
+    "unclassified": 1,
+    "opportunistic": 2
+   },
+   "clusters_in_episode": 68
+  },
+  {
+   "issuer": 90,
+   "as_of": "2026-02-17",
+   "symbol": "DIS",
+   "score": 0.874946,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 2112733.2,
+   "classifications": {
+    "unclassified": 1,
+    "opportunistic": 1
+   },
+   "clusters_in_episode": 19
+  },
+  {
+   "issuer": 2426,
+   "as_of": "2026-03-04",
+   "symbol": "EOSE",
+   "score": 1.669693,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 435600.0,
+   "classifications": {
+    "opportunistic": 2
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 723,
+   "as_of": "2025-01-08",
+   "symbol": "WPC",
+   "score": 0.092191,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 331986.6,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 8
+  },
+  {
+   "issuer": 766,
+   "as_of": "2025-03-03",
+   "symbol": "DTM",
+   "score": 0.719388,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 58233.96691,
+   "classifications": {
+    "unclassified": 10
+   },
+   "clusters_in_episode": 67
+  },
+  {
+   "issuer": 1725,
+   "as_of": "2025-08-19",
+   "symbol": "PLMR",
+   "score": 1.383117,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 132941.5,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 7
+  },
+  {
+   "issuer": 460,
+   "as_of": "2024-08-13",
+   "symbol": "CPNG",
+   "score": 3.312225,
+   "bucket": "medium",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 42454602.895,
+   "classifications": {
+    "unclassified": 6
+   },
+   "clusters_in_episode": 130
+  },
+  {
+   "issuer": 460,
+   "as_of": "2025-05-16",
+   "symbol": "CPNG",
+   "score": 3.034687,
+   "bucket": "medium",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 75081820.0,
+   "classifications": {
+    "opportunistic": 4
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 862,
+   "as_of": "2024-08-26",
+   "symbol": "ELAN",
+   "score": 1.304716,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1352584.3,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 55
+  },
+  {
+   "issuer": 862,
+   "as_of": "2025-03-11",
+   "symbol": "ELAN",
+   "score": 1.781388,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 483557.5,
+   "classifications": {
+    "opportunistic": 1,
+    "unclassified": 2
+   },
+   "clusters_in_episode": 62
+  },
+  {
+   "issuer": 862,
+   "as_of": "2025-12-15",
+   "symbol": "ELAN",
+   "score": 2.627441,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 724907.095,
+   "classifications": {
+    "opportunistic": 1,
+    "unclassified": 2
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 862,
+   "as_of": "2026-05-19",
+   "symbol": "ELAN",
+   "score": 1.655027,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 199781.385,
+   "classifications": {
+    "opportunistic": 1,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1186,
+   "as_of": "2024-11-11",
+   "symbol": "HR",
+   "score": 0.133264,
+   "bucket": "low",
+   "voices": 4,
+   "distinct_insiders": 4,
+   "dollars": 735701.51,
+   "classifications": {
+    "unclassified": 7
+   },
+   "clusters_in_episode": 48
+  },
+  {
+   "issuer": 1186,
+   "as_of": "2026-03-06",
+   "symbol": "HR",
+   "score": 1.223922,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 181087.4,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 63
+  },
+  {
+   "issuer": 1596,
+   "as_of": "2024-09-16",
+   "symbol": "NVST",
+   "score": 0.35703,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 906707.56,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 40
+  },
+  {
+   "issuer": 756,
+   "as_of": "2024-08-15",
+   "symbol": "YUMC",
+   "score": 2.448121,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 390144.05,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 1932,
+   "as_of": "2025-02-14",
+   "symbol": "FLNC",
+   "score": 1.667254,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 417180.0,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 18
+  },
+  {
+   "issuer": 836,
+   "as_of": "2025-08-01",
+   "symbol": "ALGN",
+   "score": 1.59971,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1000736.7746,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1231,
+   "as_of": "2026-03-16",
+   "symbol": "KGS",
+   "score": 2.077214,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 624381.815802,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 1046,
+   "as_of": "2025-12-11",
+   "symbol": "KYMR",
+   "score": 9.933497,
+   "bucket": "high",
+   "voices": 6,
+   "distinct_insiders": 6,
+   "dollars": 1034999508.0,
+   "classifications": {
+    "unclassified": 12
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1404,
+   "as_of": "2025-11-25",
+   "symbol": "OBDC",
+   "score": 2.4732,
+   "bucket": "low",
+   "voices": 4,
+   "distinct_insiders": 4,
+   "dollars": 1487754.48,
+   "classifications": {
+    "unclassified": 5
+   },
+   "clusters_in_episode": 39
+  },
+  {
+   "issuer": 1404,
+   "as_of": "2026-02-09",
+   "symbol": "OBDC",
+   "score": 0.082851,
+   "bucket": "low",
+   "voices": 5,
+   "distinct_insiders": 5,
+   "dollars": 1590819.972,
+   "classifications": {
+    "unclassified": 6
+   },
+   "clusters_in_episode": 6
+  },
+  {
+   "issuer": 1404,
+   "as_of": "2026-04-27",
+   "symbol": "OBDC",
+   "score": 0.855948,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 125113.44,
+   "classifications": {
+    "unclassified": 4
+   },
+   "clusters_in_episode": 39
+  },
+  {
+   "issuer": 1495,
+   "as_of": "2025-11-06",
+   "symbol": "EBC",
+   "score": 1.479722,
+   "bucket": "low",
+   "voices": 6,
+   "distinct_insiders": 6,
+   "dollars": 2882810.9899999998,
+   "classifications": {
+    "unclassified": 9
+   },
+   "clusters_in_episode": 57
+  },
+  {
+   "issuer": 1254,
+   "as_of": "2025-05-27",
+   "symbol": "VFC",
+   "score": 2.843458,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 2198403.2,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 700,
+   "as_of": "2024-08-30",
+   "symbol": "BEN",
+   "score": 2.102658,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 2629959.0300000003,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1598,
+   "as_of": "2024-08-26",
+   "symbol": "BILL",
+   "score": 3.080219,
+   "bucket": "medium",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 3138830.5172,
+   "classifications": {
+    "unclassified": 7
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 1915,
+   "as_of": "2024-09-24",
+   "symbol": "BTU",
+   "score": 1.428586,
+   "bucket": "low",
+   "voices": 4,
+   "distinct_insiders": 4,
+   "dollars": 0,
+   "classifications": {
+    "unclassified": 12
+   },
+   "clusters_in_episode": 44
+  },
+  {
+   "issuer": 211,
+   "as_of": "2025-07-30",
+   "symbol": "EPD",
+   "score": 1.836469,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 975084.0,
+   "classifications": {
+    "opportunistic": 2
+   },
+   "clusters_in_episode": 63
+  },
+  {
+   "issuer": 211,
+   "as_of": "2026-03-23",
+   "symbol": "EPD",
+   "score": 0.842455,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 581402.651,
+   "classifications": {
+    "opportunistic": 1,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 5
+  },
+  {
+   "issuer": 706,
+   "as_of": "2024-09-16",
+   "symbol": "WY",
+   "score": 1.26817,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1238051.16,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 50
+  },
+  {
+   "issuer": 706,
+   "as_of": "2026-02-23",
+   "symbol": "WY",
+   "score": 1.570786,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 721626.1,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 101,
+   "as_of": "2024-09-05",
+   "symbol": "ETN",
+   "score": 1.518547,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 811646.5,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 57
+  },
+  {
+   "issuer": 928,
+   "as_of": "2026-02-23",
+   "symbol": "PODD",
+   "score": 1.000139,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1329089.26,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 128
+  },
+  {
+   "issuer": 2900,
+   "as_of": "2025-10-17",
+   "symbol": "SOC",
+   "score": 2.867634,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 29554637.2,
+   "classifications": {
+    "unclassified": 4
+   },
+   "clusters_in_episode": 41
+  },
+  {
+   "issuer": 1722,
+   "as_of": "2026-05-11",
+   "symbol": "OLED",
+   "score": 2.644747,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1372804.5,
+   "classifications": {
+    "opportunistic": 6
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 1945,
+   "as_of": "2025-05-23",
+   "symbol": "PENN",
+   "score": 2.187153,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 707822.0,
+   "classifications": {
+    "opportunistic": 3
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1945,
+   "as_of": "2025-11-18",
+   "symbol": "PENN",
+   "score": 1.531262,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 781938.7,
+   "classifications": {
+    "opportunistic": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1245,
+   "as_of": "2025-10-07",
+   "symbol": "LUMN",
+   "score": 0.176263,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 859534.6969999999,
+   "classifications": {
+    "unclassified": 7
+   },
+   "clusters_in_episode": 21
+  },
+  {
+   "issuer": 1301,
+   "as_of": "2026-05-21",
+   "symbol": "LQDA",
+   "score": 1.748569,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 635788.0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 994,
+   "as_of": "2024-09-11",
+   "symbol": "GTLS",
+   "score": 1.345058,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 103571.4,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 68
+  },
+  {
+   "issuer": 994,
+   "as_of": "2025-03-11",
+   "symbol": "GTLS",
+   "score": 1.28071,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 64539.58,
+   "classifications": {
+    "opportunistic": 2
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 24,
+   "as_of": "2025-05-08",
+   "symbol": "CAT",
+   "score": 1.469577,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 152110.5,
+   "classifications": {
+    "unclassified": 1,
+    "opportunistic": 1
+   },
+   "clusters_in_episode": 62
+  },
+  {
+   "issuer": 810,
+   "as_of": "2026-04-03",
+   "symbol": "LULU",
+   "score": 1.510492,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1494568.5,
+   "classifications": {
+    "unclassified": 1,
+    "opportunistic": 1
+   },
+   "clusters_in_episode": 56
+  },
+  {
+   "issuer": 561,
+   "as_of": "2025-04-16",
+   "symbol": "DLTR",
+   "score": 1.813305,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1757571.83,
+   "classifications": {
+    "unclassified": 4
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 561,
+   "as_of": "2025-09-09",
+   "symbol": "DLTR",
+   "score": 1.114709,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 402028.95,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 7
+  },
+  {
+   "issuer": 1857,
+   "as_of": "2026-01-27",
+   "symbol": "MMS",
+   "score": 0.069561,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 4882.880445,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 44
+  },
+  {
+   "issuer": 540,
+   "as_of": "2025-12-10",
+   "symbol": "ASTS",
+   "score": 1.179358,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 87171.75,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 53
+  },
+  {
+   "issuer": 1300,
+   "as_of": "2026-04-06",
+   "symbol": "VSXY",
+   "score": 1.896112,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 351633.75,
+   "classifications": {
+    "unclassified": 1,
+    "opportunistic": 2
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 1552,
+   "as_of": "2024-09-16",
+   "symbol": "PI",
+   "score": 4.316274,
+   "bucket": "medium",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 60000009.510000005,
+   "classifications": {
+    "unclassified": 6
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 2154,
+   "as_of": "2025-12-22",
+   "symbol": "VRDN",
+   "score": 0.217181,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 29999970.0,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 25
+  },
+  {
+   "issuer": 1504,
+   "as_of": "2024-11-18",
+   "symbol": "WSC",
+   "score": 2.474063,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 902016.5,
+   "classifications": {
+    "unclassified": 5
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 1504,
+   "as_of": "2025-03-13",
+   "symbol": "WSC",
+   "score": 1.635753,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 433113.0,
+   "classifications": {
+    "opportunistic": 2
+   },
+   "clusters_in_episode": 126
+  },
+  {
+   "issuer": 972,
+   "as_of": "2024-11-15",
+   "symbol": "JEF",
+   "score": 0.703425,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 551780773.27,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 24
+  },
+  {
+   "issuer": 985,
+   "as_of": "2026-05-05",
+   "symbol": "ORI",
+   "score": 0.712073,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 60886.59,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 20
+  },
+  {
+   "issuer": 472,
+   "as_of": "2026-03-16",
+   "symbol": "CASY",
+   "score": 0.90575,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 366027.0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 15
+  },
+  {
+   "issuer": 2780,
+   "as_of": "2024-09-27",
+   "symbol": "BIOA",
+   "score": 4.403241,
+   "bucket": "medium",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 35399970.0,
+   "classifications": {
+    "unclassified": 7
+   },
+   "clusters_in_episode": 1
+  },
+  {
+   "issuer": 2574,
+   "as_of": "2026-01-02",
+   "symbol": "BFS",
+   "score": 0.306639,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 227856.076,
+   "classifications": {
+    "unclassified": 8,
+    "opportunistic": 1
+   },
+   "clusters_in_episode": 24
+  },
+  {
+   "issuer": 2574,
+   "as_of": "2026-06-17",
+   "symbol": "BFS",
+   "score": 0.38171,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 100637.0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 9
+  },
+  {
+   "issuer": 442,
+   "as_of": "2024-10-02",
+   "symbol": "TKO",
+   "score": 5.191156,
+   "bucket": "medium",
+   "voices": 4,
+   "distinct_insiders": 4,
+   "dollars": 584963038.8,
+   "classifications": {
+    "unclassified": 4
+   },
+   "clusters_in_episode": 239
+  },
+  {
+   "issuer": 442,
+   "as_of": "2026-05-13",
+   "symbol": "TKO",
+   "score": 3.627157,
+   "bucket": "medium",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 4499696.5,
+   "classifications": {
+    "unclassified": 6
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 582,
+   "as_of": "2024-10-02",
+   "symbol": "LUV",
+   "score": 42.055227,
+   "bucket": "high",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 107700111.99,
+   "classifications": {
+    "opportunistic": 1,
+    "unclassified": 193
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 582,
+   "as_of": "2025-03-14",
+   "symbol": "LUV",
+   "score": 3.693013,
+   "bucket": "medium",
+   "voices": 5,
+   "distinct_insiders": 5,
+   "dollars": 369471.92,
+   "classifications": {
+    "unclassified": 5
+   },
+   "clusters_in_episode": 161
+  },
+  {
+   "issuer": 4821,
+   "as_of": "2025-03-13",
+   "symbol": "NFE",
+   "score": 1.922414,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 2703850.0,
+   "classifications": {
+    "unclassified": 2,
+    "opportunistic": 1
+   },
+   "clusters_in_episode": 55
+  },
+  {
+   "issuer": 1402,
+   "as_of": "2026-03-16",
+   "symbol": "MTN",
+   "score": 1.840578,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 4967926.5,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 1632,
+   "as_of": "2025-11-24",
+   "symbol": "BBWI",
+   "score": 3.29989,
+   "bucket": "medium",
+   "voices": 4,
+   "distinct_insiders": 4,
+   "dollars": 500318.3338,
+   "classifications": {
+    "unclassified": 4
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 974,
+   "as_of": "2024-10-11",
+   "symbol": "SIRI",
+   "score": 4.304536,
+   "bucket": "medium",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 173461886.9732,
+   "classifications": {
+    "unclassified": 8
+   },
+   "clusters_in_episode": 146
+  },
+  {
+   "issuer": 974,
+   "as_of": "2025-08-05",
+   "symbol": "SIRI",
+   "score": 4.108602,
+   "bucket": "medium",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 212908758.945,
+   "classifications": {
+    "unclassified": 8
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 73,
+   "as_of": "2025-09-25",
+   "symbol": "MRVL",
+   "score": 3.699176,
+   "bucket": "medium",
+   "voices": 4,
+   "distinct_insiders": 4,
+   "dollars": 2109632.0,
+   "classifications": {
+    "opportunistic": 3,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1806,
+   "as_of": "2026-07-09",
+   "symbol": "UUUU",
+   "score": 1.775767,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1018700.0,
+   "classifications": {
+    "opportunistic": 1,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 48
+  },
+  {
+   "issuer": 2775,
+   "as_of": "2024-12-16",
+   "symbol": "JANX",
+   "score": 0.419851,
+   "bucket": "low",
+   "voices": 5,
+   "distinct_insiders": 5,
+   "dollars": 268500000.0,
+   "classifications": {
+    "unclassified": 5
+   },
+   "clusters_in_episode": 25
+  },
+  {
+   "issuer": 1235,
+   "as_of": "2024-10-25",
+   "symbol": "INGM",
+   "score": 4.823283,
+   "bucket": "medium",
+   "voices": 5,
+   "distinct_insiders": 5,
+   "dollars": 7036700.0,
+   "classifications": {
+    "unclassified": 5
+   },
+   "clusters_in_episode": 1
+  },
+  {
+   "issuer": 2406,
+   "as_of": "2024-10-28",
+   "symbol": "SEPN",
+   "score": 8.445278,
+   "bucket": "high",
+   "voices": 6,
+   "distinct_insiders": 6,
+   "dollars": 70200000.0,
+   "classifications": {
+    "unclassified": 12
+   },
+   "clusters_in_episode": 1
+  },
+  {
+   "issuer": 908,
+   "as_of": "2026-03-03",
+   "symbol": "CSGP",
+   "score": 2.766049,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 3432194.4,
+   "classifications": {
+    "opportunistic": 2,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 69
+  },
+  {
+   "issuer": 819,
+   "as_of": "2024-12-10",
+   "symbol": "HRL",
+   "score": 0.93883,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 163637.24541,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 34
+  },
+  {
+   "issuer": 1798,
+   "as_of": "2024-11-19",
+   "symbol": "AAP",
+   "score": 1.029936,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 104636.56046,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1798,
+   "as_of": "2025-03-10",
+   "symbol": "AAP",
+   "score": 1.530437,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 535286.0,
+   "classifications": {
+    "unclassified": 1,
+    "opportunistic": 1
+   },
+   "clusters_in_episode": 66
+  },
+  {
+   "issuer": 2133,
+   "as_of": "2024-11-04",
+   "symbol": "LCID",
+   "score": 3.544857,
+   "bucket": "medium",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 2053048216.252,
+   "classifications": {
+    "unclassified": 4
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 780,
+   "as_of": "2024-11-07",
+   "symbol": "DINO",
+   "score": 1.585968,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 293697.5,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 143
+  },
+  {
+   "issuer": 935,
+   "as_of": "2025-02-27",
+   "symbol": "HII",
+   "score": 1.351918,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 524349.7320000001,
+   "classifications": {
+    "opportunistic": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1047,
+   "as_of": "2025-11-06",
+   "symbol": "NCLH",
+   "score": 2.717209,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 912003.5975,
+   "classifications": {
+    "opportunistic": 3
+   },
+   "clusters_in_episode": 68
+  },
+  {
+   "issuer": 1047,
+   "as_of": "2026-05-11",
+   "symbol": "NCLH",
+   "score": 1.998413,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 718386.21,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 75
+  },
+  {
+   "issuer": 137,
+   "as_of": "2025-02-24",
+   "symbol": "BMY",
+   "score": 1.375588,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 210095.97224,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 767,
+   "as_of": "2025-10-30",
+   "symbol": "EG",
+   "score": 2.069804,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 4448369.3,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1022,
+   "as_of": "2025-01-13",
+   "symbol": "ALGM",
+   "score": 0.092991,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 384446.0,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 16
+  },
+  {
+   "issuer": 946,
+   "as_of": "2025-04-02",
+   "symbol": "RYAN",
+   "score": 1.215337,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 5212.5,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 946,
+   "as_of": "2025-09-15",
+   "symbol": "RYAN",
+   "score": 1.492547,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 14345817.9456,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 56
+  },
+  {
+   "issuer": 946,
+   "as_of": "2026-06-04",
+   "symbol": "RYAN",
+   "score": 1.675162,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 300180.871,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 67
+  },
+  {
+   "issuer": 451,
+   "as_of": "2024-11-13",
+   "symbol": "CNC",
+   "score": 1.699568,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1250321.6,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 89
+  },
+  {
+   "issuer": 451,
+   "as_of": "2025-08-11",
+   "symbol": "CNC",
+   "score": 1.414019,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 738945.0,
+   "classifications": {
+    "opportunistic": 2
+   },
+   "clusters_in_episode": 55
+  },
+  {
+   "issuer": 317,
+   "as_of": "2024-12-17",
+   "symbol": "FANG",
+   "score": 1.160435,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1485720.0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 39
+  },
+  {
+   "issuer": 317,
+   "as_of": "2025-03-05",
+   "symbol": "FANG",
+   "score": 0.896139,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1288979.8,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 8
+  },
+  {
+   "issuer": 1822,
+   "as_of": "2024-11-14",
+   "symbol": "SEDG",
+   "score": 2.054656,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 2358048.0,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 58
+  },
+  {
+   "issuer": 49,
+   "as_of": "2026-02-25",
+   "symbol": "IBM",
+   "score": 1.757344,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 417154.9924,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1550,
+   "as_of": "2026-02-24",
+   "symbol": "HLNE",
+   "score": 4.075429,
+   "bucket": "medium",
+   "voices": 4,
+   "distinct_insiders": 4,
+   "dollars": 3217593.2495,
+   "classifications": {
+    "unclassified": 4,
+    "opportunistic": 1
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1774,
+   "as_of": "2025-09-25",
+   "symbol": "OPCH",
+   "score": 0.994995,
+   "bucket": "low",
+   "voices": 5,
+   "distinct_insiders": 5,
+   "dollars": 1675470.1189,
+   "classifications": {
+    "unclassified": 5
+   },
+   "clusters_in_episode": 53
+  },
+  {
+   "issuer": 1774,
+   "as_of": "2026-05-04",
+   "symbol": "OPCH",
+   "score": 1.814272,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 591781.1575,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 1017,
+   "as_of": "2024-11-14",
+   "symbol": "OSCR",
+   "score": 8.027934,
+   "bucket": "high",
+   "voices": 5,
+   "distinct_insiders": 5,
+   "dollars": 72149912.4195,
+   "classifications": {
+    "unclassified": 15
+   },
+   "clusters_in_episode": 70
+  },
+  {
+   "issuer": 336,
+   "as_of": "2026-02-19",
+   "symbol": "NDAQ",
+   "score": 1.876726,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 16793360.0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 60
+  },
+  {
+   "issuer": 490,
+   "as_of": "2024-11-15",
+   "symbol": "EL",
+   "score": 2.669488,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 10110534.1,
+   "classifications": {
+    "unclassified": 5
+   },
+   "clusters_in_episode": 124
+  },
+  {
+   "issuer": 1399,
+   "as_of": "2024-11-18",
+   "symbol": "ZETA",
+   "score": 6.278358,
+   "bucket": "high",
+   "voices": 7,
+   "distinct_insiders": 7,
+   "dollars": 3677145.7445,
+   "classifications": {
+    "unclassified": 7
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 2783,
+   "as_of": "2025-04-24",
+   "symbol": "GO",
+   "score": 0.365591,
+   "bucket": "low",
+   "voices": 5,
+   "distinct_insiders": 5,
+   "dollars": 2948090.0,
+   "classifications": {
+    "unclassified": 2,
+    "opportunistic": 4
+   },
+   "clusters_in_episode": 29
+  },
+  {
+   "issuer": 4107,
+   "as_of": "2026-01-05",
+   "symbol": "FBLA",
+   "score": 0.104397,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 3267.3900000000003,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 1
+  },
+  {
+   "issuer": 2308,
+   "as_of": "2024-11-21",
+   "symbol": "WOLF",
+   "score": 3.658556,
+   "bucket": "medium",
+   "voices": 4,
+   "distinct_insiders": 4,
+   "dollars": 816956.4243000001,
+   "classifications": {
+    "unclassified": 5
+   },
+   "clusters_in_episode": 59
+  },
+  {
+   "issuer": 1480,
+   "as_of": "2024-12-03",
+   "symbol": "VVV",
+   "score": 1.443417,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 494100.0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 54
+  },
+  {
+   "issuer": 1480,
+   "as_of": "2025-08-15",
+   "symbol": "VVV",
+   "score": 1.656019,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 602858.45,
+   "classifications": {
+    "unclassified": 6
+   },
+   "clusters_in_episode": 6
+  },
+  {
+   "issuer": 1480,
+   "as_of": "2025-11-25",
+   "symbol": "VVV",
+   "score": 1.689179,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 452790.0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1480,
+   "as_of": "2026-05-15",
+   "symbol": "VVV",
+   "score": 1.71306,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 418347.0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 512,
+   "as_of": "2025-02-25",
+   "symbol": "CINF",
+   "score": 0.871935,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 450535.6,
+   "classifications": {
+    "unclassified": 2,
+    "opportunistic": 1
+   },
+   "clusters_in_episode": 9
+  },
+  {
+   "issuer": 512,
+   "as_of": "2025-12-05",
+   "symbol": "CINF",
+   "score": 0.865745,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 176907.8,
+   "classifications": {
+    "opportunistic": 1,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 38
+  },
+  {
+   "issuer": 512,
+   "as_of": "2026-02-13",
+   "symbol": "CINF",
+   "score": 0.88448,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 185507.8,
+   "classifications": {
+    "unclassified": 1,
+    "opportunistic": 1
+   },
+   "clusters_in_episode": 14
+  },
+  {
+   "issuer": 197,
+   "as_of": "2025-03-13",
+   "symbol": "MPC",
+   "score": 1.500494,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 403140.0,
+   "classifications": {
+    "opportunistic": 1,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 60
+  },
+  {
+   "issuer": 364,
+   "as_of": "2026-02-20",
+   "symbol": "MSCI",
+   "score": 2.637052,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 12261526.37,
+   "classifications": {
+    "opportunistic": 23,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 5519,
+   "as_of": "2026-01-26",
+   "symbol": "BLNE",
+   "score": 0.066989,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 51170.0,
+   "classifications": {
+    "unclassified": 4
+   },
+   "clusters_in_episode": 16
+  },
+  {
+   "issuer": 365,
+   "as_of": "2024-12-19",
+   "symbol": "FERG",
+   "score": 1.546005,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 611237.04,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 60
+  },
+  {
+   "issuer": 620,
+   "as_of": "2025-12-12",
+   "symbol": "GPN",
+   "score": 1.357305,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1186771.5,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 41
+  },
+  {
+   "issuer": 620,
+   "as_of": "2026-02-23",
+   "symbol": "GPN",
+   "score": 0.862812,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1186211.34,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 13
+  },
+  {
+   "issuer": 665,
+   "as_of": "2025-03-13",
+   "symbol": "LYB",
+   "score": 0.911132,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 650496.5,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 2
+  },
+  {
+   "issuer": 612,
+   "as_of": "2024-12-16",
+   "symbol": "DOW",
+   "score": 2.086194,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1311885.585,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 584,
+   "as_of": "2026-02-06",
+   "symbol": "SOFI",
+   "score": 1.626861,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 204870.0,
+   "classifications": {
+    "unclassified": 1,
+    "opportunistic": 1
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 592,
+   "as_of": "2025-05-14",
+   "symbol": "CHD",
+   "score": 2.080755,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1528435.1,
+   "classifications": {
+    "unclassified": 1,
+    "opportunistic": 3
+   },
+   "clusters_in_episode": 128
+  },
+  {
+   "issuer": 2242,
+   "as_of": "2026-03-02",
+   "symbol": "AMR",
+   "score": 0.523877,
+   "bucket": "low",
+   "voices": 7,
+   "distinct_insiders": 7,
+   "dollars": 61045848.317,
+   "classifications": {
+    "unclassified": 77
+   },
+   "clusters_in_episode": 11
+  },
+  {
+   "issuer": 116,
+   "as_of": "2024-12-23",
+   "symbol": "COP",
+   "score": 1.553553,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1256835.31,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 61
+  },
+  {
+   "issuer": 556,
+   "as_of": "2024-12-20",
+   "symbol": "VRSN",
+   "score": 7.597506,
+   "bucket": "high",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 90806935.464,
+   "classifications": {
+    "unclassified": 24
+   },
+   "clusters_in_episode": 75
+  },
+  {
+   "issuer": 556,
+   "as_of": "2025-05-30",
+   "symbol": "VRSN",
+   "score": 1.290677,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 20019.25365,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1734,
+   "as_of": "2025-05-27",
+   "symbol": "CCC",
+   "score": 1.556736,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1756400.0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 57
+  },
+  {
+   "issuer": 1019,
+   "as_of": "2025-08-14",
+   "symbol": "ADC",
+   "score": 1.122141,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1093327.5,
+   "classifications": {
+    "unclassified": 1,
+    "opportunistic": 2
+   },
+   "clusters_in_episode": 167
+  },
+  {
+   "issuer": 1019,
+   "as_of": "2026-05-18",
+   "symbol": "ADC",
+   "score": 1.816667,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 1069944.19,
+   "classifications": {
+    "unclassified": 2,
+    "opportunistic": 1
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 229,
+   "as_of": "2025-01-09",
+   "symbol": "FDX",
+   "score": 1.275839,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 365909.1455,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 54
+  },
+  {
+   "issuer": 2027,
+   "as_of": "2025-03-10",
+   "symbol": "PGNY",
+   "score": 0.054632,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 5236413.75,
+   "classifications": {
+    "unclassified": 1,
+    "opportunistic": 1
+   },
+   "clusters_in_episode": 9
+  },
+  {
+   "issuer": 275,
+   "as_of": "2025-12-23",
+   "symbol": "NKE",
+   "score": 2.135548,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 4451333.64,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 275,
+   "as_of": "2026-04-10",
+   "symbol": "NKE",
+   "score": 1.720755,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 673362.06428,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 66
+  },
+  {
+   "issuer": 28,
+   "as_of": "2025-05-16",
+   "symbol": "UNH",
+   "score": 5.075156,
+   "bucket": "medium",
+   "voices": 5,
+   "distinct_insiders": 5,
+   "dollars": 31607700.3075,
+   "classifications": {
+    "opportunistic": 4,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 2098,
+   "as_of": "2025-01-22",
+   "symbol": "FLOC",
+   "score": 15.124201,
+   "bucket": "high",
+   "voices": 14,
+   "distinct_insiders": 14,
+   "dollars": 2270400.0,
+   "classifications": {
+    "unclassified": 41
+   },
+   "clusters_in_episode": 4
+  },
+  {
+   "issuer": 803,
+   "as_of": "2025-01-29",
+   "symbol": "ALLY",
+   "score": 1.877532,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1755571.135,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 803,
+   "as_of": "2026-01-28",
+   "symbol": "ALLY",
+   "score": 1.721379,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1491173.9132,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 61
+  },
+  {
+   "issuer": 1384,
+   "as_of": "2026-02-13",
+   "symbol": "RLI",
+   "score": 0.617184,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 403230.0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 16
+  },
+  {
+   "issuer": 1384,
+   "as_of": "2026-06-15",
+   "symbol": "RLI",
+   "score": 1.851407,
+   "bucket": "low",
+   "voices": 4,
+   "distinct_insiders": 4,
+   "dollars": 1118955.0,
+   "classifications": {
+    "unclassified": 7
+   },
+   "clusters_in_episode": 55
+  },
+  {
+   "issuer": 1005,
+   "as_of": "2025-01-30",
+   "symbol": "SFD",
+   "score": 8.902381,
+   "bucket": "high",
+   "voices": 10,
+   "distinct_insiders": 10,
+   "dollars": 65684660.0,
+   "classifications": {
+    "unclassified": 10
+   },
+   "clusters_in_episode": 7
+  },
+  {
+   "issuer": 185,
+   "as_of": "2025-03-21",
+   "symbol": "ADBE",
+   "score": 1.219226,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1506704.067,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 29
+  },
+  {
+   "issuer": 380,
+   "as_of": "2025-02-03",
+   "symbol": "KDP",
+   "score": 11.611993,
+   "bucket": "high",
+   "voices": 10,
+   "distinct_insiders": 10,
+   "dollars": 1206774640.0,
+   "classifications": {
+    "unclassified": 10
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 4101,
+   "as_of": "2025-02-03",
+   "symbol": "INR",
+   "score": 3.58904,
+   "bucket": "medium",
+   "voices": 4,
+   "distinct_insiders": 4,
+   "dollars": 1600000.0,
+   "classifications": {
+    "unclassified": 4
+   },
+   "clusters_in_episode": 1
+  },
+  {
+   "issuer": 161,
+   "as_of": "2025-04-29",
+   "symbol": "PNC",
+   "score": 0.871453,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 178033.3,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 5
+  },
+  {
+   "issuer": 161,
+   "as_of": "2025-05-22",
+   "symbol": "PNC",
+   "score": 0.855606,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 161788.0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 47
+  },
+  {
+   "issuer": 1451,
+   "as_of": "2025-02-07",
+   "symbol": "MUR",
+   "score": 1.947413,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 2693414.1,
+   "classifications": {
+    "opportunistic": 2,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 42,
+   "as_of": "2025-02-07",
+   "symbol": "MRK",
+   "score": 1.90879,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1577499.98325,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1049,
+   "as_of": "2025-02-10",
+   "symbol": "MTCH",
+   "score": 1.876181,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 2153113.4960000003,
+   "classifications": {
+    "unclassified": 1,
+    "opportunistic": 1
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 2199,
+   "as_of": "2025-02-10",
+   "symbol": "SION",
+   "score": 19.271825,
+   "bucket": "high",
+   "voices": 16,
+   "distinct_insiders": 16,
+   "dollars": 158760000.0,
+   "classifications": {
+    "unclassified": 22
+   },
+   "clusters_in_episode": 1
+  },
+  {
+   "issuer": 1481,
+   "as_of": "2025-03-14",
+   "symbol": "MTH",
+   "score": 1.138666,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1166010.0,
+   "classifications": {
+    "opportunistic": 1,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 42
+  },
+  {
+   "issuer": 1481,
+   "as_of": "2025-07-30",
+   "symbol": "MTH",
+   "score": 1.034097,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 420184.2,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 30
+  },
+  {
+   "issuer": 816,
+   "as_of": "2025-03-05",
+   "symbol": "ARCC",
+   "score": 1.305052,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1069300.0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 50
+  },
+  {
+   "issuer": 816,
+   "as_of": "2026-02-09",
+   "symbol": "ARCC",
+   "score": 1.702246,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 315685.0,
+   "classifications": {
+    "unclassified": 1,
+    "opportunistic": 1
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 269,
+   "as_of": "2026-05-21",
+   "symbol": "BSX",
+   "score": 2.765071,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 553999.795,
+   "classifications": {
+    "unclassified": 4
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 29,
+   "as_of": "2025-03-24",
+   "symbol": "ORCL",
+   "score": 1.008282,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1059058.43,
+   "classifications": {
+    "opportunistic": 1,
+    "unclassified": 2
+   },
+   "clusters_in_episode": 38
+  },
+  {
+   "issuer": 1478,
+   "as_of": "2025-02-20",
+   "symbol": "AMTM",
+   "score": 1.608677,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 2178335.0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 34
+  },
+  {
+   "issuer": 1620,
+   "as_of": "2026-03-18",
+   "symbol": "GPGI",
+   "score": 2.540279,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 901700.0,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 73
+  },
+  {
+   "issuer": 1514,
+   "as_of": "2025-02-18",
+   "symbol": "MRP",
+   "score": 3.199097,
+   "bucket": "medium",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 6132544.3935,
+   "classifications": {
+    "unclassified": 5
+   },
+   "clusters_in_episode": 47
+  },
+  {
+   "issuer": 1514,
+   "as_of": "2025-12-23",
+   "symbol": "MRP",
+   "score": 0.732457,
+   "bucket": "low",
+   "voices": 5,
+   "distinct_insiders": 5,
+   "dollars": 432256.582,
+   "classifications": {
+    "unclassified": 7
+   },
+   "clusters_in_episode": 7
+  },
+  {
+   "issuer": 1514,
+   "as_of": "2026-06-17",
+   "symbol": "MRP",
+   "score": 0.729607,
+   "bucket": "low",
+   "voices": 4,
+   "distinct_insiders": 4,
+   "dollars": 6616482.9977,
+   "classifications": {
+    "unclassified": 6
+   },
+   "clusters_in_episode": 30
+  },
+  {
+   "issuer": 986,
+   "as_of": "2025-02-21",
+   "symbol": "WYNN",
+   "score": 1.732893,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 2194300.0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 96
+  },
+  {
+   "issuer": 1288,
+   "as_of": "2025-06-10",
+   "symbol": "APPF",
+   "score": 3.643012,
+   "bucket": "medium",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 5648973.5,
+   "classifications": {
+    "unclassified": 10
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 942,
+   "as_of": "2025-02-21",
+   "symbol": "CRL",
+   "score": 1.890501,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1251685.57,
+   "classifications": {
+    "opportunistic": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1420,
+   "as_of": "2025-11-13",
+   "symbol": "SON",
+   "score": 1.148926,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 909660.45,
+   "classifications": {
+    "unclassified": 6
+   },
+   "clusters_in_episode": 24
+  },
+  {
+   "issuer": 1420,
+   "as_of": "2026-04-29",
+   "symbol": "SON",
+   "score": 1.633477,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 740181.5338017601,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 61
+  },
+  {
+   "issuer": 2445,
+   "as_of": "2025-11-10",
+   "symbol": "WWW",
+   "score": 2.502473,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 524572.5,
+   "classifications": {
+    "unclassified": 2,
+    "opportunistic": 1
+   },
+   "clusters_in_episode": 24
+  },
+  {
+   "issuer": 732,
+   "as_of": "2025-02-28",
+   "symbol": "CDE",
+   "score": 1.2961,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 56288.05,
+   "classifications": {
+    "unclassified": 1,
+    "opportunistic": 1
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1940,
+   "as_of": "2025-02-26",
+   "symbol": "FRPT",
+   "score": 4.811149,
+   "bucket": "medium",
+   "voices": 5,
+   "distinct_insiders": 5,
+   "dollars": 659727.77,
+   "classifications": {
+    "unclassified": 9
+   },
+   "clusters_in_episode": 74
+  },
+  {
+   "issuer": 1940,
+   "as_of": "2025-09-11",
+   "symbol": "FRPT",
+   "score": 2.952568,
+   "bucket": "low",
+   "voices": 4,
+   "distinct_insiders": 4,
+   "dollars": 259656.0,
+   "classifications": {
+    "opportunistic": 2,
+    "unclassified": 2
+   },
+   "clusters_in_episode": 67
+  },
+  {
+   "issuer": 1940,
+   "as_of": "2026-05-20",
+   "symbol": "FRPT",
+   "score": 3.234451,
+   "bucket": "medium",
+   "voices": 4,
+   "distinct_insiders": 4,
+   "dollars": 402337.5,
+   "classifications": {
+    "opportunistic": 3,
+    "unclassified": 4
+   },
+   "clusters_in_episode": 66
+  },
+  {
+   "issuer": 1189,
+   "as_of": "2025-02-27",
+   "symbol": "SM",
+   "score": 1.725123,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 260340.0,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 68
+  },
+  {
+   "issuer": 715,
+   "as_of": "2025-09-22",
+   "symbol": "AMKR",
+   "score": 0.539809,
+   "bucket": "low",
+   "voices": 5,
+   "distinct_insiders": 5,
+   "dollars": 48243598.25,
+   "classifications": {
+    "opportunistic": 5
+   },
+   "clusters_in_episode": 30
+  },
+  {
+   "issuer": 671,
+   "as_of": "2025-08-12",
+   "symbol": "AKAM",
+   "score": 2.177818,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 3829943.9028000003,
+   "classifications": {
+    "unclassified": 1,
+    "opportunistic": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1468,
+   "as_of": "2025-08-08",
+   "symbol": "CRSP",
+   "score": 1.592482,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 52640518.36,
+   "classifications": {
+    "unclassified": 4
+   },
+   "clusters_in_episode": 48
+  },
+  {
+   "issuer": 2111,
+   "as_of": "2025-03-04",
+   "symbol": "NOG",
+   "score": 1.735534,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1164243.5,
+   "classifications": {
+    "opportunistic": 2
+   },
+   "clusters_in_episode": 12
+  },
+  {
+   "issuer": 2111,
+   "as_of": "2025-04-07",
+   "symbol": "NOG",
+   "score": 0.586152,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 1744123.5,
+   "classifications": {
+    "opportunistic": 4
+   },
+   "clusters_in_episode": 6
+  },
+  {
+   "issuer": 114,
+   "as_of": "2025-04-04",
+   "symbol": "CRM",
+   "score": 1.193306,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1498128.4692,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 41
+  },
+  {
+   "issuer": 114,
+   "as_of": "2025-12-08",
+   "symbol": "CRM",
+   "score": 9.684994,
+   "bucket": "high",
+   "voices": 9,
+   "distinct_insiders": 9,
+   "dollars": 200991267.0,
+   "classifications": {
+    "unclassified": 9
+   },
+   "clusters_in_episode": 128
+  },
+  {
+   "issuer": 2505,
+   "as_of": "2025-03-05",
+   "symbol": "FMC",
+   "score": 1.865101,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 2138788.8,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 2505,
+   "as_of": "2025-11-14",
+   "symbol": "FMC",
+   "score": 1.406419,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 232347.0,
+   "classifications": {
+    "opportunistic": 1,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 59
+  },
+  {
+   "issuer": 536,
+   "as_of": "2025-03-04",
+   "symbol": "MRNA",
+   "score": 2.3327,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 6008569.33,
+   "classifications": {
+    "unclassified": 1,
+    "opportunistic": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1354,
+   "as_of": "2026-05-12",
+   "symbol": "PSN",
+   "score": 2.025682,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1116045.0,
+   "classifications": {
+    "opportunistic": 2,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 2803,
+   "as_of": "2025-04-17",
+   "symbol": "ALIT",
+   "score": 0.377667,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 808170.2616,
+   "classifications": {
+    "unclassified": 2,
+    "opportunistic": 1
+   },
+   "clusters_in_episode": 32
+  },
+  {
+   "issuer": 1330,
+   "as_of": "2025-03-10",
+   "symbol": "CZR",
+   "score": 1.424533,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 169716.0,
+   "classifications": {
+    "opportunistic": 2
+   },
+   "clusters_in_episode": 60
+  },
+  {
+   "issuer": 1440,
+   "as_of": "2025-05-05",
+   "symbol": "MGY",
+   "score": 0.930028,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 305007.8,
+   "classifications": {
+    "opportunistic": 1,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 21
+  },
+  {
+   "issuer": 622,
+   "as_of": "2025-08-18",
+   "symbol": "EXE",
+   "score": 1.736385,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 423970.0,
+   "classifications": {
+    "opportunistic": 2
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 622,
+   "as_of": "2026-03-09",
+   "symbol": "EXE",
+   "score": 1.36401,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 315660.0,
+   "classifications": {
+    "unclassified": 1,
+    "opportunistic": 2
+   },
+   "clusters_in_episode": 127
+  },
+  {
+   "issuer": 658,
+   "as_of": "2025-03-06",
+   "symbol": "IFF",
+   "score": 1.943361,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 2528710.2,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 174
+  },
+  {
+   "issuer": 658,
+   "as_of": "2026-03-16",
+   "symbol": "IFF",
+   "score": 3.149251,
+   "bucket": "medium",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 11966532.726,
+   "classifications": {
+    "unclassified": 8
+   },
+   "clusters_in_episode": 71
+  },
+  {
+   "issuer": 1002,
+   "as_of": "2025-03-11",
+   "symbol": "SSB",
+   "score": 1.600192,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 540178.34,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 61
+  },
+  {
+   "issuer": 1002,
+   "as_of": "2025-08-04",
+   "symbol": "SSB",
+   "score": 1.589532,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 555570.78,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 61
+  },
+  {
+   "issuer": 1276,
+   "as_of": "2025-09-18",
+   "symbol": "SEI",
+   "score": 1.069248,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 298300.0,
+   "classifications": {
+    "opportunistic": 2
+   },
+   "clusters_in_episode": 121
+  },
+  {
+   "issuer": 649,
+   "as_of": "2026-05-12",
+   "symbol": "FLUT",
+   "score": 4.171858,
+   "bucket": "medium",
+   "voices": 5,
+   "distinct_insiders": 5,
+   "dollars": 745991.90206,
+   "classifications": {
+    "unclassified": 5
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 1430,
+   "as_of": "2025-03-10",
+   "symbol": "CE",
+   "score": 3.34588,
+   "bucket": "medium",
+   "voices": 4,
+   "distinct_insiders": 4,
+   "dollars": 644178.4508999999,
+   "classifications": {
+    "unclassified": 4
+   },
+   "clusters_in_episode": 67
+  },
+  {
+   "issuer": 1430,
+   "as_of": "2025-08-18",
+   "symbol": "CE",
+   "score": 3.218206,
+   "bucket": "medium",
+   "voices": 4,
+   "distinct_insiders": 4,
+   "dollars": 383327.13,
+   "classifications": {
+    "unclassified": 5
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 1430,
+   "as_of": "2025-12-12",
+   "symbol": "CE",
+   "score": 1.699912,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 363191.62,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 63
+  },
+  {
+   "issuer": 770,
+   "as_of": "2025-11-25",
+   "symbol": "J",
+   "score": 1.666964,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 201117.64,
+   "classifications": {
+    "opportunistic": 1,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 770,
+   "as_of": "2026-05-18",
+   "symbol": "J",
+   "score": 1.657863,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 477650.157,
+   "classifications": {
+    "opportunistic": 2,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 62
+  },
+  {
+   "issuer": 455,
+   "as_of": "2025-03-11",
+   "symbol": "VG",
+   "score": 2.614738,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 8636592.2,
+   "classifications": {
+    "unclassified": 4
+   },
+   "clusters_in_episode": 68
+  },
+  {
+   "issuer": 725,
+   "as_of": "2025-03-11",
+   "symbol": "OVV",
+   "score": 1.991997,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1941,
+   "as_of": "2026-03-09",
+   "symbol": "PATK",
+   "score": 0.609542,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 147280.0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 1
+  },
+  {
+   "issuer": 1941,
+   "as_of": "2026-03-31",
+   "symbol": "PATK",
+   "score": 0.555565,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1289921.0,
+   "classifications": {
+    "unclassified": 4
+   },
+   "clusters_in_episode": 90
+  },
+  {
+   "issuer": 2097,
+   "as_of": "2026-01-19",
+   "symbol": "RDW",
+   "score": 0.101801,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 405000.83861,
+   "classifications": {
+    "opportunistic": 2,
+    "unclassified": 4
+   },
+   "clusters_in_episode": 18
+  },
+  {
+   "issuer": 2051,
+   "as_of": "2025-11-11",
+   "symbol": "MLYS",
+   "score": 0.311304,
+   "bucket": "low",
+   "voices": 6,
+   "distinct_insiders": 6,
+   "dollars": 164999917.5,
+   "classifications": {
+    "unclassified": 6
+   },
+   "clusters_in_episode": 19
+  },
+  {
+   "issuer": 458,
+   "as_of": "2025-03-24",
+   "symbol": "STRD",
+   "score": 2.553069,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 680000.0,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 20
+  },
+  {
+   "issuer": 195,
+   "as_of": "2025-03-28",
+   "symbol": "HCA",
+   "score": 6.778277,
+   "bucket": "high",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 264624.7344,
+   "classifications": {
+    "unclassified": 39
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1204,
+   "as_of": "2025-04-07",
+   "symbol": "CMC",
+   "score": 1.454876,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 394669.5,
+   "classifications": {
+    "opportunistic": 2
+   },
+   "clusters_in_episode": 48
+  },
+  {
+   "issuer": 1811,
+   "as_of": "2025-04-28",
+   "symbol": "SIG",
+   "score": 1.07863,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 961792.41,
+   "classifications": {
+    "unclassified": 1,
+    "opportunistic": 1
+   },
+   "clusters_in_episode": 45
+  },
+  {
+   "issuer": 2267,
+   "as_of": "2025-04-03",
+   "symbol": "SMA",
+   "score": 3.08783,
+   "bucket": "medium",
+   "voices": 4,
+   "distinct_insiders": 4,
+   "dollars": 225000.0,
+   "classifications": {
+    "unclassified": 4
+   },
+   "clusters_in_episode": 7
+  },
+  {
+   "issuer": 2677,
+   "as_of": "2025-11-06",
+   "symbol": "LAC",
+   "score": 0.19341,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 194356.0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 22
+  },
+  {
+   "issuer": 362,
+   "as_of": "2025-05-14",
+   "symbol": "CRWV",
+   "score": 2.010413,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 20500010.86,
+   "classifications": {
+    "unclassified": 5
+   },
+   "clusters_in_episode": 39
+  },
+  {
+   "issuer": 1209,
+   "as_of": "2025-11-26",
+   "symbol": "MSM",
+   "score": 1.732031,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 17952342.4523,
+   "classifications": {
+    "unclassified": 5,
+    "opportunistic": 1
+   },
+   "clusters_in_episode": 58
+  },
+  {
+   "issuer": 1417,
+   "as_of": "2025-04-15",
+   "symbol": "ROAD",
+   "score": 2.318905,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1378110.78,
+   "classifications": {
+    "unclassified": 2,
+    "opportunistic": 2
+   },
+   "clusters_in_episode": 12
+  },
+  {
+   "issuer": 1417,
+   "as_of": "2025-06-30",
+   "symbol": "ROAD",
+   "score": 0.053842,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1378110.78,
+   "classifications": {
+    "unclassified": 2,
+    "opportunistic": 2
+   },
+   "clusters_in_episode": 2
+  },
+  {
+   "issuer": 449,
+   "as_of": "2026-02-05",
+   "symbol": "NTRS",
+   "score": 1.545686,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 186113.25,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1148,
+   "as_of": "2025-10-06",
+   "symbol": "KMX",
+   "score": 1.649253,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 590947.36,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 63
+  },
+  {
+   "issuer": 771,
+   "as_of": "2025-04-28",
+   "symbol": "DOC",
+   "score": 4.314152,
+   "bucket": "medium",
+   "voices": 5,
+   "distinct_insiders": 5,
+   "dollars": 630529.11,
+   "classifications": {
+    "opportunistic": 1,
+    "unclassified": 5
+   },
+   "clusters_in_episode": 135
+  },
+  {
+   "issuer": 1196,
+   "as_of": "2025-04-29",
+   "symbol": "AVTR",
+   "score": 3.370421,
+   "bucket": "medium",
+   "voices": 4,
+   "distinct_insiders": 4,
+   "dollars": 578625.71,
+   "classifications": {
+    "unclassified": 4
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1196,
+   "as_of": "2025-11-17",
+   "symbol": "AVTR",
+   "score": 1.425927,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 3374125.0,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 185
+  },
+  {
+   "issuer": 1353,
+   "as_of": "2025-05-07",
+   "symbol": "CHDN",
+   "score": 1.660259,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 371240.0,
+   "classifications": {
+    "opportunistic": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1747,
+   "as_of": "2025-05-06",
+   "symbol": "OGN",
+   "score": 1.724876,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 399918.0,
+   "classifications": {
+    "opportunistic": 1,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 59
+  },
+  {
+   "issuer": 1369,
+   "as_of": "2026-03-11",
+   "symbol": "ACIW",
+   "score": 1.158158,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 223486.98,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 2
+  },
+  {
+   "issuer": 1132,
+   "as_of": "2025-05-29",
+   "symbol": "BLDR",
+   "score": 1.614581,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 56032119.519999996,
+   "classifications": {
+    "opportunistic": 2,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1553,
+   "as_of": "2025-05-14",
+   "symbol": "COLD",
+   "score": 1.842282,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 2157690.0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 63
+  },
+  {
+   "issuer": 1850,
+   "as_of": "2025-05-13",
+   "symbol": "SHOO",
+   "score": 1.659724,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 206672.40000000002,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 9
+  },
+  {
+   "issuer": 2471,
+   "as_of": "2025-05-23",
+   "symbol": "WEN",
+   "score": 1.125347,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 32280.0,
+   "classifications": {
+    "unclassified": 1,
+    "opportunistic": 1
+   },
+   "clusters_in_episode": 66
+  },
+  {
+   "issuer": 2471,
+   "as_of": "2025-11-21",
+   "symbol": "WEN",
+   "score": 1.284657,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 17846.0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1398,
+   "as_of": "2025-11-13",
+   "symbol": "BXSL",
+   "score": 0.91631,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 153488.8,
+   "classifications": {
+    "opportunistic": 1,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 34
+  },
+  {
+   "issuer": 1398,
+   "as_of": "2026-03-12",
+   "symbol": "BXSL",
+   "score": 1.395814,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 42757.8,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 67
+  },
+  {
+   "issuer": 1327,
+   "as_of": "2025-05-14",
+   "symbol": "MIDD",
+   "score": 3.178,
+   "bucket": "medium",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 65845206.18,
+   "classifications": {
+    "unclassified": 6
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1327,
+   "as_of": "2025-12-15",
+   "symbol": "MIDD",
+   "score": 3.250091,
+   "bucket": "medium",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 15096729.014,
+   "classifications": {
+    "opportunistic": 1,
+    "unclassified": 7
+   },
+   "clusters_in_episode": 61
+  },
+  {
+   "issuer": 2480,
+   "as_of": "2025-11-11",
+   "symbol": "PRGO",
+   "score": 0.10853,
+   "bucket": "low",
+   "voices": 5,
+   "distinct_insiders": 5,
+   "dollars": 356383.674,
+   "classifications": {
+    "unclassified": 5,
+    "opportunistic": 1
+   },
+   "clusters_in_episode": 20
+  },
+  {
+   "issuer": 505,
+   "as_of": "2025-05-14",
+   "symbol": "ILMN",
+   "score": 3.045482,
+   "bucket": "medium",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1494055.44,
+   "classifications": {
+    "unclassified": 8
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1070,
+   "as_of": "2025-08-14",
+   "symbol": "AAOI",
+   "score": 3.473505,
+   "bucket": "medium",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 1000938.0,
+   "classifications": {
+    "unclassified": 4,
+    "opportunistic": 3
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 260,
+   "as_of": "2026-03-13",
+   "symbol": "CRH",
+   "score": 1.806956,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 601285.4,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1338,
+   "as_of": "2026-05-12",
+   "symbol": "IBP",
+   "score": 5.653065,
+   "bucket": "medium",
+   "voices": 4,
+   "distinct_insiders": 4,
+   "dollars": 844194.235,
+   "classifications": {
+    "unclassified": 16,
+    "opportunistic": 1
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1972,
+   "as_of": "2025-07-01",
+   "symbol": "CC",
+   "score": 0.379087,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 251572.1178,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 44
+  },
+  {
+   "issuer": 217,
+   "as_of": "2025-08-01",
+   "symbol": "PSX",
+   "score": 1.671524,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 237724.7549,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 933,
+   "as_of": "2025-08-06",
+   "symbol": "MUSA",
+   "score": 1.066302,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 2270618.5,
+   "classifications": {
+    "unclassified": 1,
+    "opportunistic": 1
+   },
+   "clusters_in_episode": 14
+  },
+  {
+   "issuer": 2774,
+   "as_of": "2025-11-12",
+   "symbol": "SG",
+   "score": 1.975047,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1099491.75,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 18
+  },
+  {
+   "issuer": 2774,
+   "as_of": "2026-06-12",
+   "symbol": "SG",
+   "score": 0.443643,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 6765190.96,
+   "classifications": {
+    "unclassified": 60
+   },
+   "clusters_in_episode": 19
+  },
+  {
+   "issuer": 2660,
+   "as_of": "2025-07-31",
+   "symbol": "SBET",
+   "score": 0.091188,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 349977.6,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 22
+  },
+  {
+   "issuer": 117,
+   "as_of": "2025-07-28",
+   "symbol": "CB",
+   "score": 0.935975,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 2988800.2133,
+   "classifications": {
+    "opportunistic": 1,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 30
+  },
+  {
+   "issuer": 2313,
+   "as_of": "2025-06-13",
+   "symbol": "VOYG",
+   "score": 1.764648,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 3129977.0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 16
+  },
+  {
+   "issuer": 1736,
+   "as_of": "2025-06-30",
+   "symbol": "PVH",
+   "score": 1.289004,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1039661.93712,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 52
+  },
+  {
+   "issuer": 2266,
+   "as_of": "2026-02-09",
+   "symbol": "HYMC",
+   "score": 2.709225,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 198315674.4,
+   "classifications": {
+    "unclassified": 44
+   },
+   "clusters_in_episode": 117
+  },
+  {
+   "issuer": 1503,
+   "as_of": "2025-06-23",
+   "symbol": "CAI",
+   "score": 1.827262,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 787500.0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 4
+  },
+  {
+   "issuer": 1503,
+   "as_of": "2026-01-12",
+   "symbol": "CAI",
+   "score": 0.064709,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 110332.56,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 20
+  },
+  {
+   "issuer": 1503,
+   "as_of": "2026-07-13",
+   "symbol": "CAI",
+   "score": 1.016113,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1491506.45,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 20
+  },
+  {
+   "issuer": 3250,
+   "as_of": "2025-09-23",
+   "symbol": "BTBT",
+   "score": 0.025013,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 2500000.0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 1
+  },
+  {
+   "issuer": 5343,
+   "as_of": "2026-01-21",
+   "symbol": "AGIG",
+   "score": 0.487882,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 111728.15,
+   "classifications": {
+    "unclassified": 4
+   },
+   "clusters_in_episode": 42
+  },
+  {
+   "issuer": 183,
+   "as_of": "2025-08-21",
+   "symbol": "ELV",
+   "score": 1.196774,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 2813531.3,
+   "classifications": {
+    "opportunistic": 3,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 40
+  },
+  {
+   "issuer": 183,
+   "as_of": "2026-07-17",
+   "symbol": "ELV",
+   "score": 2.10703,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1368280.05,
+   "classifications": {
+    "opportunistic": 2,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 42
+  },
+  {
+   "issuer": 623,
+   "as_of": "2025-08-04",
+   "symbol": "CHTR",
+   "score": 1.627187,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1100974.25,
+   "classifications": {
+    "opportunistic": 1,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 62
+  },
+  {
+   "issuer": 623,
+   "as_of": "2026-04-28",
+   "symbol": "CHTR",
+   "score": 2.0616,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1370081.2664,
+   "classifications": {
+    "opportunistic": 2,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 1665,
+   "as_of": "2025-10-14",
+   "symbol": "ABG",
+   "score": 0.148522,
+   "bucket": "low",
+   "voices": 5,
+   "distinct_insiders": 5,
+   "dollars": 52858491.172000006,
+   "classifications": {
+    "unclassified": 5
+   },
+   "clusters_in_episode": 1
+  },
+  {
+   "issuer": 1665,
+   "as_of": "2026-04-27",
+   "symbol": "ABG",
+   "score": 0.228341,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 2154562.8,
+   "classifications": {
+    "opportunistic": 4,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 30
+  },
+  {
+   "issuer": 868,
+   "as_of": "2025-08-06",
+   "symbol": "FIG",
+   "score": 4.019033,
+   "bucket": "medium",
+   "voices": 4,
+   "distinct_insiders": 4,
+   "dollars": 10312500.0,
+   "classifications": {
+    "unclassified": 4
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 2454,
+   "as_of": "2025-08-06",
+   "symbol": "BRBR",
+   "score": 2.481061,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 295100.51,
+   "classifications": {
+    "opportunistic": 2,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1332,
+   "as_of": "2025-08-07",
+   "symbol": "TFX",
+   "score": 4.3404,
+   "bucket": "medium",
+   "voices": 5,
+   "distinct_insiders": 5,
+   "dollars": 633590.0,
+   "classifications": {
+    "unclassified": 5,
+    "opportunistic": 1
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1963,
+   "as_of": "2026-03-09",
+   "symbol": "HOG",
+   "score": 2.264475,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 411995.6,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 133,
+   "as_of": "2025-08-07",
+   "symbol": "VRTX",
+   "score": 2.559382,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 5844183.38,
+   "classifications": {
+    "unclassified": 2,
+    "opportunistic": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 580,
+   "as_of": "2025-08-08",
+   "symbol": "BRO",
+   "score": 1.678038,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 341324.18,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 63
+  },
+  {
+   "issuer": 580,
+   "as_of": "2026-06-10",
+   "symbol": "BRO",
+   "score": 0.926319,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 164123.0,
+   "classifications": {
+    "opportunistic": 1,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 39
+  },
+  {
+   "issuer": 10,
+   "as_of": "2025-08-12",
+   "symbol": "LLY",
+   "score": 4.640138,
+   "bucket": "medium",
+   "voices": 5,
+   "distinct_insiders": 5,
+   "dollars": 2894841.252,
+   "classifications": {
+    "unclassified": 1,
+    "opportunistic": 5
+   },
+   "clusters_in_episode": 66
+  },
+  {
+   "issuer": 1730,
+   "as_of": "2025-08-08",
+   "symbol": "FLY",
+   "score": 11.723326,
+   "bucket": "high",
+   "voices": 13,
+   "distinct_insiders": 13,
+   "dollars": 5097870.0,
+   "classifications": {
+    "unclassified": 13
+   },
+   "clusters_in_episode": 13
+  },
+  {
+   "issuer": 2215,
+   "as_of": "2026-07-07",
+   "symbol": "FUN",
+   "score": 0.170488,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 286362.5,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 26
+  },
+  {
+   "issuer": 525,
+   "as_of": "2025-08-11",
+   "symbol": "AMRZ",
+   "score": 3.626673,
+   "bucket": "medium",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 691546.51,
+   "classifications": {
+    "unclassified": 13
+   },
+   "clusters_in_episode": 127
+  },
+  {
+   "issuer": 525,
+   "as_of": "2026-03-09",
+   "symbol": "AMRZ",
+   "score": 1.557376,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 3559701.95,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 117
+  },
+  {
+   "issuer": 714,
+   "as_of": "2025-11-07",
+   "symbol": "IEX",
+   "score": 0.842674,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 500672.72,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 1
+  },
+  {
+   "issuer": 1074,
+   "as_of": "2025-08-14",
+   "symbol": "PRMB",
+   "score": 1.766451,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 497938.88,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 129
+  },
+  {
+   "issuer": 2435,
+   "as_of": "2025-08-26",
+   "symbol": "ENOV",
+   "score": 1.869496,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 463787.0,
+   "classifications": {
+    "opportunistic": 2,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 4
+  },
+  {
+   "issuer": 1167,
+   "as_of": "2026-02-09",
+   "symbol": "RAL",
+   "score": 3.190839,
+   "bucket": "medium",
+   "voices": 4,
+   "distinct_insiders": 4,
+   "dollars": 329209.65,
+   "classifications": {
+    "unclassified": 4
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 1897,
+   "as_of": "2026-02-16",
+   "symbol": "UA",
+   "score": 3.47061,
+   "bucket": "medium",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 437915795.86980003,
+   "classifications": {
+    "unclassified": 46
+   },
+   "clusters_in_episode": 52
+  },
+  {
+   "issuer": 1641,
+   "as_of": "2025-08-15",
+   "symbol": "MIAX",
+   "score": 7.526022,
+   "bucket": "high",
+   "voices": 9,
+   "distinct_insiders": 9,
+   "dollars": 864800.0,
+   "classifications": {
+    "unclassified": 12
+   },
+   "clusters_in_episode": 14
+  },
+  {
+   "issuer": 1641,
+   "as_of": "2026-03-05",
+   "symbol": "MIAX",
+   "score": 1.823378,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 824670.0,
+   "classifications": {
+    "unclassified": 4
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 2036,
+   "as_of": "2025-08-25",
+   "symbol": "WU",
+   "score": 1.688442,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1644353.83,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 1027,
+   "as_of": "2026-02-09",
+   "symbol": "IT",
+   "score": 0.782296,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 9948047.71,
+   "classifications": {
+    "opportunistic": 7,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 23
+  },
+  {
+   "issuer": 875,
+   "as_of": "2025-08-20",
+   "symbol": "MDGL",
+   "score": 81.113122,
+   "bucket": "high",
+   "voices": 6,
+   "distinct_insiders": 6,
+   "dollars": 371526145.7004,
+   "classifications": {
+    "unclassified": 324
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 256,
+   "as_of": "2025-08-21",
+   "symbol": "RSG",
+   "score": 1.984653,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 2000489.302,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 256,
+   "as_of": "2026-05-14",
+   "symbol": "RSG",
+   "score": 5.685856,
+   "bucket": "medium",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 201056643.937,
+   "classifications": {
+    "unclassified": 14
+   },
+   "clusters_in_episode": 67
+  },
+  {
+   "issuer": 88,
+   "as_of": "2026-05-22",
+   "symbol": "BA",
+   "score": 0.925406,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 799311.0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 8
+  },
+  {
+   "issuer": 1159,
+   "as_of": "2025-08-28",
+   "symbol": "EMN",
+   "score": 8.584337,
+   "bucket": "high",
+   "voices": 10,
+   "distinct_insiders": 10,
+   "dollars": 1825336.33,
+   "classifications": {
+    "unclassified": 9,
+    "opportunistic": 1
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1538,
+   "as_of": "2025-11-10",
+   "symbol": "EPAM",
+   "score": 5.878603,
+   "bucket": "medium",
+   "voices": 8,
+   "distinct_insiders": 8,
+   "dollars": 119997.89314999999,
+   "classifications": {
+    "opportunistic": 16
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 1538,
+   "as_of": "2026-05-04",
+   "symbol": "EPAM",
+   "score": 3.845281,
+   "bucket": "medium",
+   "voices": 6,
+   "distinct_insiders": 6,
+   "dollars": 44999.743259999996,
+   "classifications": {
+    "opportunistic": 6
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 806,
+   "as_of": "2025-09-02",
+   "symbol": "COO",
+   "score": 1.705567,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 295282.0,
+   "classifications": {
+    "opportunistic": 1,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 134
+  },
+  {
+   "issuer": 1470,
+   "as_of": "2025-10-21",
+   "symbol": "CELC",
+   "score": 0.941528,
+   "bucket": "low",
+   "voices": 4,
+   "distinct_insiders": 4,
+   "dollars": 38285274.239999995,
+   "classifications": {
+    "unclassified": 16
+   },
+   "clusters_in_episode": 35
+  },
+  {
+   "issuer": 914,
+   "as_of": "2025-09-22",
+   "symbol": "SMMT",
+   "score": 1.547294,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 11969511.84,
+   "classifications": {
+    "unclassified": 4
+   },
+   "clusters_in_episode": 70
+  },
+  {
+   "issuer": 914,
+   "as_of": "2026-06-04",
+   "symbol": "SMMT",
+   "score": 3.196097,
+   "bucket": "medium",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 3642250.0,
+   "classifications": {
+    "unclassified": 4
+   },
+   "clusters_in_episode": 70
+  },
+  {
+   "issuer": 2356,
+   "as_of": "2025-09-22",
+   "symbol": "WBI",
+   "score": 2.382931,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 7500000.0,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 4
+  },
+  {
+   "issuer": 1439,
+   "as_of": "2025-09-23",
+   "symbol": "NTSK",
+   "score": 26.554711,
+   "bucket": "high",
+   "voices": 13,
+   "distinct_insiders": 13,
+   "dollars": 532000000.0,
+   "classifications": {
+    "unclassified": 56
+   },
+   "clusters_in_episode": 18
+  },
+  {
+   "issuer": 1439,
+   "as_of": "2026-07-10",
+   "symbol": "NTSK",
+   "score": 6.272008,
+   "bucket": "high",
+   "voices": 5,
+   "distinct_insiders": 5,
+   "dollars": 36080276.72,
+   "classifications": {
+    "unclassified": 9
+   },
+   "clusters_in_episode": 47
+  },
+  {
+   "issuer": 1037,
+   "as_of": "2025-10-08",
+   "symbol": "FDS",
+   "score": 1.326967,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 201928.3316,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1220,
+   "as_of": "2026-04-15",
+   "symbol": "CAG",
+   "score": 1.815993,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 608902.25,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 319,
+   "as_of": "2025-11-13",
+   "symbol": "FAST",
+   "score": 0.950161,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 83266.1,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 70
+  },
+  {
+   "issuer": 1521,
+   "as_of": "2026-06-01",
+   "symbol": "PRIM",
+   "score": 1.051563,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1001671.988176,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1490,
+   "as_of": "2026-05-14",
+   "symbol": "FCN",
+   "score": 2.988944,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 2076583.8,
+   "classifications": {
+    "unclassified": 1,
+    "opportunistic": 3
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1814,
+   "as_of": "2025-11-10",
+   "symbol": "ITGR",
+   "score": 2.123472,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 384754.41855,
+   "classifications": {
+    "opportunistic": 1,
+    "unclassified": 2
+   },
+   "clusters_in_episode": 53
+  },
+  {
+   "issuer": 1511,
+   "as_of": "2025-11-20",
+   "symbol": "SLGN",
+   "score": 0.844475,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 305407.8,
+   "classifications": {
+    "opportunistic": 2
+   },
+   "clusters_in_episode": 32
+  },
+  {
+   "issuer": 521,
+   "as_of": "2025-12-02",
+   "symbol": "FISV",
+   "score": 2.179143,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 2211971.0,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1342,
+   "as_of": "2026-05-04",
+   "symbol": "FND",
+   "score": 1.740678,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 372975.0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 757,
+   "as_of": "2025-11-06",
+   "symbol": "OHI",
+   "score": 1.927348,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1356974.2,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1613,
+   "as_of": "2025-11-10",
+   "symbol": "BETA",
+   "score": 5.426371,
+   "bucket": "medium",
+   "voices": 7,
+   "distinct_insiders": 7,
+   "dollars": 98997687.46,
+   "classifications": {
+    "unclassified": 7
+   },
+   "clusters_in_episode": 8
+  },
+  {
+   "issuer": 828,
+   "as_of": "2025-11-12",
+   "symbol": "DKNG",
+   "score": 1.849686,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1060200.0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1717,
+   "as_of": "2025-11-18",
+   "symbol": "SUNC",
+   "score": 1.897872,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 442880.66,
+   "classifications": {
+    "unclassified": 5
+   },
+   "clusters_in_episode": 21
+  },
+  {
+   "issuer": 427,
+   "as_of": "2025-11-12",
+   "symbol": "ROP",
+   "score": 2.27286,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 5063165.6,
+   "classifications": {
+    "opportunistic": 2,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1093,
+   "as_of": "2026-06-02",
+   "symbol": "CAVA",
+   "score": 1.862019,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 591550.0,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1160,
+   "as_of": "2025-11-17",
+   "symbol": "CELH",
+   "score": 1.627685,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 652632.94,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 61
+  },
+  {
+   "issuer": 1160,
+   "as_of": "2026-05-26",
+   "symbol": "CELH",
+   "score": 2.669289,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 716358.0,
+   "classifications": {
+    "opportunistic": 1,
+    "unclassified": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1867,
+   "as_of": "2025-11-13",
+   "symbol": "FRSH",
+   "score": 1.999936,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 3985857.3,
+   "classifications": {
+    "unclassified": 1,
+    "opportunistic": 1
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 845,
+   "as_of": "2025-11-13",
+   "symbol": "CNH",
+   "score": 1.793933,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 200219.78999999998,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1868,
+   "as_of": "2026-05-14",
+   "symbol": "UPST",
+   "score": 1.929111,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 6374606.962,
+   "classifications": {
+    "opportunistic": 3
+   },
+   "clusters_in_episode": 60
+  },
+  {
+   "issuer": 257,
+   "as_of": "2026-02-27",
+   "symbol": "TDG",
+   "score": 0.929354,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1221332.76,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 51
+  },
+  {
+   "issuer": 496,
+   "as_of": "2026-01-28",
+   "symbol": "Q",
+   "score": 0.845014,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 329572.0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 16
+  },
+  {
+   "issuer": 434,
+   "as_of": "2025-11-25",
+   "symbol": "HSY",
+   "score": 1.683147,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 408152.6,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 796,
+   "as_of": "2025-11-26",
+   "symbol": "EXEL",
+   "score": 2.012732,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 2374469.808,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 785,
+   "as_of": "2025-12-03",
+   "symbol": "OWL",
+   "score": 5.558386,
+   "bucket": "medium",
+   "voices": 4,
+   "distinct_insiders": 4,
+   "dollars": 7142237.904,
+   "classifications": {
+    "unclassified": 10,
+    "opportunistic": 1
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 759,
+   "as_of": "2025-12-12",
+   "symbol": "WMG",
+   "score": 1.692149,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 2004460.1600000001,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 59
+  },
+  {
+   "issuer": 2557,
+   "as_of": "2025-12-11",
+   "symbol": "CDNL",
+   "score": 3.455802,
+   "bucket": "medium",
+   "voices": 4,
+   "distinct_insiders": 4,
+   "dollars": 861000.0,
+   "classifications": {
+    "unclassified": 4
+   },
+   "clusters_in_episode": 4
+  },
+  {
+   "issuer": 1099,
+   "as_of": "2026-02-13",
+   "symbol": "ARE",
+   "score": 1.261029,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1489249.0,
+   "classifications": {
+    "unclassified": 1,
+    "opportunistic": 2
+   },
+   "clusters_in_episode": 19
+  },
+  {
+   "issuer": 1099,
+   "as_of": "2026-05-04",
+   "symbol": "ARE",
+   "score": 0.876685,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1491389.0,
+   "classifications": {
+    "opportunistic": 2,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 337,
+   "as_of": "2025-12-19",
+   "symbol": "AZO",
+   "score": 1.565635,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 686526.73,
+   "classifications": {
+    "opportunistic": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 4,
+   "as_of": "2026-02-18",
+   "symbol": "MSFT",
+   "score": 1.083428,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 3436970.5300000003,
+   "classifications": {
+    "opportunistic": 2
+   },
+   "clusters_in_episode": 16
+  },
+  {
+   "issuer": 241,
+   "as_of": "2025-12-22",
+   "symbol": "MDLN",
+   "score": 7.148522,
+   "bucket": "high",
+   "voices": 5,
+   "distinct_insiders": 5,
+   "dollars": 1244799886.0,
+   "classifications": {
+    "unclassified": 6
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 522,
+   "as_of": "2025-12-23",
+   "symbol": "WRB",
+   "score": 3.920948,
+   "bucket": "medium",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 85096740.34200001,
+   "classifications": {
+    "unclassified": 8
+   },
+   "clusters_in_episode": 115
+  },
+  {
+   "issuer": 1500,
+   "as_of": "2026-01-07",
+   "symbol": "INDV",
+   "score": 3.718423,
+   "bucket": "medium",
+   "voices": 5,
+   "distinct_insiders": 5,
+   "dollars": 172397.3546,
+   "classifications": {
+    "unclassified": 5
+   },
+   "clusters_in_episode": 109
+  },
+  {
+   "issuer": 2498,
+   "as_of": "2026-01-12",
+   "symbol": "AKTS",
+   "score": 4.266939,
+   "bucket": "medium",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 45090000.0,
+   "classifications": {
+    "unclassified": 6
+   },
+   "clusters_in_episode": 1
+  },
+  {
+   "issuer": 125,
+   "as_of": "2026-02-12",
+   "symbol": "SPGI",
+   "score": 1.386089,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1009376.7292,
+   "classifications": {
+    "unclassified": 4
+   },
+   "clusters_in_episode": 44
+  },
+  {
+   "issuer": 125,
+   "as_of": "2026-05-01",
+   "symbol": "SPGI",
+   "score": 1.016939,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1995756.91,
+   "classifications": {
+    "unclassified": 2,
+    "opportunistic": 1
+   },
+   "clusters_in_episode": 66
+  },
+  {
+   "issuer": 97,
+   "as_of": "2026-02-06",
+   "symbol": "ABT",
+   "score": 1.764212,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 3101298.3219999997,
+   "classifications": {
+    "opportunistic": 1,
+    "unclassified": 2
+   },
+   "clusters_in_episode": 121
+  },
+  {
+   "issuer": 1609,
+   "as_of": "2026-05-20",
+   "symbol": "EQPT",
+   "score": 1.643141,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 741270.6699999999,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 61
+  },
+  {
+   "issuer": 1607,
+   "as_of": "2026-01-30",
+   "symbol": "USAR",
+   "score": 1.707973,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 2173239.22,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 63
+  },
+  {
+   "issuer": 653,
+   "as_of": "2026-03-24",
+   "symbol": "IP",
+   "score": 0.811466,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 4008251.127,
+   "classifications": {
+    "unclassified": 4
+   },
+   "clusters_in_episode": 56
+  },
+  {
+   "issuer": 865,
+   "as_of": "2026-02-02",
+   "symbol": "CR",
+   "score": 3.593548,
+   "bucket": "medium",
+   "voices": 4,
+   "distinct_insiders": 4,
+   "dollars": 987470.02,
+   "classifications": {
+    "unclassified": 5
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 2023,
+   "as_of": "2026-02-04",
+   "symbol": "YSS",
+   "score": 2.715915,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 25734974.0,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 15
+  },
+  {
+   "issuer": 1592,
+   "as_of": "2026-02-05",
+   "symbol": "CVCO",
+   "score": 2.949367,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 866594.0,
+   "classifications": {
+    "unclassified": 5
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 401,
+   "as_of": "2026-02-05",
+   "symbol": "PAYX",
+   "score": 1.654404,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 197258.0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 2177,
+   "as_of": "2026-02-06",
+   "symbol": "BOBS",
+   "score": 3.951165,
+   "bucket": "medium",
+   "voices": 5,
+   "distinct_insiders": 5,
+   "dollars": 532015.0,
+   "classifications": {
+    "unclassified": 5
+   },
+   "clusters_in_episode": 1
+  },
+  {
+   "issuer": 3257,
+   "as_of": "2026-02-06",
+   "symbol": "EIKN",
+   "score": 9.569668,
+   "bucket": "high",
+   "voices": 7,
+   "distinct_insiders": 7,
+   "dollars": 36999774.0,
+   "classifications": {
+    "unclassified": 15
+   },
+   "clusters_in_episode": 1
+  },
+  {
+   "issuer": 1587,
+   "as_of": "2026-02-25",
+   "symbol": "TENB",
+   "score": 0.863169,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 357765.0,
+   "classifications": {
+    "opportunistic": 1,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 56
+  },
+  {
+   "issuer": 1623,
+   "as_of": "2026-02-12",
+   "symbol": "BMI",
+   "score": 2.503093,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 1255516.2,
+   "classifications": {
+    "unclassified": 1,
+    "opportunistic": 2
+   },
+   "clusters_in_episode": 113
+  },
+  {
+   "issuer": 1413,
+   "as_of": "2026-02-11",
+   "symbol": "VRNS",
+   "score": 3.377244,
+   "bucket": "medium",
+   "voices": 4,
+   "distinct_insiders": 4,
+   "dollars": 1178309.85,
+   "classifications": {
+    "unclassified": 2,
+    "opportunistic": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 516,
+   "as_of": "2026-02-17",
+   "symbol": "WTW",
+   "score": 1.649634,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1064134.06,
+   "classifications": {
+    "opportunistic": 1,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 119
+  },
+  {
+   "issuer": 585,
+   "as_of": "2026-02-13",
+   "symbol": "CHRW",
+   "score": 3.369519,
+   "bucket": "medium",
+   "voices": 4,
+   "distinct_insiders": 4,
+   "dollars": 501636.62912,
+   "classifications": {
+    "unclassified": 3,
+    "opportunistic": 1
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 835,
+   "as_of": "2026-02-25",
+   "symbol": "TYL",
+   "score": 1.780843,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 694152.36,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 63
+  },
+  {
+   "issuer": 1156,
+   "as_of": "2026-02-27",
+   "symbol": "POOL",
+   "score": 2.009208,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1515972.233,
+   "classifications": {
+    "opportunistic": 2,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 116
+  },
+  {
+   "issuer": 177,
+   "as_of": "2026-05-26",
+   "symbol": "MELI",
+   "score": 1.215088,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1093635.34,
+   "classifications": {
+    "opportunistic": 1,
+    "unclassified": 2
+   },
+   "clusters_in_episode": 4
+  },
+  {
+   "issuer": 1856,
+   "as_of": "2026-03-05",
+   "symbol": "GPK",
+   "score": 2.277129,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 700292.9691999999,
+   "classifications": {
+    "unclassified": 5
+   },
+   "clusters_in_episode": 112
+  },
+  {
+   "issuer": 558,
+   "as_of": "2026-05-04",
+   "symbol": "RIVN",
+   "score": 3.022301,
+   "bucket": "medium",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 1999912080.271,
+   "classifications": {
+    "unclassified": 6
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 2167,
+   "as_of": "2026-05-12",
+   "symbol": "ADMA",
+   "score": 0.872115,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 317545.0,
+   "classifications": {
+    "opportunistic": 3
+   },
+   "clusters_in_episode": 19
+  },
+  {
+   "issuer": 1475,
+   "as_of": "2026-05-12",
+   "symbol": "ADT",
+   "score": 2.482497,
+   "bucket": "low",
+   "voices": 4,
+   "distinct_insiders": 4,
+   "dollars": 400172.348,
+   "classifications": {
+    "unclassified": 4
+   },
+   "clusters_in_episode": 69
+  },
+  {
+   "issuer": 1453,
+   "as_of": "2026-03-10",
+   "symbol": "VSNT",
+   "score": 2.759506,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 5679039.0,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1166,
+   "as_of": "2026-03-11",
+   "symbol": "SFM",
+   "score": 1.668479,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 440248.0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 63
+  },
+  {
+   "issuer": 425,
+   "as_of": "2026-03-18",
+   "symbol": "WAT",
+   "score": 1.464836,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 451070.0,
+   "classifications": {
+    "unclassified": 1,
+    "opportunistic": 1
+   },
+   "clusters_in_episode": 58
+  },
+  {
+   "issuer": 1670,
+   "as_of": "2026-03-11",
+   "symbol": "CSTM",
+   "score": 2.919684,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 0,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 101
+  },
+  {
+   "issuer": 2496,
+   "as_of": "2026-04-08",
+   "symbol": "KOS",
+   "score": 1.001675,
+   "bucket": "low",
+   "voices": 4,
+   "distinct_insiders": 4,
+   "dollars": 6999999.0,
+   "classifications": {
+    "opportunistic": 2,
+    "unclassified": 2
+   },
+   "clusters_in_episode": 45
+  },
+  {
+   "issuer": 1230,
+   "as_of": "2026-03-13",
+   "symbol": "LOAR",
+   "score": 4.684647,
+   "bucket": "medium",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 9428004.729,
+   "classifications": {
+    "unclassified": 11
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1328,
+   "as_of": "2026-03-20",
+   "symbol": "SBSW",
+   "score": 1.839512,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 1890844.97,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 71
+  },
+  {
+   "issuer": 4562,
+   "as_of": "2026-03-20",
+   "symbol": "BHAVR",
+   "score": 1.997942,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 3
+  },
+  {
+   "issuer": 7479,
+   "as_of": "2026-03-30",
+   "symbol": "TSM",
+   "score": 1.389243,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 167190.0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 121
+  },
+  {
+   "issuer": 1314,
+   "as_of": "2026-03-24",
+   "symbol": "JAN",
+   "score": 5.307947,
+   "bucket": "medium",
+   "voices": 6,
+   "distinct_insiders": 6,
+   "dollars": 3740000.0,
+   "classifications": {
+    "unclassified": 6
+   },
+   "clusters_in_episode": 9
+  },
+  {
+   "issuer": 2502,
+   "as_of": "2026-04-08",
+   "symbol": "BORR",
+   "score": 1.071971,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 3925400.0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 55
+  },
+  {
+   "issuer": 292,
+   "as_of": "2026-04-03",
+   "symbol": "VALE",
+   "score": 1.735368,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 377881.46640000003,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 4113,
+   "as_of": "2026-04-06",
+   "symbol": "HMH",
+   "score": 4.254683,
+   "bucket": "medium",
+   "voices": 5,
+   "distinct_insiders": 5,
+   "dollars": 1480000.0,
+   "classifications": {
+    "unclassified": 5
+   },
+   "clusters_in_episode": 1
+  },
+  {
+   "issuer": 1003,
+   "as_of": "2026-05-04",
+   "symbol": "AYI",
+   "score": 1.061905,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 340746.0,
+   "classifications": {
+    "opportunistic": 1,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 48
+  },
+  {
+   "issuer": 2003,
+   "as_of": "2026-04-20",
+   "symbol": "KLRA",
+   "score": 15.465547,
+   "bucket": "high",
+   "voices": 12,
+   "distinct_insiders": 12,
+   "dollars": 956250048.0,
+   "classifications": {
+    "unclassified": 12
+   },
+   "clusters_in_episode": 1
+  },
+  {
+   "issuer": 688,
+   "as_of": "2026-04-21",
+   "symbol": "ARXS",
+   "score": 6.413124,
+   "bucket": "high",
+   "voices": 7,
+   "distinct_insiders": 7,
+   "dollars": 5643792.0,
+   "classifications": {
+    "unclassified": 7
+   },
+   "clusters_in_episode": 9
+  },
+  {
+   "issuer": 688,
+   "as_of": "2026-07-01",
+   "symbol": "ARXS",
+   "score": 0.190729,
+   "bucket": "low",
+   "voices": 7,
+   "distinct_insiders": 7,
+   "dollars": 5643792.0,
+   "classifications": {
+    "unclassified": 7
+   },
+   "clusters_in_episode": 7
+  },
+  {
+   "issuer": 2852,
+   "as_of": "2026-04-21",
+   "symbol": "AVEX",
+   "score": 3.982181,
+   "bucket": "medium",
+   "voices": 5,
+   "distinct_insiders": 5,
+   "dollars": 1483000.0,
+   "classifications": {
+    "unclassified": 5
+   },
+   "clusters_in_episode": 10
+  },
+  {
+   "issuer": 2852,
+   "as_of": "2026-06-23",
+   "symbol": "AVEX",
+   "score": 0.175989,
+   "bucket": "low",
+   "voices": 5,
+   "distinct_insiders": 5,
+   "dollars": 1483000.0,
+   "classifications": {
+    "unclassified": 5
+   },
+   "clusters_in_episode": 14
+  },
+  {
+   "issuer": 3467,
+   "as_of": "2026-04-24",
+   "symbol": "ELMT",
+   "score": 1.626215,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 168000.0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 1
+  },
+  {
+   "issuer": 1556,
+   "as_of": "2026-04-29",
+   "symbol": "XE",
+   "score": 2.898918,
+   "bucket": "low",
+   "voices": 4,
+   "distinct_insiders": 4,
+   "dollars": 282900.0,
+   "classifications": {
+    "unclassified": 4
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 488,
+   "as_of": "2026-04-30",
+   "symbol": "GEHC",
+   "score": 1.723956,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 355614.825,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 73
+  },
+  {
+   "issuer": 7053,
+   "as_of": "2026-05-01",
+   "symbol": "PSUS",
+   "score": 9.380619,
+   "bucket": "high",
+   "voices": 7,
+   "distinct_insiders": 7,
+   "dollars": 310958550.0,
+   "classifications": {
+    "unclassified": 12
+   },
+   "clusters_in_episode": 13
+  },
+  {
+   "issuer": 2589,
+   "as_of": "2026-05-01",
+   "symbol": "AVLN",
+   "score": 3.897987,
+   "bucket": "medium",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 24999984.0,
+   "classifications": {
+    "unclassified": 5
+   },
+   "clusters_in_episode": 1
+  },
+  {
+   "issuer": 1520,
+   "as_of": "2026-05-04",
+   "symbol": "SRAD",
+   "score": 6.602423,
+   "bucket": "high",
+   "voices": 7,
+   "distinct_insiders": 7,
+   "dollars": 4668317.896495,
+   "classifications": {
+    "unclassified": 10
+   },
+   "clusters_in_episode": 53
+  },
+  {
+   "issuer": 2684,
+   "as_of": "2026-05-04",
+   "symbol": "SPTX",
+   "score": 8.478571,
+   "bucket": "high",
+   "voices": 7,
+   "distinct_insiders": 7,
+   "dollars": 138600000.0,
+   "classifications": {
+    "unclassified": 7
+   },
+   "clusters_in_episode": 1
+  },
+  {
+   "issuer": 687,
+   "as_of": "2026-05-15",
+   "symbol": "ULS",
+   "score": 1.259317,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 9988.5728,
+   "classifications": {
+    "unclassified": 5
+   },
+   "clusters_in_episode": 56
+  },
+  {
+   "issuer": 1579,
+   "as_of": "2026-05-07",
+   "symbol": "MMSI",
+   "score": 2.50988,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 348857.5,
+   "classifications": {
+    "unclassified": 2,
+    "opportunistic": 1
+   },
+   "clusters_in_episode": 67
+  },
+  {
+   "issuer": 7028,
+   "as_of": "2026-06-30",
+   "symbol": "OTAI",
+   "score": 0.32849,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 4525000.0,
+   "classifications": {
+    "unclassified": 4
+   },
+   "clusters_in_episode": 5
+  },
+  {
+   "issuer": 4488,
+   "as_of": "2026-05-22",
+   "symbol": "SAGU-WT",
+   "score": 1.15179,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 2
+  },
+  {
+   "issuer": 1653,
+   "as_of": "2026-05-14",
+   "symbol": "PLNT",
+   "score": 1.658766,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 478750.0,
+   "classifications": {
+    "opportunistic": 1,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 62
+  },
+  {
+   "issuer": 936,
+   "as_of": "2026-05-12",
+   "symbol": "HUBS",
+   "score": 2.873111,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 2585781.46,
+   "classifications": {
+    "opportunistic": 2,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 471,
+   "as_of": "2026-05-13",
+   "symbol": "ZTS",
+   "score": 2.651284,
+   "bucket": "low",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 886366.9,
+   "classifications": {
+    "unclassified": 3
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1071,
+   "as_of": "2026-05-14",
+   "symbol": "ACM",
+   "score": 1.732735,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 401049.9,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 958,
+   "as_of": "2026-05-14",
+   "symbol": "JKHY",
+   "score": 1.679882,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 317135.0,
+   "classifications": {
+    "unclassified": 1,
+    "opportunistic": 1
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 853,
+   "as_of": "2026-05-15",
+   "symbol": "ONON",
+   "score": 3.739527,
+   "bucket": "medium",
+   "voices": 3,
+   "distinct_insiders": 3,
+   "dollars": 6594299.265000001,
+   "classifications": {
+    "unclassified": 6
+   },
+   "clusters_in_episode": 64
+  },
+  {
+   "issuer": 1073,
+   "as_of": "2026-05-18",
+   "symbol": "FLS",
+   "score": 1.550767,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 231615.0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 63
+  },
+  {
+   "issuer": 1545,
+   "as_of": "2026-05-18",
+   "symbol": "KBR",
+   "score": 1.490734,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 348585.0,
+   "classifications": {
+    "opportunistic": 1,
+    "unclassified": 1
+   },
+   "clusters_in_episode": 67
+  },
+  {
+   "issuer": 4637,
+   "as_of": "2026-05-19",
+   "symbol": "VECA-UN",
+   "score": 1.888795,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 2
+  },
+  {
+   "issuer": 1987,
+   "as_of": "2026-05-18",
+   "symbol": "SHAK",
+   "score": 5.895872,
+   "bucket": "medium",
+   "voices": 6,
+   "distinct_insiders": 6,
+   "dollars": 3232567.5927999998,
+   "classifications": {
+    "unclassified": 9
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 4797,
+   "as_of": "2026-08-12",
+   "symbol": "MNTS",
+   "score": 0.031206,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 35141.01,
+   "classifications": {
+    "unclassified": 2,
+    "opportunistic": 3
+   },
+   "clusters_in_episode": 6
+  },
+  {
+   "issuer": 2152,
+   "as_of": "2026-05-19",
+   "symbol": "BXDC",
+   "score": 17.465982,
+   "bucket": "high",
+   "voices": 14,
+   "distinct_insiders": 14,
+   "dollars": 1329661300.0,
+   "classifications": {
+    "unclassified": 21
+   },
+   "clusters_in_episode": 8
+  },
+  {
+   "issuer": 697,
+   "as_of": "2026-06-01",
+   "symbol": "ASND",
+   "score": 2.227794,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 262512.5,
+   "classifications": {
+    "unclassified": 6
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 7119,
+   "as_of": "2026-06-04",
+   "symbol": "AADX",
+   "score": 3.419051,
+   "bucket": "medium",
+   "voices": 4,
+   "distinct_insiders": 4,
+   "dollars": 1170000.0,
+   "classifications": {
+    "unclassified": 4
+   },
+   "clusters_in_episode": 10
+  },
+  {
+   "issuer": 569,
+   "as_of": "2026-06-08",
+   "symbol": "INIO",
+   "score": 3.830977,
+   "bucket": "medium",
+   "voices": 4,
+   "distinct_insiders": 4,
+   "dollars": 4559976.0,
+   "classifications": {
+    "unclassified": 4
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 712,
+   "as_of": "2026-06-08",
+   "symbol": "QNT",
+   "score": 10.636862,
+   "bucket": "high",
+   "voices": 11,
+   "distinct_insiders": 11,
+   "dollars": 24661920.0,
+   "classifications": {
+    "unclassified": 11
+   },
+   "clusters_in_episode": 65
+  },
+  {
+   "issuer": 6991,
+   "as_of": "2026-06-09",
+   "symbol": "DGAC-RI",
+   "score": 2.07471,
+   "bucket": "low",
+   "voices": 2,
+   "distinct_insiders": 2,
+   "dollars": 3635000.0,
+   "classifications": {
+    "unclassified": 2
+   },
+   "clusters_in_episode": 4
+  },
+  {
+   "issuer": 1636,
+   "as_of": "2026-06-10",
+   "symbol": "LFTO",
+   "score": 16.628875,
+   "bucket": "high",
+   "voices": 14,
+   "distinct_insiders": 14,
+   "dollars": 419999734.0,
+   "classifications": {
+    "unclassified": 14
+   },
+   "clusters_in_episode": 3
+  }
+ ]
+}

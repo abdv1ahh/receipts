@@ -35,11 +35,18 @@ def latest_definition(conn: psycopg.Connection, name: str) -> dict | None:
     return {"id": r[0], "version": r[1], "params": r[2], "code_hash": r[3], "changelog": r[4], "created_at": r[5]}
 
 
-def register(conn: psycopg.Connection, changelog: str) -> tuple[int, bool]:
-    """Register the current convergence module as a definition version. No-op if the module
-    hash already matches the latest registered version. Returns (version, created?)."""
-    name = convergence.NAME
-    code_hash = convergence.module_code_hash()
+def register(conn: psycopg.Connection, changelog: str, module=convergence) -> tuple[int, bool]:
+    """Register a signal module as a definition version. No-op if the module hash already
+    matches the latest registered version. Returns (version, created?).
+
+    `module` is a parameter rather than a hardcoded import because there is now more than one
+    signal: `signals.insider` is a pure Form 4 definition registered under its own NAME, so
+    that its versions number independently of `convergence`'s and a new definition here cannot
+    move `max(version)` under `convergence`. Any module with NAME, DEFAULT_PARAMS and
+    module_code_hash() fits.
+    """
+    name = module.NAME
+    code_hash = module.module_code_hash()
     latest = latest_definition(conn, name)
     if latest and latest["code_hash"] == code_hash:
         return latest["version"], False
@@ -48,7 +55,7 @@ def register(conn: psycopg.Connection, changelog: str) -> tuple[int, bool]:
         cur.execute(
             """INSERT INTO signal_definitions (name, version, params, code_hash, changelog)
                VALUES (%s, %s, %s, %s, %s)""",
-            (name, version, Json(convergence.DEFAULT_PARAMS), code_hash, changelog),
+            (name, version, Json(module.DEFAULT_PARAMS), code_hash, changelog),
         )
     conn.commit()
     log.info("registered %s v%d (hash %s)", name, version, code_hash[:12])
