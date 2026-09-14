@@ -33,3 +33,9 @@ backups/
 
 # Agent-tool scratch file; not part of the project.
 AGENTS.md
+
+# Document-build page renders and draft PDF copies under docs/research/*/.work/.
+# ~36MB of PNGs plus superseded revisions of a PDF that IS committed; both are
+# reproducible from the build scripts and source markdown kept beside them.
+docs/research/**/render/
+docs/research/**/*-render/
