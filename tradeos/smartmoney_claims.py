@@ -79,17 +79,18 @@ def build(conn, horizon_days: int = 30, since: str | None = None, limit: int = 2
     """Create a claim per historical signal cluster, and import its measured outcome.
 
     Idempotent: a cluster already imported is skipped, so re-running never inflates the record."""
-    model_version = _definition_version(conn)
     made, scored, skipped = 0, 0, 0
+    versions_written: set[str] = set()
     with conn.cursor() as cur:
         cur.execute(
             """SELECT c.id, c.as_of, c.confidence_bucket, c.issuer_entity, c.voices, c.source_classes,
                       o.entry_day, o.excess_30, o.excess_90,
                       (SELECT symbol FROM security_map m WHERE m.entity_id = c.issuer_entity
                          AND m.source = 'sec_company_tickers' ORDER BY confidence DESC LIMIT 1),
-                      e.name
+                      e.name, d.name, d.version
                  FROM signal_clusters c
                  JOIN signal_outcomes o ON o.cluster_id = c.id
+                 JOIN signal_definitions d ON d.id = c.definition_id
                  LEFT JOIN entities e ON e.id = c.issuer_entity
                 WHERE o.excess_30 IS NOT NULL
                   AND (%s::date IS NULL OR c.as_of::date >= %s::date)
@@ -97,7 +98,8 @@ def build(conn, horizon_days: int = 30, since: str | None = None, limit: int = 2
         rows = cur.fetchall()
 
         for (cid, as_of, bucket, _issuer, voices, classes, entry_day,
-             ex30, ex90, symbol, name) in rows:
+             ex30, ex90, symbol, name, defn_name, defn_version) in rows:
+            model_version = f"{defn_name}-v{defn_version}"
             if not symbol:
                 skipped += 1          # nothing scoreable without a ticker
                 continue
@@ -132,6 +134,7 @@ def build(conn, horizon_days: int = 30, since: str | None = None, limit: int = 2
                  external))
             claim_id = cur.fetchone()[0]
             made += 1
+            versions_written.add(model_version)
 
             # The outcome as the existing backtest measured it — same excess-vs-SPY method the
             # Ledger uses, so importing it is not mixing two yardsticks.
@@ -148,11 +151,4 @@ def build(conn, horizon_days: int = 30, since: str | None = None, limit: int = 2
     conn.commit()
     log.info("smartmoney_claims: %d made, %d scored, %d skipped", made, scored, skipped)
     return {"claims_made": made, "outcomes_imported": scored, "skipped": skipped,
-            "model_version": model_version, "lag_note": LAG_NOTE}
-
-
-def _definition_version(conn) -> str:
-    with conn.cursor() as cur:
-        cur.execute("SELECT max(version) FROM signal_definitions")
-        row = cur.fetchone()
-    return f"convergence-v{row[0]}" if row and row[0] else "convergence"
+            "model_versions": sorted(versions_written), "lag_note": LAG_NOTE}

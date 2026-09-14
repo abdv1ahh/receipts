@@ -250,6 +250,28 @@ when a phase touches it, not as a standalone refactor.
 The full list, with the reasoning, is in `docs/state.md` §"Things learned". The ones that bite
 fastest:
 
+0z3. **`signal_clusters` HAS NO DEFINITION FILTER ANYWHERE, and v3/v4 miss each other by luck.**
+   30 read sites across 12 live modules query it on `as_of` alone — `/api/clusters` is
+   `WHERE c.as_of = %s` and nothing more. Measured 2026-09-15: **0** colliding (issuer, as_of)
+   pairs today, because v3 was computed over 419 days and v4 over 77 **disjoint** ones. Compute a
+   third definition over a range v3 already covers and every one of those 419 days collides: the
+   Smart Money feed lists each issuer twice, `_cluster_detail` does `fetchone()` on two rows and
+   silently picks one, and `compute_calibration` — which the PUBLIC methodology page reads — double
+   counts. This is why `convergence_insider` is computed in memory to a JSON artifact instead of
+   being stored (`scripts/analysis/compute_v5.py`). Storing a second definition over a shared range
+   is a 12-module refactor, not a compute.
+
+0z2. **A DEFINITION'S VERSION NUMBER IS GLOBAL TO THE TABLE, AND THE SCHEDULER STAMPS CLAIMS WITH
+   IT.** `smartmoney_claims._definition_version()` read `SELECT max(version) FROM
+   signal_definitions` with **no name filter**, and `scheduler` calls `build()` every cycle. So
+   registering ANY definition numbered 5 — under any name — would have restamped new claims
+   `convergence-v5` while v3 logic produced them, and those claims are exactly what
+   `seed-house-records` imports into `calls`, where the append-only trigger seals them forever. A
+   mislabelled claim is fixable; a mislabelled sealed call is not. Fixed by joining each cluster's
+   own `definition_id` rather than guessing globally; two tests pin it. **Register a new signal
+   under a new NAME** (versions then number from 1 per name) unless it really is a new version of
+   the same signal.
+
 0z1. **A RESOLVED CALL IS IMMUTABLE INCLUDING ITS ARITHMETIC** (migration 035). 034 sealed the
    commitment and refused to change a verdict, and said nothing about the nine columns the verdict
    is COMPUTED from: `UPDATE calls SET excess_return = 0.42 WHERE verdict = 'miss'` succeeded,
@@ -452,6 +474,17 @@ fastest:
    a source, **check whether it accepts a header before reaching for `?key=`**; `redact` is the net,
    not the wire. One consequence: `follow_redirects` must stay **False**, because a header is sent
    to whatever host a redirect lands on and `daily()`'s allowlist only checks the URL we build.
+
+0h4. **Alpaca's cost scales with BARS, not symbols, and the "requests" counter counts neither.**
+   The counter logged as `batches` counts symbol groups of 100; the real HTTP round trips are
+   those TIMES the pagination factor, because a page caps at 10,000 bars. So "345 symbols, 4
+   requests, 47 seconds" in §0h is ~39 actual fetches, and a deep backfill pays the factor in
+   full: measured 2026-09-15, **1,664 symbols / ~1.85M rows / 17 batches / ~355 seconds**, which
+   is 4.8x the symbols but 7.6x the time. Budget a backfill by ROWS (symbols x trading days), not
+   by symbol count. Also: **26 stored symbols have zero Alpaca coverage** and are frozen at
+   Tiingo's last day — warrants (`...W`/`WW`), preferreds, units, OTC foreign lines, B-class
+   shares, bankruptcy `Q` tickers. IEX does not quote them. `--only-stale` re-selects them every
+   run and can never fix them.
 
 0h. **Prices come from ALPACA now; the Tiingo ceiling is why.** Free Tiingo is ~57 unique
    symbols/HOUR, ~500/month, and ONE symbol per request, so a 500-symbol top-up could never

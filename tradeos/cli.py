@@ -747,8 +747,9 @@ def cmd_import_signals(args) -> None:
     from . import smartmoney_claims
     with db.connect() as conn:
         out = smartmoney_claims.build(conn, horizon_days=args.horizon, since=args.since)
+    versions = ", ".join(out["model_versions"]) or "none"
     print(f"import-signals: {out['claims_made']} claims, {out['outcomes_imported']} outcomes "
-          f"({out['model_version']}), {out['skipped']} skipped")
+          f"({versions}), {out['skipped']} skipped")
 
 
 def cmd_capture_context(args) -> None:
