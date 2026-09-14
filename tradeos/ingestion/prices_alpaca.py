@@ -14,13 +14,17 @@ not 500. The constraint disappears rather than being managed.
 
 THE FREE TIER SERVES THE IEX FEED, NOT THE CONSOLIDATED TAPE. This is a real limitation and it is
 recorded here rather than hidden. IEX is one exchange, carrying roughly 2-3% of US equity volume,
-so a daily close computed from IEX prints can differ slightly from the official consolidated close
-that Tiingo reports — most visibly on thin names near the open and close. For this product's
-purpose that is acceptable: every outcome is an EXCESS return measured against SPY over 7, 30 or 90
-days, both legs come from the same feed, and a few basis points of close-price noise is far below
-the 2% noise floor `receipts.scoring` already applies. It would NOT be acceptable for intraday
-execution, and nothing here should be repurposed for that. `docs/analysis/alpaca_vs_tiingo.md`
-holds the measured divergence against the Tiingo series we already have.
+so a daily close computed from IEX prints can differ from the official consolidated close — most
+visibly on thin names. That prediction has now been MEASURED rather than assumed: 1,324 day-pairs
+against our own Tiingo rows on 2026-09-14 give 0.398% mean absolute difference, passing the 0.5%
+migration gate. For this product's purpose that is acceptable: every outcome is an EXCESS return
+measured against SPY over 7, 30 or 90 days and both legs come from the same feed.
+
+But do not round the average up into a guarantee. The tail is real — DMLP 2.86% and JCTC 2.29%
+EXCEED the 2% noise floor `receipts.scoring` applies, so on an illiquid symbol the choice of feed
+can by itself move a verdict, and a Receipts verdict is sealed by trigger and never correctable.
+Liquid names are nowhere near that. It would NOT be acceptable for intraday execution, and nothing
+here should be repurposed for that. `docs/analysis/alpaca_vs_tiingo.md` holds the full numbers.
 
 AUTHENTICATION IS BY HEADER, NEVER BY QUERY STRING. Alpaca uses `APCA-API-KEY-ID` and
 `APCA-API-SECRET-KEY`. This is not a style preference: httpx puts the full request URL in its
@@ -97,13 +101,27 @@ class AlpacaClient:
         if urlparse(ALPACA_BARS_URL).hostname != ALPACA_HOST:
             raise ValueError("Alpaca host allowlist violation")
 
+        # Alpaca spells a class or preferred share with a DOT (GEF.B); this database stores the
+        # hyphen form the SEC and Nasdaq use (GEF-B). A hyphen is not merely absent from Alpaca's
+        # universe, it is a 400 `invalid symbol` that fails the WHOLE batch of 100 — so one
+        # unconverted symbol costs 99 healthy ones their refresh. Convert on the way out and map
+        # back on the way in, so no caller and no stored row ever sees the wire spelling.
+        wire = {s.upper().replace("-", "."): s.upper() for s in symbols}
+
         out: dict[str, list[dict]] = {}
         params = {
-            "symbols": ",".join(s.upper() for s in symbols),
+            "symbols": ",".join(wire),
             "timeframe": "1Day",
             "start": start.isoformat(),
             "end": end.isoformat(),
             "adjustment": "all",        # splits AND dividends
+            # EXPLICIT, because Alpaca's default is SIP and this account cannot query recent SIP:
+            # omitting it returns 403 `subscription does not permit querying recent SIP data` for
+            # any window reaching today, which is every scheduled top-up. Worse when it did NOT
+            # 403 — an older window quietly returned consolidated-tape bars while every row was
+            # stored under SOURCE "alpaca:iex:adjusted", so the provenance string was false.
+            # Asking for the feed we are entitled to makes the label true and the 403 impossible.
+            "feed": "iex",
             "limit": 10000,
             "sort": "asc",
         }
@@ -115,7 +133,8 @@ class AlpacaClient:
             resp.raise_for_status()
             data = resp.json()
             for sym, bars in (data.get("bars") or {}).items():
-                out.setdefault(sym.upper(), []).extend(bars or [])
+                key = wire.get(sym.upper(), sym.upper())      # back to this database's spelling
+                out.setdefault(key, []).extend(bars or [])
             token = data.get("next_page_token")
             if not token:
                 return out

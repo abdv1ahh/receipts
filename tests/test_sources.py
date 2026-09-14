@@ -19,6 +19,28 @@ def test_catalog_states_are_derived_from_config(monkeypatch):
     assert sources.by_key("reddit")["state"] == sources.CONNECTED
 
 
+def test_alpaca_state_is_derived_from_config(monkeypatch):
+    """Alpaca is the price source, so a wrong state here stops outcomes being scored at all."""
+    monkeypatch.delenv("ALPACA_API_KEY_ID", raising=False)
+    monkeypatch.delenv("ALPACA_API_SECRET_KEY", raising=False)
+    assert sources.by_key("alpaca")["state"] == sources.NEEDS_KEY
+    monkeypatch.setenv("ALPACA_API_KEY_ID", "id")
+    monkeypatch.setenv("ALPACA_API_SECRET_KEY", "secret")
+    assert sources.by_key("alpaca")["state"] == sources.CONNECTED
+
+
+def test_every_dynamic_source_has_a_config_check():
+    """A catalog entry with `state: None` is asking for its state to be COMPUTED. If no _DYNAMIC
+    entry answers, `_state` falls through to NEEDS_KEY forever: the source can never report
+    connected however valid the credential, `check-source` refuses to run its probe, and the
+    integration page tells the operator to add a key they already added. Alpaca shipped that way.
+    This asserts the two tables cannot drift apart again."""
+    dynamic = {s["key"] for s in sources.CATALOG if s["state"] is None}
+    assert dynamic, "no dynamic sources found - has the registry's shape changed?"
+    assert dynamic <= set(sources._DYNAMIC), (
+        f"declared dynamic but no config check: {sorted(dynamic - set(sources._DYNAMIC))}")
+
+
 def test_sources_with_no_free_path_stay_unavailable_not_needs_key():
     """X and StockTwits must never render as 'add a key' — there is no key to add."""
     assert sources.by_key("x")["state"] == sources.UNAVAILABLE

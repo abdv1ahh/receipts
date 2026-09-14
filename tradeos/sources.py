@@ -140,9 +140,12 @@ CATALOG: list[dict] = [
         "signup_url": "https://app.alpaca.markets/signup",
         "note": ("Free tier: 200 requests/minute, unlimited history, and MANY SYMBOLS PER REQUEST, "
                  "which is the whole reason it replaced Tiingo — 500 symbols is five calls, not "
-                 "500. The free feed is IEX rather than the consolidated tape, so a daily close "
-                 "can differ from the official close by a few basis points; that is far below the "
-                 "2% noise floor outcomes are scored against, and it is measured in "
+                 "500. The free feed is IEX rather than the consolidated tape. Measured against "
+                 "our own Tiingo rows on 2026-09-14 over 1,324 day-pairs, closes differ by "
+                 "0.398% on average, which passes the 0.5% migration gate — but that average "
+                 "has a thin-name tail: DMLP 2.86% and JCTC 2.29% both exceed the 2% noise "
+                 "floor outcomes are scored against, so on an illiquid symbol the feed alone "
+                 "can move a verdict. Liquid names are unaffected. Full numbers in "
                  "docs/analysis/alpaca_vs_tiingo.md."),
         "feeds": [], "jobs": ["ingest_prices"],
     },
@@ -280,8 +283,30 @@ def _fill_rss_feeds() -> None:
 
 _fill_rss_feeds()
 
-# Sources whose state is computed from config rather than fixed.
+# Sources whose state is computed from config rather than fixed. EVERY catalog entry declaring
+# `"state": None` must appear here: `_state` falls through to NEEDS_KEY when it finds no check, so
+# an omission does not degrade, it LIES — the source reports "add a key" forever however valid the
+# credential is, `check-source` refuses to run its probe, and the operator is told to fix something
+# they already fixed. Alpaca, SMTP and Google OAuth all shipped missing. A test pins the two tables
+# together; do not add a dynamic source without adding its check here.
+#
+# `mail` and `oauth` are imported inside the check, not at module scope, to keep this module's
+# "no network, no database, cheap to import" property — the same reason `_fill_rss_feeds` defers
+# its ingestion import.
+
+
+def _smtp_configured() -> bool:
+    from . import mail
+    return mail.configured()
+
+
+def _google_oauth_configured() -> bool:
+    from . import oauth
+    return oauth.configured()
+
+
 _DYNAMIC = {
+    "alpaca": config.alpaca_configured,
     "tiingo": lambda: bool(config.tiingo_configured()),
     "reddit": config.reddit_configured,
     "youtube": config.youtube_configured,
@@ -290,6 +315,8 @@ _DYNAMIC = {
     "llm_openai": config.openai_compat_configured,
     "stripe": config.stripe_configured,
     "sentry": config.sentry_configured,
+    "smtp": _smtp_configured,
+    "google_oauth": _google_oauth_configured,
 }
 
 

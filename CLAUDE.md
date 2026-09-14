@@ -123,13 +123,15 @@ gitignored.
 docker compose exec -T api python -m tradeos.cli <command>
 ```
 
-All 42, checked against `--help` rather than remembered:
+All 44, checked against `--help` rather than remembered:
 
 `migrate`, `preflight`, `status` · **SEC ingestion** `ingest-form4`, `ingest-13dg`, `ingest-13f`
 `backfill-form4`, `backfill-13dg`, `backfill-13f` (`--from`/`--to` over a date range; weekends skipped, holidays 404 and
 are logged past) · **resolution** `sync-tickers`, `resolve-entities`, `resolve-cusips` ·
 **signals** `signals-register`, `compute-signals`, `run-backtest`, `calibration` ·
-**other ingestion** `ingest-prices`, `ingest-short-interest`, `ingest-sentiment`, `ingest-news`,
+**prices** `ingest-prices-alpaca` (the price path — batched, 500 symbols is 5 requests),
+`ingest-prices` (the Tiingo fallback, one symbol per request), `compare-prices` ·
+**other ingestion** `ingest-short-interest`, `ingest-sentiment`, `ingest-news`,
 `analyze-news`, `ingest-calendar`, `ingest-bluesky` · **spine and claims** `spine`, `reprocess`, `interpret`,
 `measure-claims`, `ledger`, `import-signals` · **seeds** `seed-admin`, `seed-demo`,
 `seed-watchlist`, `seed-exposure`, `sync-library`, `create-invites` ·
@@ -270,6 +272,24 @@ fastest:
    wrong: a symbol lagging SPY is the ROUTINE state of this table, because SPY is fetched first on
    purpose. It would have sealed ordinary calls an hour before their prices arrived. A delisted
    symbol staying open forever is visible, honest and correctable; a wrong verdict is none of those.
+
+0h2. **Alpaca's default feed is SIP, which this plan may not query — always send `feed=iex`.**
+   The adapter documented IEX in its docstring, labelled every row it wrote
+   `SOURCE = "alpaca:iex:adjusted"`, and then did not ask for it. Omitting the parameter failed
+   both ways at once: any window reaching today came back `403 subscription does not permit
+   querying recent SIP data`, which is EVERY scheduled top-up, and any older window came back 200
+   carrying consolidated-tape bars that were stored under the IEX provenance string — so the
+   quieter half of the bug was a row whose own label was false. A 403 that only appears once the
+   window reaches today is invisible to a backfill and fatal to the scheduler.
+
+0h3. **Alpaca spells a class or preferred share with a DOT, and one wrong symbol kills 100.**
+   `GEF-B` is the SEC/Nasdaq spelling this database stores; Alpaca answers `400 invalid symbol`,
+   and because the request is batched that 400 rejects the WHOLE batch — 99 healthy symbols lose
+   their refresh for one bad name. `daily_batch` converts `-` to `.` on the wire and maps the
+   response back, so nothing stored ever carries a dot. Note the reject row logs only `batch[:20]`
+   while BATCH is 100, so the symbol that actually failed may not even appear in the log line.
+   Delisted and OTC names are NOT this problem — they return 200 with no bars and count as
+   `no_data`.
 
 0y. **`receipts/chain.py`'s canonical payload is a WIRE FORMAT and its field order is frozen
    forever.** Adding a sealed field, reordering two, or changing how a timestamp renders would
@@ -432,12 +452,14 @@ fastest:
    not the wire. One consequence: `follow_redirects` must stay **False**, because a header is sent
    to whatever host a redirect lands on and `daily()`'s allowlist only checks the URL we build.
 
-0h. **Free Tiingo is ~57 unique symbols/HOUR and ~500/month, and there was no "what is stale"
-   selector.** All three symbol selectors asked what was *missing*, so a feed that stopped a month
-   ago looked complete — 499 symbols and 235,162 rows, newest close two days *before* the claims
-   naming them. Use `ingest-prices --only-stale` (SPY first: a stale benchmark makes every other
-   symbol unscoreable) and pace it with `scripts/topup-prices.sh`. A pass that ignores the ceiling
-   does not fetch 400 symbols, it fetches ~50 and spends the rest proving it is rate limited.
+0h. **Prices come from ALPACA now; the Tiingo ceiling is why.** Free Tiingo is ~57 unique
+   symbols/HOUR, ~500/month, and ONE symbol per request, so a 500-symbol top-up could never
+   finish: it died mid-alphabet every time and price staleness became alphabetically biased while
+   the table reported 99% fresh. Use `ingest-prices-alpaca --only-stale` — 461 symbols, 8,216
+   rows, 5 requests, ~3 seconds, measured 2026-09-14. The `--only-stale` selector still matters
+   and still puts SPY first, because a stale benchmark makes every other symbol unscoreable; what
+   changed is that the pass now FINISHES. `ingest-prices` and `scripts/topup-prices.sh` are the
+   Tiingo fallback and stay only until Alpaca has a track record.
 
 0i. **A key in `.env` does NOT reach the container.** `docker-compose.yml` enumerates every
    variable explicitly (`FOO: ${FOO:-}`), so a key added to `.env` alone is silently absent from
@@ -489,7 +511,8 @@ fastest:
 | Wikipedia pageviews | none | Attention | connected (noisy — see bugs) |
 | Hacker News | none | Attention | connected |
 | CoinGecko | none | Crypto | connected |
-| Tiingo | `TIINGO_API_KEY` | EOD prices | connected |
+| Alpaca Market Data | `ALPACA_API_KEY_ID` + `_SECRET_KEY` | EOD prices — **the price source**; batched, free IEX feed | connected |
+| Tiingo | `TIINGO_API_KEY` | EOD prices — FALLBACK only | connected |
 | OpenFIGI | `OPENFIGI_API_KEY` | 13F CUSIP → ticker; unmapped holdings are invisible | connected |
 | Reddit | `REDDIT_CLIENT_ID` + `_SECRET` | Social sentiment | **not connected** |
 | YouTube | `YOUTUBE_API_KEY` | Social sentiment | not connected |

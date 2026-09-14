@@ -1,12 +1,13 @@
 # Alpaca vs Tiingo — price source validation
 
-**Written 2026-09-13.** Status: **PREPARED, NOT YET MEASURED — blocked on an Alpaca API key.**
+**Written 2026-09-13. Measured 2026-09-14.** Status: **RUN — verdict PASS at 0.398% against a
+0.5% gate.** See Results; the aggregate passes but the per-symbol tail deserves the caveat below.
 
-The comparison is a single command and the symbols are already chosen. It has not been run because
-no Alpaca credential exists on this machine: `.env` contains no `ALPACA_*` variables and neither
-does the environment. **Nothing was switched over on the strength of an assumption** — per the
-brief, a mean absolute difference above 0.5% stops the migration, and a gate you have not measured
-is not a gate.
+The comparison is a single command and the symbols were chosen in advance. It sat unrun for a day
+because no Alpaca credential existed on this machine. **Nothing was switched over on the strength
+of an assumption** — per the brief, a mean absolute difference above 0.5% stops the migration, and
+a gate you have not measured is not a gate. The credential arrived 2026-09-14 and the gate was
+measured the same hour; the numbers are in Results.
 
 ---
 
@@ -107,19 +108,45 @@ single largest divergence with its symbol and date, and a `verdict` field that a
 
 ## Results
 
-> **NOT YET RUN.** Requires `ALPACA_API_KEY_ID` and `ALPACA_API_SECRET_KEY`. Paste them into `.env`,
-> run `docker compose up -d api worker` (the compose file enumerates variables explicitly, so a
-> value in `.env` alone does not reach the container), then run the command above and fill in this
-> section.
+Run 2026-09-14, the day the credential was first configured.
 
 | Metric | Value |
 |---|---|
-| Symbols compared | — |
-| Total day-pairs compared | — |
-| Exact close matches | — |
-| **Mean absolute % difference** | — |
-| Largest single divergence | — |
-| Days Tiingo-only / Alpaca-only | — |
+| Symbols compared | 25 |
+| Total day-pairs compared | 1,324 |
+| Exact close matches | 169 (12.8%) |
+| **Mean absolute % difference** | **0.398%** |
+| Largest single divergence | JCTC, 2026-06-12 — **11.27%** (Tiingo 2.085, Alpaca 1.85) |
+| Days Tiingo-only / Alpaca-only | 0 / 101 |
+
+**Read the comparison as IEX vs the consolidated tape, which is what it is.** The first attempt at
+this measurement would NOT have been: the adapter never sent `feed`, Alpaca's default is SIP, and
+so it would have compared Tiingo's consolidated closes against Alpaca's *consolidated* closes and
+found a flatteringly small number that said nothing about the feed we actually receive. `feed=iex`
+is now explicit (CLAUDE.md §0h2) and this run is the honest comparison.
+
+The 101 Alpaca-only days are not a discrepancy — they are days Tiingo never delivered, which is the
+staleness bias this migration exists to fix, showing up as missing rows.
+
+### The caveat the headline hides
+
+The 0.398% aggregate passes the gate. It is also an average over a distribution with a thin-name
+tail, and three symbols exceed 1% on their own:
+
+| Symbol | Mean abs % diff | Exact matches |
+|---|---:|---:|
+| DMLP | **2.86%** | 1 / 52 |
+| JCTC | **2.29%** | 6 / 51 |
+| AAT | **1.55%** | 0 / 52 |
+| OCFC | 0.60% | 2 / 57 |
+| GABC | 0.39% | 0 / 52 |
+
+`receipts.scoring` applies a **2% noise floor**, so DMLP's and JCTC's mean divergence is *larger
+than the floor meant to absorb it*. On a liquid name the feed choice cannot move a verdict; on a
+thin one it can. That matters more here than it would anywhere else, because a Receipts verdict is
+sealed by trigger and can never be corrected (CLAUDE.md §0z, §0z1). This is not a reason to stop
+the migration — Tiingo's alternative was no data at all for most of the table — but a call on an
+illiquid symbol carries price-source risk that the aggregate number does not show.
 
 ### The gate
 
