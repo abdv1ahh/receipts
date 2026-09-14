@@ -50,6 +50,20 @@ export function ReceiptsMethodologyView() {
         <p>{data.noise_floor_text}</p>
       </section>
 
+      {/* Sits directly under the noise floor because it is the case where the floor does not
+          hold: on a thin symbol the price feed's own divergence is larger than the floor meant
+          to absorb it. Putting it anywhere else would separate the control from its limit. */}
+      <section className="mt-section">
+        <h2 className="rc-h2">Where the prices come from</h2>
+        <p>{data.price_source.text}</p>
+        {data.universe.price_feed && (
+          <p className="mt-algo num">feed: {data.universe.price_feed}</p>
+        )}
+        <p className="mt-limit">
+          <Icon name="alert" size={15} /> {data.price_source.limit}
+        </p>
+      </section>
+
       <section className="mt-section">
         <h2 className="rc-h2">The four verdicts</h2>
         <dl className="mt-verdicts">

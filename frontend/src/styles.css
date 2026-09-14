@@ -2007,6 +2007,15 @@ textarea.pb-input { resize: vertical; line-height: 1.6; }
 .mt-algo, .mt-fields { font-size: var(--fs-sm) !important; color: var(--faint) !important;
                        overflow-wrap: anywhere; }
 
+/* The thin-name price caveat. Amber and boxed like .mt-doesnot because it is the same KIND of
+   statement: a limit on what a verdict MEANS, not a rule for computing one. The selector is
+   compound on purpose — `.mt-section p` above is (0,1,1) and would win the colour against a bare
+   `.mt-limit` at (0,1,0). Same trap as CLAUDE.md 0c, one specificity class lower. */
+.mt-section .mt-limit { display: flex; gap: 10px; align-items: flex-start;
+                        border: 1px solid rgba(255,194,92,0.28); border-radius: var(--radius);
+                        padding: var(--s4); margin-top: var(--s4); color: var(--text); }
+.mt-section .mt-limit svg { color: var(--amber); flex: 0 0 auto; margin-top: 4px; }
+
 /* =====================================================================================================
    NARROW SCREENS — must stay LAST in this file
    -----------------------------------------------------------------------------------------------------

@@ -92,6 +92,35 @@ def test_the_public_surfaces_answer_without_a_session(client, path):
     assert client.get(path).status_code == 200
 
 
+def test_methodology_discloses_where_the_price_feed_stops_working(client):
+    """The noise floor is the control that absorbs price noise. On a thin symbol the FEED's own
+    divergence is LARGER than that floor (measured 2.86% against a 2% floor), so the feed alone
+    can move a verdict across the line — and a verdict is sealed and never revised.
+
+    This asserts the limit is stated on the page a reader reaches from a published record, not
+    only in docs/analysis/. A disclosure that exists only where the operator reads it is not a
+    disclosure. The numeric claim must keep naming a divergence above the floor, because the whole
+    point of the sentence is that this is the case the floor does not cover.
+    """
+    m = client.get("/api/receipts/methodology").json()
+    ps = m["price_source"]
+    assert ps["text"] and ps["limit"]
+    assert ps["worst_symbol_divergence_pct"] > m["noise_floor"] * 100, (
+        "the caveat must describe a divergence LARGER than the noise floor; below it there is "
+        "nothing to disclose and this section should not exist")
+    assert "sealed" in ps["limit"] or "never revised" in ps["limit"], (
+        "the reader has to be told the verdict is permanent, or the risk reads as correctable")
+
+
+def test_methodology_names_the_price_feed_from_data(client):
+    """Read from prices_eod.source rather than typed into prose, so it cannot outlive a source
+    change. None is acceptable (an empty price table); a stale hardcoded name would not be."""
+    u = client.get("/api/receipts/methodology").json()["universe"]
+    assert "price_feed" in u
+    if u["price_feed"] is not None:
+        assert ":" in u["price_feed"]          # e.g. "alpaca:iex:adjusted"
+
+
 @pytest.mark.parametrize("method, path", [
     ("post", "/api/callers"),
     ("post", "/api/calls"),

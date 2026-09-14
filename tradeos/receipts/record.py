@@ -276,6 +276,26 @@ def methodology() -> dict:
                              f"benchmark is recorded as inconclusive rather than counted either "
                              f"way. Counting small moves as hits is the easiest way to manufacture "
                              f"a track record."),
+        # Disclosed here rather than only in docs/analysis/, because this is the page a reader
+        # reaches from a published record. The noise floor is the control that is supposed to
+        # absorb price noise, and on a thin symbol the FEED's own divergence can be larger than
+        # it — so the reader is told where the floor stops working, beside the floor itself.
+        "price_source": {
+            "measured_divergence_pct": 0.391,
+            "worst_symbol_divergence_pct": 2.86,
+            "text": (f"Prices are end-of-day closes from a single free feed, which carries one "
+                     f"exchange's prints rather than the consolidated tape. Measured 2026-09-14 "
+                     f"against an independent feed over 961 day-pairs, closes differ by 0.391% on "
+                     f"average — well inside the {scoring.NOISE_FLOOR:.0%} noise floor."),
+            "limit": (f"That average hides a thin-name tail, and it is the honest limit of every "
+                      f"verdict on this site. On the least liquid symbols measured, the two feeds "
+                      f"disagreed by 2.86% and 2.29% on average — LARGER than the "
+                      f"{scoring.NOISE_FLOOR:.0%} floor that exists to absorb exactly this. On a "
+                      f"thinly traded symbol the choice of price feed can therefore move a call "
+                      f"across the line by itself, and because a verdict is sealed and never "
+                      f"revised, it stays moved. Liquid symbols are nowhere near this. Read a "
+                      f"verdict on an illiquid name with that in mind."),
+        },
         "verdicts": [
             {"key": "hit", "means": "the excess return moved past the noise floor in the "
                                     "direction the call named."},
@@ -322,6 +342,14 @@ def scoreable_universe(conn: psycopg.Connection) -> dict:
                               max(day) FILTER (WHERE symbol = 'SPY')
                          FROM prices_eod""")
         symbols, newest, spy_newest = cur.fetchone()
+        # Which feed is actually behind the most recent session, read from the rows themselves.
+        # Naming the feed in prose would be a second copy of a fact that already lives in the
+        # data, and the copy is the one that goes stale the day the source changes.
+        cur.execute("""SELECT source, count(*) FROM prices_eod
+                        WHERE day = (SELECT max(day) FROM prices_eod)
+                        GROUP BY source ORDER BY count(*) DESC LIMIT 1""")
+        row = cur.fetchone()
     return {"symbols": symbols or 0,
             "newest_close": newest.isoformat() if newest else None,
-            "benchmark_newest_close": spy_newest.isoformat() if spy_newest else None}
+            "benchmark_newest_close": spy_newest.isoformat() if spy_newest else None,
+            "price_feed": row[0] if row else None}
