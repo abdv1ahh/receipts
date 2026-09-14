@@ -71,10 +71,15 @@ def load_series(conn, symbols: set[str]) -> dict[str, Series]:
     return {s: Series.from_rows(r) for s, r in rows.items()}
 
 
-def score(records: list[dict], series: dict[str, Series], spy: Series) -> list[dict]:
-    """Attach excess returns at each horizon. `why` is kept so coverage can say WHY a horizon
-    is missing — "still open" and "no price history" are different facts and were conflated
-    once before in this codebase (`ledger.UNSCOREABLE_REASONS`)."""
+def score(records: list[dict], series: dict[str, Series], benchmark: Series) -> list[dict]:
+    """Attach excess returns at each horizon, measured against `benchmark`.
+
+    Named `benchmark` rather than `spy` because the robustness pass calls it with IWM and IJR;
+    a parameter called spy that is not SPY is how the wrong index ends up in a headline.
+
+    `why` is kept so coverage can say WHY a horizon is missing — "still open" and "no price
+    history" are different facts and were conflated once before here
+    (`ledger.UNSCOREABLE_REASONS`)."""
     out = []
     for r in records:
         sym = series.get(r["symbol"])
@@ -85,15 +90,9 @@ def score(records: list[dict], series: dict[str, Series], spy: Series) -> list[d
             continue
         ex, why = {}, {}
         for h in HORIZONS:
-            ex[h], why[h] = excess_return(sym, spy, as_of, h)
+            ex[h], why[h] = excess_return(sym, benchmark, as_of, h)
         out.append({**r, "ex": ex, "why": why})
     return out
-
-
-def _spy_rows(conn):
-    with conn.cursor() as cur:
-        cur.execute("SELECT day, close FROM prices_eod WHERE symbol = 'SPY' ORDER BY day")
-        return cur.fetchall()
 
 
 def main() -> None:
@@ -195,17 +194,26 @@ def main() -> None:
                            ("Q3", lambda d: q2 < d <= q3),
                            ("Q4 largest", lambda d: d > q3)):
             cut(f"(c) {name}", [r for r in records if pred(r["dollars"])])
+
     # --- robustness. Reported whatever they say, and counted in the tally below. ------------
     for bench, recs in benchmarks.items():
         if bench == "SPY":
             continue
         cut(f"[robust] vs {bench}", recs, benchmark=bench)
-    report["benchmark_itself_vs_spy"] = {
-        bench: {f"{h}d": round(statistics.fmean(v), 5) if (
-            v := [x for x in (excess_return(series[bench], spy, date.fromisoformat(r["as_of"]), h)[0]
-                              for r in art["rows"]) if x is not None]) else None
-                for h in HORIZONS}
-        for bench in benchmarks if bench != "SPY"}
+    # How each control index itself did against SPY over the SAME entry dates. Without this the
+    # benchmark table above cannot be read: "worse against IWM" only rules out a size effect if
+    # IWM was not itself falling relative to SPY over the window.
+    index_vs_spy: dict[str, dict] = {}
+    for bench in benchmarks:
+        if bench == "SPY":
+            continue
+        index_vs_spy[bench] = {}
+        for h in HORIZONS:
+            vals_b = [v for v in (excess_return(series[bench], spy,
+                                                date.fromisoformat(r["as_of"]), h)[0]
+                                  for r in art["rows"]) if v is not None]
+            index_vs_spy[bench][f"{h}d"] = round(statistics.fmean(vals_b), 5) if vals_b else None
+    report["benchmark_itself_vs_spy"] = index_vs_spy
 
     for y in sorted({r["as_of"][:4] for r in records}):
         cut(f"[robust] entry year {y}", [r for r in records if r["as_of"][:4] == y])

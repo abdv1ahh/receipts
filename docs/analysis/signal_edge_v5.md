@@ -24,9 +24,9 @@ Measured 2026-09-15 against `convergence_insider-v2`, hash `ea6b6a98227b95b4`.
 
 **1. Does the opportunistic cut beat the routine cut, and by how much?**
 Not answerable. The routine arm holds zero episodes. The nearest computable substitute —
-episodes whose every voice is opportunistic (n=31) against episodes with no opportunistic voice
-at all (n=305) — does show a gap in CMP's predicted direction and it is large: **+4.26% versus
-−4.37% at 90 days, a spread of 8.6 percentage points.** But the opportunistic arm's interval is
+episodes whose every voice is opportunistic against episodes with no opportunistic voice at all
+— does show a gap in CMP's predicted direction and it is large: at 90 days **+4.26% (n=31) versus
+−4.37% (n=297), a spread of 8.6 percentage points.** But the opportunistic arm's interval is
 [−0.76%, +9.28%] and spans zero, so the gap is not established. It is the single most interesting
 number in this document and it is not evidence yet. §"Cut (a)".
 
@@ -158,11 +158,13 @@ contact with the rest of the pipeline:
 |---|---:|---|
 | Passed the 1-class / 2-voice gate | 251,688 | over 2,188 issuers |
 | Dropped: no ticker mapped to the issuer | −30,723 | 245 issuers unresolved |
-| Dropped: below the $2M liquidity floor | **−195,461** | **77.7% of the rest** |
+| Dropped: below the $2M liquidity floor | **−195,461** | **88.5% of those that had one** |
 | **Published** | **25,504** | 359 issuers |
 | **Episodes after 14-day collapsing** | **457** | 359 distinct symbols |
 
-**The floor removing 78% is itself a finding.** Insider buying concentrates in small, illiquid
+**The floor is the single biggest filter, and that is itself a finding.** It rejects **88.5% of
+the clusters it can actually test** (195,461 of the 220,965 with a ticker), or 77.7% of all
+251,688. Insider buying concentrates in small, illiquid
 companies; v3's blended gate needed a 13F or 13D/G filer to agree, and those cluster on larger
 names. The pure-insider signal points almost entirely at companies the product's own liquidity
 rule refuses to publish.
@@ -241,6 +243,7 @@ isolates a worse one. The blend was, if anything, diluting the damage.
 | ≥1 opportunistic voice | 30d | 148 | −0.21% | [−1.83%, +1.41%] | 48.6% |
 | ≥1 opportunistic voice | 90d | 145 | −1.40% | [−4.64%, +1.84%] | 44.1% |
 | ≥1 opportunistic voice | 180d | 114 | −1.65% | [−8.27%, +4.97%] | 40.4% |
+| no opportunistic voice | 30d | 305 | −0.69% | [−2.39%, +1.02%] | 45.6% |
 | no opportunistic voice | 90d | 297 | **−4.37%** | **[−6.89%, −1.85%]** | 39.1% |
 | no opportunistic voice | 180d | 238 | **−9.87%** | **[−13.43%, −6.30%]** | 32.4% |
 | **CONTROL: incl. routine** | all | — | **identical to ALL** | zero routine episodes | — |
@@ -488,7 +491,8 @@ of a record whose entire value is that it cannot be edited.
 4. **Do not re-cut this dataset looking for a better number.** 59 tests have been run against 457
    episodes. Each further cut raises the chance of a false positive without adding an observation.
 
-5. **The liquidity floor deserves its own decision.** It removes 77.7% of pure-insider clusters.
+5. **The liquidity floor deserves its own decision.** It removes 88.5% of the pure-insider
+   clusters that carry a ticker (77.7% of every gate-passing cluster).
    That is either correct (illiquid names were the v3 performance drag, decision #38) or it is
    discarding the population the literature is actually about. Both readings are defensible and
    the question has never been measured directly.
