@@ -1,7 +1,9 @@
 # Alpaca vs Tiingo — price source validation
 
-**Written 2026-09-13. Measured 2026-09-14.** Status: **RUN — verdict PASS at 0.398% against a
-0.5% gate.** See Results; the aggregate passes but the per-symbol tail deserves the caveat below.
+**Written 2026-09-13. Measured 2026-09-14.** Status: **RUN — verdict PASS.** Two independent
+runs agree: 0.391% on the 20-symbol alphabet-spread protocol and 0.398% on an earlier 25-symbol
+set, against a 0.5% gate. The aggregate passes; the per-symbol tail and a coverage gap both
+deserve the caveats below.
 
 The comparison is a single command and the symbols were chosen in advance. It sat unrun for a day
 because no Alpaca credential existed on this machine. **Nothing was switched over on the strength
@@ -108,16 +110,41 @@ single largest divergence with its symbol and date, and a `verdict` field that a
 
 ## Results
 
-Run 2026-09-14, the day the credential was first configured.
+Run 2026-09-14, the day the credential was first configured. Window 2026-06-02 to 2026-08-21.
+
+**Primary run — 20 symbols, one per letter across 20 letters, six of them after P**
+(AAT BATRB CACC DMLP ELAN FIISO GABC IRD KNSL LWAY MED NCLH OCFC PAHC QTRX ROCK SATL TKO VITL WGS).
+Selected by most total Tiingo history per letter among cluster symbols, excluding hyphenated
+tickers. An earlier attempt selected on in-window days instead and returned SPAC units and
+preferreds for half the alphabet; the gate would then have measured the twenty thinnest
+instruments in the universe rather than the feed.
 
 | Metric | Value |
 |---|---|
-| Symbols compared | 25 |
-| Total day-pairs compared | 1,324 |
-| Exact close matches | 169 (12.8%) |
-| **Mean absolute % difference** | **0.398%** |
-| Largest single divergence | JCTC, 2026-06-12 — **11.27%** (Tiingo 2.085, Alpaca 1.85) |
-| Days Tiingo-only / Alpaca-only | 0 / 101 |
+| Symbols compared | 20 (18 with any overlap) |
+| Total day-pairs compared | 961 |
+| Exact close matches | 111 (11.6%) |
+| **Mean absolute % difference** | **0.391%** |
+| Largest single divergence | DMLP, 2026-06-03 — **5.12%** (Tiingo 28.15, Alpaca 26.71) |
+| Days Tiingo-only / Alpaca-only | 114 / 65 |
+| **Verdict** | **PASS** (gate: ≤ 0.5%) |
+
+**Corroborating run — 25 symbols**, same window: 1,324 day-pairs, 169 exact (12.8%),
+**0.398%** mean absolute difference, worst JCTC 2026-06-12 at 11.27% (Tiingo 2.085, Alpaca 1.85),
+0 Tiingo-only / 101 Alpaca-only. Two disjoint-ish symbol sets landing within 0.007 points of each
+other is the reason to believe the number.
+
+### The coverage gap, which matters more than the price difference
+
+**Two of the twenty symbols — `BATRB` and `FIISO` — have NO Alpaca data at all**: 57 Tiingo-only
+days each and zero shared days. They contribute nothing to the mean (there is nothing to compare),
+so the headline number is silent about them. This is precisely the failure mode this document
+predicted in advance and ranked above price drift, because **a missing exit price leaves a call
+OPEN rather than scored** (CLAUDE.md §0z) — the symbol is not mis-scored, it is unscoreable.
+
+Both are non-common-stock: BATRB is a thinly traded tracking stock, FIISO a preferred line. IEX
+prints them rarely or never. Expect a residue of cluster symbols that Alpaca cannot price at all,
+and read a Tiingo-only count as a coverage report rather than a rounding error.
 
 **Read the comparison as IEX vs the consolidated tape, which is what it is.** The first attempt at
 this measurement would NOT have been: the adapter never sent `feed`, Alpaca's default is SIP, and

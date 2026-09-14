@@ -159,6 +159,13 @@ def cmd_compute_signals(args) -> None:
 
 
 def cmd_ingest_prices(args) -> None:
+    """The Tiingo FALLBACK path, reached as `ingest-prices-tiingo`.
+
+    Kept working and kept reachable, not deleted: it is the only second opinion on a price this
+    database has, and `compare-prices` measures Alpaca against the rows it wrote. One symbol per
+    request at ~50 requests/hour means it cannot complete a pass over the cluster universe — that
+    is why it is no longer what `ingest-prices` runs.
+    """
     start = date.fromisoformat(args.start)
     client = TiingoClient(os.environ.get("TIINGO_API_KEY", ""))
     try:
@@ -1017,7 +1024,11 @@ def main() -> None:
     cs.add_argument("--to", dest="to_date", default=None)
     cs.set_defaults(fn=cmd_compute_signals)
 
-    ip = sub.add_parser("ingest-prices")
+    # Tiingo is the FALLBACK price path now. It keeps every flag it had; only the name moved,
+    # so a muscle-memory `ingest-prices` reaches the source that can actually finish a pass.
+    ip = sub.add_parser("ingest-prices-tiingo",
+                        help="daily bars from Tiingo; FALLBACK — one symbol per request, "
+                             "~50 requests/hour, cannot finish a full pass")
     ip.add_argument("--symbols-from-clusters", action="store_true", dest="symbols_from_clusters")
     ip.add_argument("--only-missing", action="store_true", dest="only_missing",
                     help="only fetch cluster symbols with no prices yet (spend free-tier quota wisely)")
@@ -1037,14 +1048,27 @@ def main() -> None:
     ip.add_argument("--start", default="2026-01-01")
     ip.set_defaults(fn=cmd_ingest_prices)
 
-    ipa = sub.add_parser("ingest-prices-alpaca",
+    # THE default price path. `ingest-prices-alpaca` stays as an alias rather than being retired:
+    # the Makefile, GO-LIVE.md and three docs name one or the other, and a command that silently
+    # stops existing is worse than a second spelling. Measured 2026-09-14: 345 symbols, 349,480
+    # rows, 4 requests, 47 seconds — the same work Tiingo could not complete in a month.
+    ipa = sub.add_parser("ingest-prices", aliases=["ingest-prices-alpaca"],
                          help="daily bars from Alpaca; batched, so 500 symbols is 5 requests")
-    for a in ("--symbols-from-clusters", "--only-missing", "--only-missing-history", "--only-stale"):
-        ipa.add_argument(a, action="store_true", dest=a[2:].replace("-", "_"))
-    ipa.add_argument("--history-before", default="2026-01-02")
-    ipa.add_argument("--stale-before", default="")
-    ipa.add_argument("--limit", type=int, default=0)
-    ipa.add_argument("--symbols", default="")
+    ipa.add_argument("--symbols-from-clusters", action="store_true", dest="symbols_from_clusters")
+    ipa.add_argument("--only-missing", action="store_true", dest="only_missing",
+                     help="only fetch cluster symbols with no prices yet")
+    ipa.add_argument("--only-missing-history", action="store_true", dest="only_missing_history",
+                     help="only fetch cluster symbols lacking history before --history-before")
+    ipa.add_argument("--history-before", default="2026-01-02",
+                     help="cutoff for --only-missing-history")
+    ipa.add_argument("--only-stale", action="store_true", dest="only_stale",
+                     help="only fetch symbols ALREADY stored whose series stops before "
+                          "--stale-before (the top-up pass; SPY first, because a stale benchmark "
+                          "unscoreables everything)")
+    ipa.add_argument("--stale-before", default="",
+                     help="cutoff for --only-stale; defaults to the freshest day any symbol has")
+    ipa.add_argument("--limit", type=int, default=0, help="cap symbols fetched this pass (0 = no cap)")
+    ipa.add_argument("--symbols", default="", help="comma-separated symbols if not --symbols-from-clusters")
     ipa.add_argument("--start", default="2026-01-01")
     ipa.set_defaults(fn=cmd_ingest_prices_alpaca)
 

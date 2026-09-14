@@ -129,8 +129,9 @@ All 44, checked against `--help` rather than remembered:
 `backfill-form4`, `backfill-13dg`, `backfill-13f` (`--from`/`--to` over a date range; weekends skipped, holidays 404 and
 are logged past) · **resolution** `sync-tickers`, `resolve-entities`, `resolve-cusips` ·
 **signals** `signals-register`, `compute-signals`, `run-backtest`, `calibration` ·
-**prices** `ingest-prices-alpaca` (the price path — batched, 500 symbols is 5 requests),
-`ingest-prices` (the Tiingo fallback, one symbol per request), `compare-prices` ·
+**prices** `ingest-prices` (Alpaca, THE price path — batched, 500 symbols is 5 requests;
+`ingest-prices-alpaca` is kept as an alias), `ingest-prices-tiingo` (the fallback, one symbol per
+request, cannot finish a full pass), `compare-prices` ·
 **other ingestion** `ingest-short-interest`, `ingest-sentiment`, `ingest-news`,
 `analyze-news`, `ingest-calendar`, `ingest-bluesky` · **spine and claims** `spine`, `reprocess`, `interpret`,
 `measure-claims`, `ledger`, `import-signals` · **seeds** `seed-admin`, `seed-demo`,

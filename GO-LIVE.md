@@ -85,7 +85,7 @@ $X ingest-13f --date 2026-07-21 --limit 60
 $X resolve-cusips --limit 700
 $X ingest-short-interest --start 2026-07-01
 $X compute-signals
-$X ingest-prices --symbols-from-clusters --start 2026-01-01   # needs TIINGO_API_KEY
+$X ingest-prices --symbols-from-clusters --start 2026-01-01   # Alpaca; needs ALPACA_API_KEY_ID + ALPACA_API_SECRET_KEY
 $X run-backtest
 $X ingest-sentiment --source hn --limit 40                    # Hacker News, no key needed
 $X sync-library

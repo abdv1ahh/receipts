@@ -30,3 +30,6 @@ tradeos/site_static/
 
 # Local database backups (scripts/backup.sh). Never commit a dump.
 backups/
+
+# Agent-tool scratch file; not part of the project.
+AGENTS.md
