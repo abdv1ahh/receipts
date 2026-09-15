@@ -2162,3 +2162,137 @@ textarea.pb-input { resize: vertical; line-height: 1.6; }
   .pb-head { align-items: flex-start; }
   .cd-head { flex-direction: column; }
 }
+
+/* =====================================================================================================
+   PUBLISHING FROM A PHONE (Part C). Appended at the true end of the file, after the narrow-screen
+   block, because these carry their own narrow-screen rules and a media query adds no specificity —
+   see the note above that block. Every size below is a touch target first and a layout second.
+   ===================================================================================================== */
+
+/* One column, and wider than the old 640px cap is wide on a phone. The cap stays for a desktop so
+   the form does not stretch into a form-shaped landscape. */
+.pb-form { max-width: 560px; }
+.pb-field > span { font-size: 12px; }
+
+/* 17px, not 16, on the ticker field. Mobile Safari ZOOMS the whole page when a focused input's font
+   size is under 16px, which on this form throws the suggestion list off screen and leaves the
+   caller panning around to find it. Everything typed into goes above that line. */
+.pb-input, .pb-input-lg { font-size: 17px; }
+.pb-input-lg { padding: 14px var(--s3); letter-spacing: 0.06em; text-transform: uppercase; }
+
+/* The segmented controls carry the two decisions that cannot be corrected, so they are the biggest
+   targets on the page: 48px is the smallest a thumb hits reliably. `minmax(0, 1fr)` rather than
+   `1fr` — the recurring overflow cause in this file — and a grid rather than a wrapping flex, which
+   is what made three windows render 2 + 1 and read as two choices. */
+.pb-seg-lg { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;
+             flex-wrap: nowrap; }
+.pb-seg-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.pb-seg-lg button { min-height: 48px; font-size: var(--fs-md); padding: 0 6px; }
+.pb-seg-lg button.on { background: rgba(110,140,255,0.16); font-weight: 600; }
+
+/* The suggestion list. In flow rather than absolutely positioned: a floating dropdown over a
+   soft keyboard is how a phone ends up with a list nobody can see, and pushing the page down
+   costs nothing here because the fields below are not what the caller is looking at. */
+.pb-sym { position: relative; }
+.pb-sugg { display: flex; flex-direction: column; border: 1px solid var(--border);
+           border-radius: var(--radius-sm); overflow: hidden; background: var(--card); }
+.pb-sugg-row { display: grid; grid-template-columns: 84px minmax(0, 1fr); align-items: center;
+               gap: var(--s3); text-align: left; background: none; border: 0;
+               border-bottom: 1px solid var(--border); padding: 12px var(--s3);
+               min-height: 48px; cursor: pointer; color: var(--muted);
+               font-size: var(--fs-sm); }
+.pb-sugg-row:last-child { border-bottom: 0; }
+.pb-sugg-row:hover, .pb-sugg-row:focus-visible { background: rgba(110,140,255,0.08); }
+.pb-sugg-sym { color: var(--text); font-size: 16px; letter-spacing: 0.06em; }
+.pb-sugg-ok { color: #7fb69a; }
+.pb-sugg-stale { color: var(--amber); }
+
+/* The blocked path. Not styled as an error, because the caller has done nothing wrong — they typed
+   a ticker we cannot price, and the sentence tells them what we do hold. */
+.pb-blocked { display: flex; gap: 8px; align-items: flex-start; color: var(--amber);
+              font-size: var(--fs-sm); line-height: 1.6; border: 1px solid rgba(255,194,92,0.3);
+              border-radius: var(--radius-sm); padding: 10px var(--s3);
+              background: rgba(255,194,92,0.05); }
+
+/* The commitment panel: numbers before the tap. */
+.pb-commit { border: 1px solid var(--border); border-radius: var(--radius); padding: var(--s4);
+             background: var(--card); display: flex; flex-direction: column; gap: var(--s3); }
+.pb-commit-rows { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+                  gap: var(--s3) var(--s4); }
+.pb-commit-rows > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.pb-commit-rows span { color: var(--faint); font-size: 11px; letter-spacing: 0.06em;
+                       text-transform: uppercase; }
+.pb-commit-rows b { color: var(--text); font-size: var(--fs-lg); font-weight: 600;
+                    overflow-wrap: anywhere; }
+.pb-commit-rows b small { color: var(--faint); font-size: var(--fs-sm); font-weight: 400;
+                          margin-left: 6px; }
+.pb-commit-rule { margin: 0; color: var(--muted); font-size: var(--fs-sm); line-height: 1.65; }
+.pb-commit-warn { margin: 0; font-size: var(--fs-sm); line-height: 1.65; }
+.pb-commit-warn.warn { color: var(--amber); }
+.pb-commit-warn.bad { color: #c98a95; }
+
+/* THE PERMANENCE SENTENCE. The strongest treatment on this page, and the only place it is spent.
+   Nothing sits between this and the button. */
+.pb-permanent { border: 1px solid rgba(255,194,92,0.45); border-left-width: 3px;
+                border-radius: var(--radius); padding: var(--s4);
+                background: rgba(255,194,92,0.05); display: flex; flex-direction: column;
+                gap: 8px; }
+.pb-permanent b { color: var(--text); font-size: var(--fs-lg); line-height: 1.4; }
+.pb-permanent span { color: var(--muted); font-size: var(--fs-md); line-height: 1.7; }
+
+/* Full width and 52px tall. A publish button a thumb can miss is a publish button that gets
+   double-tapped, and the rate limiter counts both. */
+.pb-submit { align-self: stretch; min-height: 52px; font-size: var(--fs-lg); }
+.pb-submit:disabled { opacity: 0.55; }
+.pb-done-acts { display: flex; gap: var(--s3); flex-wrap: wrap; }
+.pb-done-acts .act { min-height: 44px; }
+
+@media (max-width: 720px) {
+  /* One column everywhere. The old two-up rows stacked anyway at this width; saying so explicitly
+     stops the horizon buttons wrapping 2 + 1, which made a three-way choice read as two. */
+  .pb-row { grid-template-columns: minmax(0, 1fr); }
+  .pb-commit-rows { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pb-form, .pb-claim { max-width: none; }
+  /* The verification panel's two buttons side by side leave 40px each. Stack them. */
+  .pb-verify-methods { flex-direction: column; }
+  .pb-verify-methods .act, .pb-verify-row .act { min-height: 44px; }
+  .pb-done-acts { flex-direction: column; }
+  .pb-done-acts .act { width: 100%; }
+}
+
+@media (max-width: 420px) {
+  /* At 375px a two-up commitment grid gives each value ~150px, which holds a price and a date but
+     not both on one line. One column, four rows, nothing clipped. */
+  .pb-commit-rows { grid-template-columns: minmax(0, 1fr); }
+  .pb-sugg-row { grid-template-columns: 68px minmax(0, 1fr); }
+}
+
+/* Open calls, and why they are open (Part C, on migration 036's columns). */
+.rc-opens { display: flex; flex-direction: column; gap: var(--s2); }
+.rc-open-row { display: flex; flex-direction: column; gap: 6px; align-items: flex-start;
+               text-align: left; background: var(--card); border: 1px solid var(--border);
+               border-radius: var(--radius-sm); padding: var(--s3); cursor: pointer;
+               min-height: 48px; }
+.rc-open-row:hover { border-color: var(--accent); }
+.rc-open-head { display: flex; align-items: baseline; gap: var(--s3); flex-wrap: wrap;
+                width: 100%; }
+.rc-open-when { color: var(--faint); font-size: var(--fs-sm); margin-left: auto; }
+.rc-open-note { display: flex; flex-direction: column; gap: 3px; color: var(--muted);
+                font-size: var(--fs-sm); line-height: 1.6; }
+.rc-open-note b { color: var(--amber); font-weight: 600; }
+.rc-open-note.waiting_for_benchmark b { color: var(--amber); }
+.rc-open-note.subject_series_ended b { color: #c98a95; }
+.rc-open-when, .rc-open-why { color: var(--faint); }
+.rc-open-why { overflow-wrap: anywhere; }
+.rc-miss-thesis.none { color: var(--faint); font-style: italic; }
+
+/* The distance to the sample gate. A bar, because "5 of 25" is a shape before it is a number. */
+.rc-gate-progress { display: flex; flex-direction: column; gap: 8px; }
+.rc-gate-bar { height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
+.rc-gate-bar span { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+.rc-gate-progress b { color: var(--text); font-size: var(--fs-md); font-weight: 600; }
+
+@media (max-width: 720px) {
+  /* The date pushes the row past 375px once a symbol and a horizon are on it. */
+  .rc-open-when { display: none; }
+}

@@ -22,7 +22,7 @@ this subject" and "the price feed ends before the claim", for the same reason.
 """
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 import psycopg
 from psycopg import sql
@@ -40,6 +40,18 @@ DEFAULT_BENCHMARK = "SPY"
 
 # A thesis is the part a reader judges. Forty characters is not a quality bar, it is a floor under
 # "up" and "looks good", which carry no information a reader could later hold anyone to.
+#
+# OPTIONAL, BUT SUBSTANTIVE IF GIVEN. The floor used to be mandatory, and on a phone it was the
+# single slowest step in publishing a call — a forty-character minimum in a five-row textarea reads
+# as an essay, and a caller with a view and thirty seconds abandons rather than writes one. So an
+# EMPTY thesis is now allowed and a short one still is not: either say nothing, or say something a
+# reader could hold you to. That keeps the exact property the floor was built for (no "up", no
+# "looks good") while removing it as a barrier.
+#
+# The trade is real and is stated rather than hidden: a record whose calls carry no reasoning is
+# less useful to a reader than one whose calls do, and the record page says "no reasoning
+# published" where that is the case rather than rendering an empty cell. A blank is information
+# about the caller too.
 MIN_THESIS_CHARS = 40
 
 # How far behind a symbol's last close may sit before publishing warns about it. Five sessions is
@@ -89,9 +101,10 @@ def validate(spec: dict) -> list[str]:
         problems.append("confidence has to be low, medium or high.")
 
     thesis = str(spec.get("thesis") or "").strip()
-    if len(thesis) < MIN_THESIS_CHARS:
-        problems.append(f"the thesis needs at least {MIN_THESIS_CHARS} characters, so a reader can "
-                        f"tell what you actually claimed. This one has {len(thesis)}.")
+    if thesis and len(thesis) < MIN_THESIS_CHARS:
+        problems.append(f"a reason is optional, but a short one is worse than none: either leave "
+                        f"it empty or write at least {MIN_THESIS_CHARS} characters a reader could "
+                        f"hold you to. This one has {len(thesis)}.")
 
     return problems
 
@@ -185,6 +198,53 @@ def scoreability(symbol: str, conn: psycopg.Connection,
     return {**common, "scoreable": True, "permanent": False, "blocks_publish": False,
             "reason": f"{symbol} has {sym_rows} daily closes through {sym_last} and can be scored "
                       f"against {benchmark}."}
+
+
+def preview(symbol: str, horizon_days: int, conn: psycopg.Connection,
+            now: datetime | None = None, benchmark: str = DEFAULT_BENCHMARK) -> dict:
+    """Exactly what a caller is committing to, shown before they commit to it.
+
+    WHAT THIS DELIBERATELY DOES NOT CLAIM, because it cannot: the entry price. Entry is the close of
+    the first session STRICTLY AFTER publication (`entry_day_after`), which at publish time has not
+    happened — the number does not exist yet and nobody, including us, knows it. Printing the last
+    close under the label "entry price" would be the single most damaging small lie this product
+    could tell, because the whole proposition is that its numbers mean exactly what they say.
+
+    So this returns three true things instead, which together make the commitment unambiguous:
+
+      the last close WE HOLD    labelled as what it is, with its date, so the caller knows roughly
+                                where they are entering and can see how current our data is
+      the entry RULE            stated in words, because the rule is knowable even when the price
+                                is not. The date is not asserted either: whether the next session
+                                is tomorrow depends on a trading calendar this database does not
+                                have, and "the next session after you publish" is exact without one
+      the horizon's CALENDAR    plain arithmetic on the horizon, so "when will this be scored" has
+        target                  a date attached rather than a duration
+    """
+    now = now or datetime.now(UTC)
+    score = scoreability(symbol, conn, benchmark)
+    out = {"symbol": (symbol or "").strip().upper(), "horizon_days": horizon_days,
+           "scoreability": score, "published_at": now.isoformat(),
+           "horizon_target": (now.date() + timedelta(days=horizon_days)).isoformat(),
+           "entry_rule": "You are measured from the close of the first session AFTER you publish, "
+                         "never from the session in progress. A call made at 3pm cannot enter at "
+                         "that day's close, because most of that close has already happened.",
+           "exit_rule": f"The horizon closes on the first session on or after "
+                        f"{(now.date() + timedelta(days=horizon_days)).isoformat()}, "
+                        f"{horizon_days} days from today.",
+           "benchmark": benchmark}
+    with conn.cursor() as cur:
+        cur.execute("""SELECT day, close FROM prices_eod WHERE symbol = %s
+                        ORDER BY day DESC LIMIT 1""", ((symbol or "").strip().upper(),))
+        row = cur.fetchone()
+        cur.execute("""SELECT day, close FROM prices_eod WHERE symbol = %s
+                        ORDER BY day DESC LIMIT 1""", (benchmark,))
+        bench = cur.fetchone()
+    out["last_close"] = float(row[1]) if row else None
+    out["last_close_day"] = row[0].isoformat() if row else None
+    out["benchmark_last_close"] = float(bench[1]) if bench else None
+    out["benchmark_last_close_day"] = bench[0].isoformat() if bench else None
+    return out
 
 
 # ------------------------------------------------------------------ publishing

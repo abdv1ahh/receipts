@@ -16,7 +16,7 @@ import { fetchMyCaller, fetchRecord, verifyChain } from "./api";
 import { Icon } from "./icons.jsx";
 import { EmptyState, LoadError } from "./shell.jsx";
 import {
-  ChainStrip, Counts, Disclaimer, HouseBanner, Rate, VerdictChip, day, signed,
+  ChainStrip, Counts, Disclaimer, HouseBanner, OpenReason, Rate, VerdictChip, day, signed,
 } from "./receiptsui.jsx";
 
 /** A URL, or null if it is not one we are willing to put in an href.
@@ -100,7 +100,12 @@ function Misses({ misses, onOpenCall }) {
           <span className="rc-miss-sym num">{m.symbol}</span>
           <span className="rc-miss-dir">said {m.direction}</span>
           <span className="rc-miss-x num">{signed(m.excess_return)}</span>
-          <span className="rc-miss-thesis">{m.thesis}</span>
+          {/* An empty reason is now allowed (it was a 40-character minimum, and on a phone it was
+              the slowest step in publishing). So it is SAID rather than left as a blank cell: a
+              caller who published no reasoning has told a reader something too. */}
+          <span className={`rc-miss-thesis ${m.thesis ? "" : "none"}`}>
+            {m.thesis || "no reasoning published"}
+          </span>
           <span className="rc-miss-when num">{day(m.published_at)}</span>
         </button>
       ))}
@@ -155,6 +160,14 @@ function Calibration({ rows }) {
   );
 }
 
+/* The short form, for a row in a list of hundreds. The full sentence is on the open-calls panel
+   and on the call's own page; repeating it here would push every other column off a phone. */
+const OPEN_SHORT = {
+  waiting_for_benchmark: "waiting on our benchmark",
+  waiting_for_subject_price: "waiting on our prices",
+  subject_series_ended: "price feed stopped",
+};
+
 function AllCalls({ calls, onOpenCall }) {
   if (!calls.length) {
     return (
@@ -178,7 +191,9 @@ function AllCalls({ calls, onOpenCall }) {
           <span className="rc-call-x num">
             {c.verdict === "unscoreable"
               ? <span className="rc-call-why">{c.verdict_note}</span>
-              : c.excess_return == null ? "" : signed(c.excess_return)}
+              : !c.verdict && c.open_reason_code
+                ? <span className="rc-call-why">{OPEN_SHORT[c.open_reason_code]}</span>
+                : c.excess_return == null ? "" : signed(c.excess_return)}
           </span>
           <span className="rc-call-when num">{day(c.published_at)}</span>
         </button>
@@ -230,6 +245,35 @@ export function RecordView({ handle, onOpenCall, onNav }) {
         <Counts counts={data.summary.counts} />
         <Rate summary={data.summary} />
       </section>
+
+      {/* Open calls, and WHY each one is open. Part A made the reason a stored column (migration
+          036) precisely so this section could exist: before it, a call thirty days past its stated
+          horizon showed a reader no verdict and no explanation, which is indistinguishable from a
+          result being withheld. It sits above the breakdowns and below the misses, because a
+          pending call is a weaker claim on a reader's attention than a resolved loss. */}
+      {data.open_calls.length > 0 && (
+        <section className="rc-section">
+          <h2 className="rc-h2">Open calls</h2>
+          <p className="rc-lede">
+            Published, not yet scored. Every one of these will resolve and appear below whichever
+            way it goes; none of them can be withdrawn. Where the window has already closed, the
+            reason we have not scored it yet is stated on the row.
+          </p>
+          <div className="rc-opens">
+            {data.open_calls.map((c) => (
+              <button className="rc-open-row" key={c.id} onClick={() => onOpenCall(c.id)}>
+                <span className="rc-open-head">
+                  <span className="rc-call-sym num">{c.symbol}</span>
+                  <span className="rc-call-dir">{c.direction}</span>
+                  <span className="rc-call-h num">{c.horizon_days}d</span>
+                  <span className="rc-open-when num">{day(c.published_at)}</span>
+                </span>
+                <OpenReason call={c} />
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Above the breakdowns. This ordering is the argument, not a layout preference. */}
       <section className="rc-section">

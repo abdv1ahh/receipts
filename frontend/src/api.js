@@ -167,6 +167,14 @@ export const authRegister = (email, password, invite_code) => post("/api/auth/re
 // print "Invite-only." as a hardcoded string; once the flag is runtime-settable that sentence is a
 // guess, and a signup screen is the worst place in the product to guess wrong about itself.
 export const fetchRegistrationState = () => get("/api/auth/registration");
+// Ticker autocomplete, restricted to symbols we hold prices for. Part A left "no price series" as
+// the one remaining route to a permanent unscoreable verdict, so the form offers the universe
+// rather than letting a caller type their way into it.
+export const fetchSymbols = (q) => get(`/api/calls/symbols?q=${encodeURIComponent(q)}`);
+// What a caller is committing to, before they commit. Deliberately does NOT return an entry price:
+// entry is the close of the first session after publication and does not exist yet.
+export const fetchPreview = (symbol, horizon_days) =>
+  get(`/api/calls/preview?symbol=${encodeURIComponent(symbol)}&horizon_days=${horizon_days}`);
 export const authLogout = () => fetch("/api/auth/logout", { method: "POST" }).then((r) => r.json());
 
 // ------------------------------------------------------------------ Receipts

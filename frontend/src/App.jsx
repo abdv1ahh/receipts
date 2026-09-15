@@ -21,6 +21,11 @@ import { Dashboard } from "./dashboard.jsx";
 import { IntegrationsView } from "./integrations.jsx";
 import { RadarView } from "./radar.jsx";
 import { OnboardingCard } from "./onboarding.jsx";
+
+// Surfaces the first-run Radar setup must not cover. `auth` because a signup screen with a
+// configuration card on it is absurd; the Receipts surfaces because the card is about a different
+// product and it was taking their entire first screen on a phone.
+const ONBOARDING_SUPPRESSED = new Set(["auth", "publish", "record", "board", "call", "methodology"]);
 import { ResetView, VerifyView } from "./account.jsx";
 import { GlobeView } from "./globe.jsx";
 import { ExposureView } from "./exposure.jsx";
@@ -343,8 +348,17 @@ export default function App() {
         <main className="content">
           {/* First-run frame setup. Renders nothing unless the server says this reader is due, so
               it costs one request and never blocks a surface. Keyed by user so signing in as
-              someone else re-asks the question for them. */}
-          {user && view !== "auth" && (
+              someone else re-asks the question for them.
+
+              NOT on the Receipts surfaces. Measured at 375px: this card filled the entire first
+              viewport of /publish and /record — a country selector, a currency field and a follow
+              list, above the fold, on the two screens whose whole job is publish-a-call and
+              check-my-record. It configures the RADAR, which is not even on the navigation rail
+              any more, and none of the Receipts code paths read `relevance`. So a caller arriving
+              to publish met a minute of setup for a surface they will never open, with a "not now"
+              link wrapping onto two lines in the corner as the only way past it. It still shows
+              everywhere it is relevant. */}
+          {user && !ONBOARDING_SUPPRESSED.has(view) && (
             <OnboardingCard key={user.id} onDone={refreshUser} />
           )}
           <ErrorBoundary key={view} surface={view}>

@@ -24,6 +24,49 @@ export const price = (v) => money(v, { dp: 2, empty: null });
 export const shortHash = (h) => (h ? `${h.slice(0, 10)}…${h.slice(-6)}` : "not held");
 export const day = (iso) => (iso ? String(iso).slice(0, 10) : "not held");
 
+/** How long ago, in the coarsest unit that is still true.
+ *
+ *  Exists for exactly one sentence: an open call past its horizon has to read as "we looked N
+ *  hours ago and the prices still are not there", never as a blank. A reader who cannot tell
+ *  "waiting" from "withheld" will assume the second, on the one product whose whole proposition is
+ *  that nothing is withheld. */
+export function ago(iso) {
+  if (!iso) return null;
+  const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  if (mins < 2) return "just now";
+  if (mins < 60) return `${mins} minutes ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.round(hours / 24);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+}
+
+/** Why an open call is still open. The three codes come from migration 036; the SENTENCE comes
+ *  from the server (`scoring.OPEN_REASONS`) and is never rewritten here. */
+const OPEN_LABEL = {
+  waiting_for_benchmark: "waiting on our benchmark data",
+  waiting_for_subject_price: "waiting on our price feed",
+  subject_series_ended: "the price feed for this symbol has stopped",
+};
+
+export function OpenReason({ call }) {
+  const when = ago(call.open_checked_at);
+  if (!call.open_reason_code) {
+    return (
+      <span className="rc-open-note">
+        the window has not closed yet, so there is nothing to score
+      </span>
+    );
+  }
+  return (
+    <span className={`rc-open-note ${call.open_reason_code}`}>
+      <b>{OPEN_LABEL[call.open_reason_code] || "waiting"}</b>
+      {when && <span className="rc-open-when"> · last checked {when}</span>}
+      {call.open_reason && <span className="rc-open-why">{call.open_reason}</span>}
+    </span>
+  );
+}
+
 // Verdict vocabulary, in the reader's words. A miss is a normal outcome of making calls in public
 // and its treatment says so: muted, not an alarm.
 export const VERDICT = {
@@ -77,6 +120,21 @@ export function Rate({ summary }) {
           <b className="num">{summary.resolved_scoreable}</b>
           <span>resolved as a hit or a miss so far</span>
         </div>
+        {/* The DISTANCE to the gate, not only the gate. A caller with three resolved calls and a
+            blank percentage has no way to tell "the sample is too thin" from "this product is
+            broken", and a blank invites the second reading. The number comes from the server so a
+            surface cannot subtract it differently. */}
+        {summary.remaining_to_gate > 0 && (
+          <div className="rc-gate-progress">
+            <div className="rc-gate-bar">
+              <span style={{ width: `${Math.round(100 * summary.resolved_scoreable / summary.sample_gate)}%` }} />
+            </div>
+            <b>
+              {summary.remaining_to_gate} more {summary.remaining_to_gate === 1 ? "call" : "calls"}
+              {" "}need to resolve before a percentage appears
+            </b>
+          </div>
+        )}
         <p className="rc-gatewhy">{summary.gate_reason}</p>
       </div>
     );

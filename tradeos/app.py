@@ -70,6 +70,7 @@ from .receipts import calls as receipts_calls
 from .receipts import chain as receipts_chain
 from .receipts import record as receipts_record
 from .receipts import scoring as receipts_scoring
+from .receipts import universe as receipts_universe
 from .receipts import verification as receipts_verification
 
 # One sentence, one place. It appears on every public Receipts surface and on the share card, and
@@ -3353,6 +3354,35 @@ def call_scoreability(symbol: str, response: Response,
         return receipts_calls.scoreability(symbol, conn)
 
 
+@app.get("/api/calls/symbols")
+def call_symbols(response: Response, q: str = "",
+                 tos_session: str | None = Cookie(None)) -> dict:
+    """Ticker autocomplete, restricted to symbols a call could actually be scored on.
+
+    Behind a session for the same reason `scoreability` is: it is a read on behalf of someone about
+    to publish, not a public lookup of what this database holds.
+    """
+    with db.connect() as conn:
+        if not authn.session_user(conn, tos_session):
+            response.status_code = 401
+            return {"error": "sign in first"}
+        return receipts_universe.suggest(conn, q)
+
+
+@app.get("/api/calls/preview")
+def call_preview(response: Response, symbol: str, horizon_days: int = 30,
+                 tos_session: str | None = Cookie(None)) -> dict:
+    """What a caller is committing to, before they commit to it. See `calls.preview`."""
+    with db.connect() as conn:
+        if not authn.session_user(conn, tos_session):
+            response.status_code = 401
+            return {"error": "sign in first"}
+        if horizon_days not in receipts_calls.SCOREABLE_HORIZONS:
+            response.status_code = 400
+            return {"error": "the horizon has to be 7, 30 or 90 days."}
+        return receipts_calls.preview(symbol, horizon_days, conn)
+
+
 @app.get("/api/calls/{call_id}")
 def one_call(call_id: int, response: Response) -> dict:
     """One call with everything a sceptic needs to check it by hand. Public."""
@@ -3403,6 +3433,12 @@ def receipts_for(handle: str, response: Response) -> dict:
             "misses": receipts_record.recent_misses(cid, 10, conn),
             "calibration": receipts_record.calibration(cid, conn),
             "calls": listing,
+            # The open ones, split out rather than left for a surface to filter. They get their own
+            # panel because Part A gave them a stored REASON (migration 036) and a blank row past
+            # its horizon is indistinguishable, to a sceptic, from a result being withheld. Oldest
+            # first: the one that has been waiting longest is the one a reader should see first,
+            # which is the opposite of the newest-first ordering the full list wants.
+            "open_calls": [c for c in reversed(listing) if c["verdict"] is None],
             "chain_links": len(listing),
             "chain_head": listing[0]["content_hash"] if listing else receipts_chain.GENESIS_HASH,
             "disclaimer": RECEIPTS_DISCLAIMER,

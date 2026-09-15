@@ -104,6 +104,13 @@ def _compute(counts: tuple, followed: list[float]) -> dict:
         "sample_needed_1pct": ledger.sample_needed(ci["sd"] or 0, 0.01),
         "gated": gated,
         "gate_reason": GATE_REASON if gated else None,
+        # The gate, and HOW FAR OFF IT IS. Returned rather than left for a surface to subtract,
+        # because a caller with three resolved calls and no percentage has no way to tell "the
+        # sample is too thin" from "this product is broken" — and the second reading is the one a
+        # blank number invites. `remaining_to_gate` is 0 once the rate is published, so a surface
+        # can render the same component either side of the line.
+        "sample_gate": SAMPLE_GATE,
+        "remaining_to_gate": max(0, SAMPLE_GATE - scoreable),
     }
 
 
