@@ -91,7 +91,11 @@ COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").lower() == "true"  # tr
 class RegisterReq(BaseModel):
     email: str
     password: str
-    invite_code: str
+    # Optional on the wire, because registration is open by default. Still honoured when supplied:
+    # a referral code credits the referrer and grants the new account its trial. The server decides
+    # whether one is REQUIRED (the `open_registration` flag), so the client cannot opt out of the
+    # invite wall by omitting the field.
+    invite_code: str = ""
 
 
 class LoginReq(BaseModel):
@@ -374,6 +378,9 @@ _PUBLIC_PREFIXES = ("/api/public/", "/api/ledger", "/api/receipts", "/api/board"
 _MODEL_PATHS = ("/api/assistant", "/api/analyze-chart", "/api/extract-tickers")
 # Anything that can cause an email to be sent, or that guesses at a token.
 _AUTH_TOKEN_PATHS = ("/api/auth/verify/", "/api/auth/reset/")
+# Creating an account. Registration is open now, and an account is upstream of a caller handle and
+# of permanent rows on a public board, so it gets a bucket tighter than the publish one.
+_REGISTER_PATHS = ("/api/auth/register",)
 # Publishing seals a row that can never be deleted, so a runaway script does permanent damage
 # rather than recoverable damage. It gets its own bucket for that reason and not for load.
 _PUBLISH_PATHS = ("/api/calls",)
@@ -385,6 +392,8 @@ def _limit_bucket(path: str, method: str = "GET") -> str | None:
     # would let twenty page views an hour exhaust a limit meant for writes.
     if method == "POST" and path.startswith(_PUBLISH_PATHS):
         return "publish"
+    if path.startswith(_REGISTER_PATHS):
+        return "register"
     if path.startswith(_PUBLIC_PREFIXES):
         return "public"
     if path.startswith(_MODEL_PATHS):
@@ -449,12 +458,38 @@ def auth_register(req: RegisterReq, request: Request, response: Response) -> dic
                 return {"error": "registration is temporarily closed"}
             token, user = authn.register(conn, req.email, req.password, req.invite_code,
                                          ip=request.client.host if request.client else None,
-                                         ua=request.headers.get("user-agent"))
+                                         ua=request.headers.get("user-agent"),
+                                         require_invite=not flags.enabled(conn,
+                                                                          "open_registration"))
     except authn.AuthError as exc:
         response.status_code = 400
         return {"error": str(exc)}
     _set_session_cookie(response, token)
     return {"user": user}
+
+
+@app.get("/api/auth/registration")
+def registration_state() -> dict:
+    """Whether an account can be created, and whether a code is needed. Public and unauthenticated.
+
+    This exists because the auth screen used to print the words "Invite-only." as a hardcoded
+    string. Once the flag can be flipped at runtime that sentence is a guess, and a signup screen
+    that guesses wrong about its own requirements is the worst place in the product to be wrong.
+    """
+    with db.connect() as conn:
+        on = flags.enabled(conn, "registration")
+        open_signup = flags.enabled(conn, "open_registration")
+    return {
+        "open": on,
+        "invite_required": on and not open_signup,
+        # Said here rather than only in the docs. With no SMTP configured there is no email
+        # verification flow at all, so a reader of any public record is entitled to know that the
+        # only thing behind a handle is an address nobody has confirmed.
+        "email_verification": False,
+        "note": ("Anyone can create an account." if on and open_signup
+                 else "An invite or referral code is required." if on
+                 else "Registration is closed."),
+    }
 
 
 @app.post("/api/auth/login")
@@ -3128,9 +3163,28 @@ _HANDLE_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,29}$")
 # served: the route would answer with the methodology payload and the record page would render a
 # caller that is not there. The rest are reserved before the same trap can be set for them, and
 # because a record at /r/admin reads as an official one.
+# Two groups, for two different reasons.
+#
+# THE URL SPACE. `GET /api/receipts/methodology` is registered before `GET /api/receipts/{handle}`,
+# so a caller holding that handle could never have their record served: the route would answer with
+# the methodology payload and the record page would render a caller that is not there.
+#
+# IMPERSONATION. Registration is open now, so the first person to type `sec` or `nasdaq` gets a
+# public, permanent, sealed record at `/r/sec` that reads as an official one — and the handle
+# becomes unchangeable the moment they publish under it (migration 037), so it cannot be taken back
+# later either. Cheap to reserve in advance; impossible to reclaim afterwards. This list is not a
+# trademark policy and does not pretend to be one: it covers the words whose misuse would mislead a
+# reader about WHO IS SPEAKING, which is the one thing this product sells.
 _RESERVED_HANDLES = frozenset({
-    "methodology", "verify", "board", "admin", "api", "me", "new", "settings", "support",
-    "help", "about", "login", "logout", "signup", "account", "official", "staff", "rhumb",
+    # the URL space
+    "methodology", "verify", "board", "api", "me", "new", "settings", "record", "publish",
+    "call", "calls", "callers", "card", "site", "health", "static", "assets",
+    # this product speaking
+    "admin", "official", "staff", "rhumb", "tradeos", "tradeoss", "team", "moderator", "mod",
+    "root", "system", "security", "billing", "press", "news", "info", "contact", "legal",
+    "compliance", "support", "help", "about", "login", "logout", "signup", "account",
+    # regulators and exchanges, which is the impersonation a market record invites
+    "sec", "finra", "cftc", "fca", "esma", "sipc", "nyse", "nasdaq", "cboe", "lse",
 })
 
 
@@ -3455,6 +3509,7 @@ def receipt_share_page(handle: str) -> str:
 <img src="{card}" alt="{e(title)}">
 <a href="/record?handle={e(caller['handle'])}">Open the full record on {e(brand)} &#8594;</a>
 <p>{e(line)}</p>
+<p>{e(caller['identity_note'])}</p>
 <p>{e(RECEIPTS_DISCLAIMER)}</p>
 </body></html>'''
 

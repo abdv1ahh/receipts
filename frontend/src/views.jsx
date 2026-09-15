@@ -2,7 +2,7 @@
 // a link into its profile; nothing evaluates a user's position (the advice line).
 import { useEffect, useState } from "react";
 import { ForgotPassword } from "./account.jsx";
-import { addFollow, addWatchlist, analyzeChartImage, authLogin, authRegister, extractTickers, fetchActivity, fetchAsset, fetchExplanation, fetchInsider, fetchInstitution, fetchLibrary, fetchLibraryEntry, fetchScreener, fetchWatchlist, removeWatchlist } from "./api";
+import { addFollow, addWatchlist, analyzeChartImage, authLogin, authRegister, extractTickers, fetchActivity, fetchAsset, fetchExplanation, fetchInsider, fetchInstitution, fetchLibrary, fetchLibraryEntry, fetchRegistrationState, fetchScreener, fetchWatchlist, removeWatchlist } from "./api";
 import { Backtested, Disclaimer, Freshness } from "./components.jsx";
 import { Icon } from "./icons.jsx";
 
@@ -349,6 +349,11 @@ export function AuthPanel({ onAuthed, onBack, initialInvite }) {
   // official-sounding sentence they liked.
   const [err, setErr] = useState(() => AUTH_ERRORS[
     new URLSearchParams(window.location.search).get("auth_error")] || null);
+  // Asked, not assumed. Null while unknown, so the screen says nothing about its own rules until
+  // it has an answer rather than briefly showing the wrong one.
+  const [reg, setReg] = useState(null);
+  useEffect(() => { fetchRegistrationState().then(setReg).catch(() => setReg(null)); }, []);
+  const inviteRequired = reg?.invite_required === true;
   const submit = async () => {
     setErr(null);
     const r = mode === "login" ? await authLogin(email, pw, totp) : await authRegister(email, pw, invite);
@@ -359,17 +364,27 @@ export function AuthPanel({ onAuthed, onBack, initialInvite }) {
     <div className="detail" style={{ maxWidth: 440 }}>
       <button className="back" onClick={onBack}>← back</button>
       <h2>{mode === "login" ? "Log in" : "Create account"}</h2>
-      <div className="meta">Invite-only. Free tier sees signals on a 48-hour delay; paid tiers see them live.</div>
+      <div className="meta">
+        {mode === "register" && reg
+          ? `${reg.note} Free tier sees signals on a 48-hour delay; paid tiers see them live.`
+          : "Free tier sees signals on a 48-hour delay; paid tiers see them live."}
+      </div>
       {initialInvite && mode === "register" && <div className="warn" style={{ borderColor: "#2f4a2f", color: "var(--green)", background: "#0f2417" }}>You were referred — register to start a 14-day Pro trial free.</div>}
       <div className="auth-form">
         <input className="search" style={{ width: "100%" }} placeholder="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         <input className="search" style={{ width: "100%" }} type="password" placeholder="password (10+ chars)" value={pw} onChange={(e) => setPw(e.target.value)} />
-        {mode === "register" && <input className="search" style={{ width: "100%" }} placeholder="invite or referral code" value={invite} onChange={(e) => setInvite(e.target.value)} />}
+        {mode === "register" && (
+          <input className="search" style={{ width: "100%" }} value={invite}
+                 placeholder={inviteRequired ? "invite or referral code" : "referral code (optional)"}
+                 onChange={(e) => setInvite(e.target.value)} />
+        )}
         {mode === "login" && <input className="search" style={{ width: "100%" }} placeholder="TOTP code (admins only)" value={totp} onChange={(e) => setTotp(e.target.value)} />}
         <button className="shot-btn" onClick={submit}>{mode === "login" ? "log in" : "register"}</button>
         {err && <div className="warn">{err}</div>}
         <button className="linkish" onClick={() => { setMode(mode === "login" ? "register" : "login"); setErr(null); }}>
-          {mode === "login" ? "have an invite? create an account" : "already have an account? log in"}
+          {mode === "login"
+            ? (inviteRequired ? "have an invite? create an account" : "create an account")
+            : "already have an account? log in"}
         </button>
         {/* Without this, a forgotten password was unrecoverable from the interface: the reset API
             existed but nothing on the login screen pointed at it. */}

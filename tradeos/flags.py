@@ -48,6 +48,17 @@ FLAGS: dict[str, dict] = {
         "description": "Allow new accounts to sign up. Off closes registration for everyone.",
         "default": True,
     },
+    # Two flags rather than one, because they answer different questions and an operator needs
+    # both answers. `registration` is the door; `open_registration` is whether the door needs a
+    # key. Collapsing them would mean the only way to go back to invite-only was to shut signups
+    # entirely, which is not the same decision.
+    "open_registration": {
+        "label": "Signup without an invite",
+        "description": "Allow anyone to create an account. Off requires an invite or referral "
+                       "code, which is how this product ran while it was private. The invite path "
+                       "keeps working either way.",
+        "default": True,
+    },
     "community_writes": {
         "label": "Community posting",
         "description": "Allow comments, reactions, follows and reports. Off makes the community "

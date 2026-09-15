@@ -47,6 +47,11 @@ LIMITS: dict[str, tuple[int, int]] = {
     # than a recoverable mess. Twenty an hour is far more than any honest caller publishes and far
     # less than a loop would.
     "publish": (20, 3600),
+    # Creating an account. Not about load either: registration is now open, and one account can
+    # claim one handle and then seal permanent rows onto a public board. Five an hour per client is
+    # far more than any honest person needs (they register once) and far less than a script would
+    # want. Deliberately tighter than `publish`, because the account is upstream of the damage.
+    "register": (5, 3600),
 }
 
 _buckets: dict[tuple[str, str], list[float]] = {}

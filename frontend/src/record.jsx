@@ -36,7 +36,7 @@ function Header({ caller }) {
         <div className="rc-handle num">@{caller.handle}</div>
       </div>
       <div className="rc-head-meta">
-        {caller.verified_at ? (
+        {caller.verified_at && (
           <span className="rc-verified">
             <Icon name="shield" size={14} /> verified
             <span className="rc-verified-how">
@@ -54,11 +54,18 @@ function Header({ caller }) {
               </>
             )}
           </span>
-        ) : (
-          <span className="rc-unverified">
-            not yet verified. The record is real and sealed either way; what is unproven is that
-            this handle is the person who publishes elsewhere.
-          </span>
+        )}
+        {/* The sentence itself comes from `record.identity_note` on the server, never from here:
+            it is the same words the server-rendered /r/{handle} share page prints, and two copies
+            of a claim about what we have and have not verified would drift -- with the copy that
+            drifts being the one that overstates.
+
+            Shown for a verified caller too, unless they are one of ours. A badge earned by proving
+            control of a newsletter is not an identity check, and registration is open now, so
+            there is a real difference between "proved they run that Substack" and "we know who
+            this is". The house records are exempt because "verified as ours" already says it. */}
+        {!caller.is_house && !(caller.verified_at && caller.account_verified) && (
+          <span className="rc-unverified">{caller.identity_note}</span>
         )}
         {/* Checked here as well as at the write path. React escapes an attribute value but does
             not restrict the SCHEME, so `javascript:` in an href survives to something a reader can

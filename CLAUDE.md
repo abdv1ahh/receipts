@@ -209,7 +209,7 @@ frontend/src/             React, one .jsx per surface, imported by App.jsx
   radar.jsx ledger.jsx    the two flagship surfaces
   globe.jsx globe3d.jsx   globe3d is lazy-loaded ONLY; never import it statically
 tests/                    pytest; offline, fixture-driven (tests/fixtures/)
-docs/                     audit, bugs, dead_code, plan, state, progress/, decision-log,
+docs/                     audit, bugs, dead_code, known_gaps, plan, state, progress/, decision-log,
                           threat-models/, runbooks/
 content/                  seed content for the learning library
 deploy/                   Caddyfile for the production compose file

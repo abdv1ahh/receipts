@@ -180,19 +180,66 @@ def recent_misses(caller_id: int, limit: int, conn: psycopg.Connection) -> list[
                 for r in cur.fetchall()]
 
 
+# What a reader is told about WHO holds a handle, in one place so both the React record page and
+# the server-rendered share page say the same words. A formatter duplicated across surfaces drifts,
+# and the copy that drifts is the one that overstates (CLAUDE.md 0b2).
+#
+# Two independent things are unproven and they are usually confused:
+#
+#   AUDIENCE    `callers.verified_at` — has this person shown they control the newsletter, site or
+#               account they claim? The flow exists; the reviewer queue has no interface yet.
+#   ACCOUNT     `users.email_verified_at` — has anyone confirmed the address behind the login? With
+#               no SMTP configured there is no verification flow at all, so this is false for every
+#               human caller and will stay false until mail is configured. Registration is open, so
+#               saying nothing would leave a reader assuming more than we know.
+#
+# The sentence has to carry the distinction that matters more than either: the CALLS are sealed and
+# checkable whatever the identity turns out to be. An unverified identity is a reason to discount
+# who is speaking, not a reason to doubt the record.
+_IDENTITY_HOUSE = ("This is one of our own records, published by our signal engine rather than by "
+                   "a person.")
+_IDENTITY_UNVERIFIED = (
+    "Nobody has verified who holds this handle. There is no email confirmation on this account and "
+    "the audience link has not been proved, so treat the identity as unconfirmed. The calls "
+    "themselves are sealed and every hash can be recomputed here, which is the part that does not "
+    "depend on trusting them or us.")
+_IDENTITY_AUDIENCE_ONLY = (
+    "This handle has proved it controls the audience it claims. The email address behind the "
+    "account has not been confirmed — there is no mail flow configured yet — so that part of the "
+    "identity is still unverified.")
+
+
+def identity_note(is_house: bool, audience_verified: bool, account_verified: bool) -> str:
+    """The one sentence a reader gets about who is speaking. Pure."""
+    if is_house:
+        return _IDENTITY_HOUSE
+    if audience_verified and not account_verified:
+        return _IDENTITY_AUDIENCE_ONLY
+    if audience_verified:
+        return "This handle has proved it controls the audience it claims."
+    return _IDENTITY_UNVERIFIED
+
+
 def caller(handle: str, conn: psycopg.Connection) -> dict | None:
     with conn.cursor() as cur:
-        cur.execute("""SELECT id, user_id, handle, display_name, bio, kind, is_house, audience_url,
-                              verified_at, verification_method, verification_evidence_url,
-                              created_at
-                         FROM callers WHERE lower(handle) = lower(%s)""", (handle,))
+        cur.execute("""SELECT c.id, c.user_id, c.handle, c.display_name, c.bio, c.kind,
+                              c.is_house, c.audience_url, c.verified_at, c.verification_method,
+                              c.verification_evidence_url, c.created_at,
+                              u.email_verified_at IS NOT NULL
+                         FROM callers c
+                         LEFT JOIN users u ON u.id = c.user_id
+                        WHERE lower(c.handle) = lower(%s)""", (handle,))
         r = cur.fetchone()
     if not r:
         return None
+    # `user_id IS NULL` for the two house callers, so the LEFT JOIN yields NULL rather than False.
+    account_verified = bool(r[12])
     return {"id": r[0], "user_id": r[1], "handle": r[2], "display_name": r[3], "bio": r[4],
             "kind": r[5], "is_house": r[6], "audience_url": r[7],
             "verified_at": r[8].isoformat() if r[8] else None, "verification_method": r[9],
-            "verification_evidence_url": r[10], "created_at": r[11].isoformat()}
+            "verification_evidence_url": r[10], "created_at": r[11].isoformat(),
+            "account_verified": account_verified,
+            "identity_note": identity_note(r[6], r[8] is not None, account_verified)}
 
 
 def board(conn: psycopg.Connection) -> list[dict]:

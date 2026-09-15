@@ -145,10 +145,34 @@ def audit(conn: psycopg.Connection, actor: str | None, action: str, obj: str | N
 # ------------------------------------------------------------------ register / login
 
 def register(conn: psycopg.Connection, email: str, password: str, invite_code: str,
-             ip: str | None = None, ua: str | None = None) -> tuple[str, dict]:
+             ip: str | None = None, ua: str | None = None,
+             require_invite: bool = True) -> tuple[str, dict]:
+    """Create an account and return (session token, user).
+
+    `require_invite` DEFAULTS TO TRUE, which is fail-closed on purpose: this function is called
+    from one route that reads the `open_registration` flag, and any future caller that forgets to
+    pass it gets the private-product behaviour rather than silently opening the door.
+
+    Three cases, and the middle one is the interesting one:
+
+      a code is given and it resolves    consumed as a single-use invite, or credited as another
+                                         user's referral. Works whether or not one was required.
+      a code is given and it does not    REFUSED, even when none was required. Someone who types a
+                                         code believes they used it; dropping it silently costs
+                                         them a referral reward they think they earned and costs
+                                         the referrer their credit. Same rule `calls.validate`
+                                         applies to a field it does not recognise.
+      no code is given                   allowed when `require_invite` is False, refused otherwise.
+    """
     if is_weak_password(password):
         raise AuthError("password too short or too common")
     email = email.strip().lower()
+    invite_code = (invite_code or "").strip()
+    if not invite_code and require_invite:
+        # Checked before the INSERT rather than after it. The old order created the user, failed
+        # the invite lookup, and relied on `conn.rollback()` to undo it — which worked, but meant
+        # the ordinary "no code" path ran a password hash and a write for nothing.
+        raise AuthError("an invite code is required to create an account right now")
     with conn.cursor() as cur:
         try:
             cur.execute("INSERT INTO users (email, password_hash) VALUES (%s, %s) RETURNING id, tier",
@@ -157,18 +181,19 @@ def register(conn: psycopg.Connection, email: str, password: str, invite_code: s
             conn.rollback()
             raise AuthError("email already registered") from exc
         uid, tier = cur.fetchone()
-        cur.execute("UPDATE invites SET used_by = %s, used_at = now() WHERE code = %s AND used_by IS NULL",
-                    (uid, invite_code))
         referred_by = None
-        if cur.rowcount != 1:
-            # not a single-use invite — it may be another user's reusable referral code
-            cur.execute("SELECT id FROM users WHERE referral_code = %s", (invite_code,))
-            ref = cur.fetchone()
-            if not ref:
-                conn.rollback()
-                raise AuthError("invalid or already-used invite code")
-            referred_by = ref[0]
-            cur.execute("UPDATE users SET referred_by = %s WHERE id = %s", (referred_by, uid))
+        if invite_code:
+            cur.execute("UPDATE invites SET used_by = %s, used_at = now() "
+                        "WHERE code = %s AND used_by IS NULL", (uid, invite_code))
+            if cur.rowcount != 1:
+                # not a single-use invite — it may be another user's reusable referral code
+                cur.execute("SELECT id FROM users WHERE referral_code = %s", (invite_code,))
+                ref = cur.fetchone()
+                if not ref:
+                    conn.rollback()
+                    raise AuthError("invalid or already-used invite code")
+                referred_by = ref[0]
+                cur.execute("UPDATE users SET referred_by = %s WHERE id = %s", (referred_by, uid))
         token = _create_session(cur, uid, ip, ua)
     conn.commit()
     if referred_by is not None:

@@ -163,6 +163,10 @@ export const revokeKey = (id) => fetch(`/api/keys/${id}`, { method: "DELETE" }).
 export const authMe = () => get("/api/auth/me");
 export const authLogin = (email, password, totp_code) => post("/api/auth/login", { email, password, totp_code: totp_code || null });
 export const authRegister = (email, password, invite_code) => post("/api/auth/register", { email, password, invite_code });
+// Whether an account can be created at all, and whether a code is needed. The auth screen used to
+// print "Invite-only." as a hardcoded string; once the flag is runtime-settable that sentence is a
+// guess, and a signup screen is the worst place in the product to guess wrong about itself.
+export const fetchRegistrationState = () => get("/api/auth/registration");
 export const authLogout = () => fetch("/api/auth/logout", { method: "POST" }).then((r) => r.json());
 
 // ------------------------------------------------------------------ Receipts
