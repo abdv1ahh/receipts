@@ -49,15 +49,28 @@ def _first_ge(days: list[date], target: date) -> date | None:
 def excess_return(sym: Series, spy: Series, as_of_day: date, horizon_days: int):
     """Excess return vs SPY over the horizon, or None if the pair cannot be resolved (missing
     price history, or the horizon has not closed). The second element flags WHY it is None so
-    the driver can separate 'horizon still open' from 'excluded for missing price history'."""
+    the driver can separate 'horizon still open' from 'excluded for missing price history'.
+
+    FOUR reasons, not two, and the split is load bearing. Two of them are facts about the SUBJECT
+    and two are facts about OUR BENCHMARK INGESTION, and a caller cannot be held to the second
+    kind. This used to return `no_entry_price` both when the subject had no session after the
+    claim and when the benchmark was missing that one session; Receipts read the merged answer as
+    a permanent property of the subject and sealed `unscoreable` on a healthy, liquid symbol
+    because SPY had a single hole -- with a note naming the wrong ticker, and the append-only
+    trigger making both unchangeable. Whose gap it is has to survive the return statement.
+    """
     entry = _first_gt(sym.days, as_of_day)          # first trading day strictly after as_of
-    if entry is None or entry not in spy.close:
-        return None, "no_entry_price"
+    if entry is None:
+        return None, "no_entry_price"                  # the SUBJECT has no session after as_of
+    if entry not in spy.close:
+        return None, "no_benchmark_entry_price"        # ours: the benchmark is missing that session
     target = entry + timedelta(days=horizon_days)
     sym_exit = _first_ge(sym.days, target)
+    if sym_exit is None:
+        return None, "horizon_open_or_delisted"        # the SUBJECT has not reached the horizon
     spy_exit = _first_ge(spy.days, target)
-    if sym_exit is None or spy_exit is None:
-        return None, "horizon_open_or_delisted"
+    if spy_exit is None:
+        return None, "no_benchmark_exit_price"         # ours: the benchmark has not reached it
     sym_ret = sym.close[sym_exit] / sym.close[entry] - 1.0
     spy_ret = spy.close[spy_exit] / spy.close[entry] - 1.0
     return round(sym_ret - spy_ret, 6), "ok"

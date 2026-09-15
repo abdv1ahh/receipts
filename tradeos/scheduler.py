@@ -286,8 +286,74 @@ def is_due(last_success: datetime | None, interval_s: int, now: datetime | None 
 
 def _last_success(conn, job: str) -> datetime | None:
     with conn.cursor() as cur:
-        cur.execute("SELECT max(finished_at) FROM job_runs WHERE job=%s AND status='ok'", (job,))
+        # 'warning' counts as having run. A warning means the job completed and produced nothing,
+        # not that it needs retrying sooner — and treating it as never-succeeded would make a job
+        # in warning run on every single tick, which is the opposite of what an alarm should do.
+        cur.execute("SELECT max(finished_at) FROM job_runs WHERE job=%s AND status IN ('ok', "
+                    "'warning')", (job,))
         return cur.fetchone()[0]
+
+
+# ------------------------------------------------------------------ the zero-output alarm
+#
+# `job_runs.status` was 'ok' | 'error'. So a job that ran, found work, and did none of it was
+# recorded exactly like a job that succeeded — and this codebase has already paid for that once:
+# five weeks of green while the claim engine produced nothing, because "did not crash" and "did
+# its job" were the same value. The Part A proof run reproduced it exactly, with `run_job`
+# returning status ok on a run that resolved 0 of 4 due calls.
+#
+# Which detail key counts as a job's OUTPUT. Only jobs listed here can warn; the rest are
+# unchanged, because a threshold invented for a job nobody has thought about is noise, and an
+# alarm that cries wolf gets switched off. `resolve_calls` first, since it is the one whose silence
+# costs a caller their record.
+OUTPUT_KEYS = {"resolve_calls": "resolved"}
+
+
+def _barren(detail: dict, key: str) -> bool:
+    """True if this run HAD work to do and produced none of its output.
+
+    The distinction between barren and idle is what makes the alarm worth having. A board with no
+    open calls legitimately scores nothing every six hours forever; warning on that would leave the
+    status permanently amber and teach the operator to ignore it, which is worse than no alarm. A
+    job says it was idle by returning `nothing_due` or `skipped`, both of which already exist.
+    """
+    if detail.get("nothing_due") or detail.get("skipped"):
+        return False
+    return not detail.get(key)
+
+
+def run_status(job: str, detail: dict, previous: dict | None) -> str:
+    """'ok' or 'warning' for a run that did not raise. Pure.
+
+    Two ways to warn, and they are deliberately different in urgency:
+
+      NAMED FAULT.   The job returned a `warning` key — it knows what is wrong and says so. Warns
+                     on the FIRST run, because waiting for a second would delay the one signal
+                     that means "stop and look". `resolve_due` sets this when it refuses a batch.
+      SUSPICIOUS     Two consecutive barren runs. One barren run can be a race with an ingestion
+      SILENCE.       pass that is still working; two in a row is a pattern.
+    """
+    if detail.get("warning"):
+        return "warning"
+    key = OUTPUT_KEYS.get(job)
+    if key is None:
+        return "ok"
+    if _barren(detail, key) and previous is not None and _barren(previous, key):
+        return "warning"
+    return "ok"
+
+
+def _previous_detail(conn, job: str) -> dict | None:
+    """The last non-error run's detail for this job, or None if there has never been one.
+
+    Errors are skipped rather than counted as barren: a run that raised has no output dict to
+    judge, and it is already recorded as `error`, which is louder than a warning.
+    """
+    with conn.cursor() as cur:
+        cur.execute("SELECT detail FROM job_runs WHERE job=%s AND status <> 'error' "
+                    "ORDER BY id DESC LIMIT 1", (job,))
+        row = cur.fetchone()
+    return row[0] if row and isinstance(row[0], dict) else None
 
 
 # A URL's query string is where credentials travel (Gemini authenticates with ?key=..., and other
@@ -306,9 +372,13 @@ def run_job(conn, name: str, fn) -> dict:
     """Run one job, recording the attempt in job_runs whether it succeeds or fails (degrade loudly)."""
     started = datetime.now(UTC)
     t0 = time.monotonic()
+    previous = _previous_detail(conn, name) if name in OUTPUT_KEYS else None
     try:
         detail = fn(conn) or {}
-        status = "ok"
+        status = run_status(name, detail, previous)
+        if status == "warning":
+            log.warning("job %s produced nothing: %s", name,
+                        detail.get("warning") or detail.get("note") or "no output on two runs")
     except Exception as exc:
         conn.rollback()
         detail = {"error": type(exc).__name__, "message": redact(str(exc))[:300]}

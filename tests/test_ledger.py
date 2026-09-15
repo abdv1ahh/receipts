@@ -85,8 +85,30 @@ def test_every_reason_excess_return_can_return_has_a_sentence():
     assert excess_return(sym, spy, date(2025, 6, 1), 30)[1] == "no_entry_price"
     # entry exists but the horizon has not closed in the data -> horizon open
     assert excess_return(sym, spy, date(2024, 12, 1), 30)[1] == "horizon_open_or_delisted"
-    for reason in ("no_entry_price", "horizon_open_or_delisted"):
+    # the benchmark's own gaps, which used to arrive wearing the subject's reasons
+    full = Series.from_rows([(date(2025, 1, 2), 10.0), (date(2025, 1, 3), 10.0),
+                             (date(2025, 2, 3), 11.0)])
+    # SPY holds the claim day but not the entry session the subject actually enters on
+    missing_entry = Series.from_rows([(date(2025, 1, 2), 100.0)])
+    assert excess_return(full, missing_entry, date(2025, 1, 2), 30)[1] == "no_benchmark_entry_price"
+    # SPY holds the entry session but stops before the horizon closes
+    missing_exit = Series.from_rows([(date(2025, 1, 3), 100.0)])
+    assert excess_return(full, missing_exit, date(2025, 1, 2), 30)[1] == "no_benchmark_exit_price"
+    for reason in ("no_entry_price", "horizon_open_or_delisted",
+                   "no_benchmark_entry_price", "no_benchmark_exit_price"):
         assert reason in ledger.UNSCOREABLE_REASONS
+
+
+def test_a_benchmark_gap_does_not_wear_the_subject_s_sentence():
+    """The Receipts plane seals on some of these reasons and not others, so the sentences have to
+    be distinguishable by a reader as well as by a `==`."""
+    subject = ledger.UNSCOREABLE_REASONS["no_entry_price"]
+    bench_in = ledger.UNSCOREABLE_REASONS["no_benchmark_entry_price"]
+    bench_out = ledger.UNSCOREABLE_REASONS["no_benchmark_exit_price"]
+    assert subject != bench_in != bench_out
+    for note in (bench_in, bench_out):
+        assert "benchmark" in note
+    assert "benchmark" not in subject
 
 
 def test_a_non_asset_subject_says_what_kind_it_was():

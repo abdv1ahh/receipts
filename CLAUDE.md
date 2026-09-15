@@ -61,7 +61,7 @@ files still read "TradeOSS" to the reader. If you are typing the product's name 
 | DB driver | psycopg (v3, binary) | 3.2.9 |
 | Database | PostgreSQL (Docker `postgres:16`) | 16.14 |
 | HTTP client | httpx | 0.28.1 |
-| Images | Pillow | 10.4.0 |
+| Images | Pillow | 12.3.0 |
 | XML | defusedxml | 0.7.1 |
 | Auth | argon2-cffi, pyotp (TOTP for admins) | 23.1.0 / 2.9.0 |
 | Tests | pytest | 9.0.3 |
@@ -94,7 +94,7 @@ The app is at <http://localhost:8000>. Demo login: `demo@tradeos.app` / `<genera
 ### Tests
 
 ```bash
-make test     # 834 tests, ~1.4s. Offline except the DB-backed authz and Receipts integrity tests
+make test     # 904 tests, ~3.6s. Offline except the DB-backed authz and Receipts integrity tests
 make lint     # ruff; zero errors is the standard
 make dev      # reload-in-place stack; then `make web` for a UI change
 make fix      # ruff --fix
@@ -197,7 +197,7 @@ tradeos/                  the Python package (all backend code)
   watchlist_accounts.py   the consequential-accounts influence list.
   receipts/               THE PRODUCT. chain.py (pure, the wire format) calls.py scoring.py
                           record.py verification.py seed.py context.py
-  migrations/             001..035 ordered .sql; NEVER edit an applied migration, and every
+  migrations/             001..036 ordered .sql; NEVER edit an applied migration, and every
                           file MUST insert its own schema_migrations row
   (surface modules)       dashboard, brief, news, social, sentiment, crypto, events,
                           trades, insights, portfolio, community, alerts, admin,
@@ -249,6 +249,35 @@ when a phase touches it, not as a standalone refactor.
 
 The full list, with the reasoning, is in `docs/state.md` §"Things learned". The ones that bite
 fastest:
+
+0z5. **A CALL IS SEALED `unscoreable` IF AND ONLY IF WE HOLD NO PRICE SERIES FOR ITS SYMBOL.**
+   Nothing else may seal — and in particular no gap in OUR BENCHMARK, ever. `excess_return`
+   returned `no_entry_price` both when the SUBJECT had no session after the call and when SPY was
+   missing that one session, and `resolve_call` guarded only `horizon_open_or_delisted`, so the
+   merged answer fell through to `_write(..., "unscoreable")`. Measured 2026-09-15 by the Part A
+   proof run: **one missing SPY session** permanently sealed a healthy MSFT call, with the note
+   *"our price feed for MSFT ends before this call was published"* while MSFT's series ran ten days
+   past it. Backfilling the SPY row did not help; the trigger refuses to change a resolved call,
+   which is the product working as designed on a verdict that should never have been written.
+   `excess_return` now returns **four** reasons — two the subject's, two ours
+   (`no_benchmark_entry_price`, `no_benchmark_exit_price`) — and `resolve_due` **refuses the whole
+   batch** when `benchmark_health` finds a hole or a short tail in SPY. Note a hole exactly AT the
+   exit session is absorbed rather than failed (`exit_day_for` rolls to the next session), which is
+   why the batch-level refusal exists as well as the per-call reason. Open calls now carry
+   `open_reason_code` (migration 036).
+
+0z4. **`scoreability`'s `days_behind` WAS `bench_last - sym_last`, so a lagging BENCHMARK produced a
+   negative number and sailed through `> STALE_TOLERANCE_DAYS`.** Measured: `days_behind: -25,
+   scoreable: true` with SPY twenty-five days stale. The gate could see a lagging symbol and was
+   structurally blind to the far more dangerous case. It is now measured from `max(sym_last,
+   bench_last)`, reports `benchmark_days_behind` separately against the tighter
+   `BENCHMARK_TOLERANCE_DAYS = 3`, and **a lagging benchmark now BLOCKS the publish**
+   (`blocks_publish`) rather than accepting a permanent commitment we cannot price. Related:
+   `scoring._write` ignored `cur.rowcount` behind its `AND verdict IS NULL`, so it returned a
+   fabricated verdict the row never received and `resolve_due` counted it into `job_runs.detail`;
+   it now reports `no_op`. And `job_runs.status` gained **`warning`**: a job that had work and
+   produced none of it on two consecutive runs is no longer recorded as `ok`
+   (`scheduler.run_status`, `OUTPUT_KEYS`). `resolve_calls` stays at 21600s.
 
 0z3. **`signal_clusters` HAS NO DEFINITION FILTER ANYWHERE, and v3/v4 miss each other by luck.**
    30 read sites across 12 live modules query it on `as_of` alone — `/api/clusters` is

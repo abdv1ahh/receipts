@@ -13,7 +13,7 @@ outside our control.
 from __future__ import annotations
 
 import secrets
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 
@@ -529,3 +529,348 @@ def test_a_symbol_whose_feed_is_behind_is_never_sealed_unscoreable(caller, monke
     out = scoring.resolve_call(published["id"], conn)
     assert out.get("status") == "open", out
     assert calls.get(published["id"], conn)["verdict"] is None
+
+
+# ================================================================== THE BENCHMARK-GAP DEFECTS
+#
+# Part A's proof run published twelve genuinely-due calls and hand-verified every figure. Eleven
+# were exactly right. The twelfth finding was worse than a wrong number: ONE MISSING SPY SESSION
+# permanently sealed `unscoreable` on a healthy, liquid symbol, with a note that named the wrong
+# ticker and stated something the database contradicted. Backfilling the SPY row did not help --
+# the trigger refused to correct it, which is the product working as designed on a verdict that
+# should never have been written.
+#
+# The rule these tests pin: A CALL IS SEALED `unscoreable` IF AND ONLY IF WE HOLD NO PRICE SERIES
+# FOR ITS SYMBOL. Every other gap -- the subject's feed behind, the subject's series ended, any
+# gap at all in the benchmark -- leaves the call OPEN with a stored reason, and is retried. An open
+# call is visible, honest and correctable. A wrong verdict is none of those, permanently.
+
+def _weekdays(start: date, n: int) -> list[date]:
+    out, d = [], start
+    while len(out) < n:
+        if d.weekday() < 5:
+            out.append(d)
+        d += timedelta(days=1)
+    return out
+
+
+SESSIONS = _weekdays(date(2026, 1, 5), 160)          # 2026-01-05 .. mid-August, weekdays only
+PUBLISHED = datetime(2026, 2, 2, 14, 30, tzinfo=UTC)  # long past every horizon by test time
+ENTRY = date(2026, 2, 3)                              # first session strictly after publication
+EXIT = date(2026, 3, 5)                               # first session on/after ENTRY + 30 days
+
+
+def _step(first: float, last: float, switch: date = EXIT, days=None) -> Series:
+    return Series.from_rows([(d, last if d >= switch else first) for d in (days or SESSIONS)])
+
+
+def _without(series: Series, *drop: date) -> Series:
+    return Series.from_rows([(d, c) for d, c in series.close.items() if d not in drop])
+
+
+def _benchmark_just_past_horizon() -> list[date]:
+    """Sessions up to the first one after the horizon closes: a benchmark that is fully current."""
+    return [d for d in SESSIONS if d <= EXIT]
+
+
+def _subject_two_days_behind() -> list[date]:
+    """Sessions stopping two short of the horizon -- close enough to the benchmark's last close to
+    read as a feed catching up rather than as a series that has ended."""
+    return [d for d in SESSIONS if d < EXIT][:-1]
+
+
+def _inject(monkeypatch, **series):
+    """Point the scorer's price loader at series we control.
+
+    `prices_eod` holds 2.2M real rows and is shared with every other plane of this product, so the
+    benchmark-gap cases are built by substituting the loader rather than by writing synthetic
+    prices into it. The call itself is real: published through `calls.publish`, sealed into the
+    real chain, resolved by the real scorer.
+    """
+    monkeypatch.setattr(scoring, "_series",
+                        lambda _conn, symbol: series.get(symbol, Series([], {})))
+
+
+def _due(caller_id, conn, symbol=None):
+    return calls.publish(caller_id, {**VALID, "horizon_days": 30,
+                                     **({"symbol": symbol} if symbol else {})},
+                         conn, now=PUBLISHED)
+
+
+# ------------------------------------------------------------------ case 1: the entry session
+
+def test_a_benchmark_missing_the_entry_session_leaves_the_call_open(caller, monkeypatch):
+    """DEFECT 1's regression test, and the most important one in this file.
+
+    Before the fix this sealed `unscoreable` with "our price feed for ABT ends before this call was
+    published" -- while ABT's series ran six months past it.
+    """
+    caller_id, _handle, conn = caller
+    published = _due(caller_id, conn)
+    _inject(monkeypatch, ABT=_step(100.0, 130.0), SPY=_without(_step(200.0, 220.0), ENTRY))
+
+    out = scoring.resolve_call(published["id"], conn)
+    row = calls.get(published["id"], conn)
+
+    assert out["status"] == "open", "a benchmark gap must never seal a verdict"
+    assert row["verdict"] is None
+    assert row["resolved_at"] is None
+    assert row["open_reason_code"] == "waiting_for_benchmark"
+    # The note may NAME the subject — it does, to exonerate it — but it must not BLAME it, which
+    # is exactly what the sealed note used to do: "our price feed for ABT ends before this call
+    # was published", while ABT's series ran six months past it.
+    assert "SPY" in row["open_reason"]
+    assert "not a problem with ABT" in row["open_reason"]
+    assert "our side" in row["open_reason"]
+    assert "feed for ABT ends" not in row["open_reason"]
+
+
+def test_the_same_call_scores_correctly_once_the_benchmark_row_arrives(caller, monkeypatch):
+    """The other half of DEFECT 1: staying open has to be RECOVERABLE, or it is just a slower way
+    of losing the call."""
+    caller_id, _handle, conn = caller
+    published = _due(caller_id, conn)
+
+    _inject(monkeypatch, ABT=_step(100.0, 130.0), SPY=_without(_step(200.0, 220.0), ENTRY))
+    assert scoring.resolve_call(published["id"], conn)["status"] == "open"
+
+    _inject(monkeypatch, ABT=_step(100.0, 130.0), SPY=_step(200.0, 220.0))   # the row arrives
+    out = scoring.resolve_call(published["id"], conn)
+    row = calls.get(published["id"], conn)
+
+    assert out["verdict"] == "hit"
+    assert row["entry_session"] == ENTRY.isoformat()
+    assert row["exit_session"] == EXIT.isoformat()
+    assert row["excess_return"] == pytest.approx(0.20, abs=1e-6)   # +30% subject, +10% benchmark
+    assert row["open_reason_code"] is None, "a resolved call has no open reason"
+
+
+# ------------------------------------------------------------------ case 2: the exit session
+
+def test_a_benchmark_hole_at_the_exit_session_is_absorbed_not_failed(caller, monkeypatch):
+    """Measured, and it corrects the expectation I started with. A hole AT the exit session is not
+    a failure: `exit_day_for` takes the first session on or AFTER the target, so the benchmark
+    simply exits on its next session while the subject exits on its own. That is deliberate --
+    the benchmark gets its own `exit_day_for` precisely so a symbol that does not trade on the
+    exact day cannot silently borrow SPY's date.
+
+    The cost is a benchmark window one session longer than the subject's, which is why a holed
+    benchmark is refused at BATCH level by `benchmark_health` rather than absorbed quietly. Both
+    behaviours are correct and they are not in tension: per call the arithmetic still resolves,
+    per batch we decline to use a series we know has gaps.
+    """
+    caller_id, _handle, conn = caller
+    published = _due(caller_id, conn)
+    _inject(monkeypatch, ABT=_step(100.0, 130.0), SPY=_without(_step(200.0, 220.0), EXIT))
+
+    out = scoring.resolve_call(published["id"], conn)
+    assert out["verdict"] == "hit"
+    assert calls.get(published["id"], conn)["exit_session"] == EXIT.isoformat()
+
+
+def test_a_benchmark_that_stops_before_the_horizon_leaves_the_call_open(caller, monkeypatch):
+    """The exit-side half of DEFECT 1: the benchmark has an entry price but never reaches the
+    horizon. Before the fix this was indistinguishable from the subject's own horizon being open."""
+    caller_id, _handle, conn = caller
+    published = _due(caller_id, conn)
+    short_spy = [d for d in SESSIONS if d < EXIT]
+    _inject(monkeypatch, ABT=_step(100.0, 130.0), SPY=_step(200.0, 220.0, days=short_spy))
+
+    out = scoring.resolve_call(published["id"], conn)
+    row = calls.get(published["id"], conn)
+
+    assert out["status"] == "open"
+    assert row["verdict"] is None
+    assert row["open_reason_code"] == "waiting_for_benchmark"
+
+
+def test_a_benchmark_with_no_rows_at_all_leaves_the_call_open(caller, monkeypatch):
+    """Part A proved `resolve_call` sealed this when called directly -- `resolve_due`'s guard was
+    the only thing standing in front of it, and a guard one layer up is not the same as a rule."""
+    caller_id, _handle, conn = caller
+    published = _due(caller_id, conn)
+    _inject(monkeypatch, ABT=_step(100.0, 130.0))          # SPY resolves to an empty series
+
+    assert scoring.resolve_call(published["id"], conn)["status"] == "open"
+    assert calls.get(published["id"], conn)["verdict"] is None
+
+
+# ------------------------------------------------------------------ case 3: refuse the batch
+
+def test_a_holed_benchmark_refuses_the_whole_batch_and_names_the_dates(caller, monkeypatch):
+    """Refusing to score is always recoverable. Sealing wrongly is not, so the batch stops."""
+    caller_id, _handle, conn = caller
+    published = [_due(caller_id, conn) for _ in range(3)]
+    spy = _without(_step(200.0, 220.0), ENTRY, EXIT)
+    _inject(monkeypatch, ABT=_step(100.0, 130.0), SPY=spy)
+    monkeypatch.setattr(scoring, "market_sessions", lambda _conn, _since: SESSIONS)
+
+    out = scoring.resolve_due(conn)
+
+    assert out["resolved"] == 0
+    assert out["refused"] is True
+    assert out["warning"], "a refused batch must reach job_runs as a warning"
+    assert ENTRY.isoformat() in out["missing_benchmark_sessions"]
+    assert EXIT.isoformat() in out["missing_benchmark_sessions"]
+    for p in published:
+        assert calls.get(p["id"], conn)["verdict"] is None
+
+
+def test_a_lagging_benchmark_refuses_the_whole_batch(caller, monkeypatch):
+    """SPY trades every session the market is open, so a short tail is always our ingestion rather
+    than a market fact. CLAUDE.md 0h: SPY is fetched first precisely because of this."""
+    caller_id, _handle, conn = caller
+    published = _due(caller_id, conn)
+    _inject(monkeypatch, ABT=_step(100.0, 130.0),
+            SPY=_step(200.0, 220.0, days=SESSIONS[:40]))
+    monkeypatch.setattr(scoring, "market_sessions", lambda _conn, _since: SESSIONS)
+
+    out = scoring.resolve_due(conn)
+    assert out["refused"] is True and out["resolved"] == 0
+    assert calls.get(published["id"], conn)["verdict"] is None
+
+
+def test_a_healthy_benchmark_does_not_refuse(caller, monkeypatch):
+    """The guard has to be quiet in normal operation or it will be switched off."""
+    caller_id, _handle, conn = caller
+    published = _due(caller_id, conn)
+    _inject(monkeypatch, ABT=_step(100.0, 130.0), SPY=_step(200.0, 220.0))
+    monkeypatch.setattr(scoring, "market_sessions", lambda _conn, _since: SESSIONS)
+
+    out = scoring.resolve_due(conn)
+    assert out.get("refused") is not True
+    assert calls.get(published["id"], conn)["verdict"] == "hit"
+
+
+def test_the_live_benchmark_is_healthy_right_now():
+    """Measured, not assumed: the guard above would block every run if SPY were holed today."""
+    with db.connect() as conn:
+        health = scoring.benchmark_health(conn)
+    assert health["ok"] is True, f"SPY is not healthy: {health}"
+
+
+# ------------------------------------------------------------------ case 4: the no-op write
+
+def test_writing_a_verdict_onto_a_resolved_call_reports_a_no_op(caller, monkeypatch):
+    """`_write`'s UPDATE carries `AND verdict IS NULL` and used to ignore rowcount, so it returned
+    a fabricated verdict the row never received -- and `resolve_due` counted that into
+    `job_runs.detail`. A run that wrote nothing could report hits."""
+    caller_id, _handle, conn = caller
+    published = _due(caller_id, conn)
+    _inject(monkeypatch, ABT=_step(100.0, 130.0), SPY=_step(200.0, 220.0))
+    assert scoring.resolve_call(published["id"], conn)["verdict"] == "hit"
+
+    out = scoring._write(conn, published["id"], "miss", "a verdict this call never received",
+                         {"excess_return": -0.99})
+
+    assert out["no_op"] is True
+    assert out.get("verdict") != "miss"
+    row = calls.get(published["id"], conn)
+    assert row["verdict"] == "hit"
+    assert row["excess_return"] == pytest.approx(0.20, abs=1e-6)
+
+
+def test_resolve_due_counts_no_ops_separately(caller, monkeypatch):
+    caller_id, _handle, conn = caller
+    _due(caller_id, conn)
+    _inject(monkeypatch, ABT=_step(100.0, 130.0), SPY=_step(200.0, 220.0))
+    monkeypatch.setattr(scoring, "market_sessions", lambda _conn, _since: SESSIONS)
+    assert scoring.resolve_due(conn)["resolved"] == 1
+    assert "no_ops" in scoring.resolve_due(conn)
+
+
+# ------------------------------------------------------------------ case 5: the open reason
+
+def test_a_subject_whose_feed_is_merely_behind_says_so(caller, monkeypatch):
+    caller_id, _handle, conn = caller
+    published = _due(caller_id, conn)
+    # The benchmark has reached the horizon; the subject is two sessions short of it. Both series
+    # end in the same week, which is what "the feed is catching up" actually looks like.
+    _inject(monkeypatch, ABT=_step(100.0, 130.0, days=_subject_two_days_behind()),
+            SPY=_step(200.0, 220.0, days=_benchmark_just_past_horizon()))
+
+    assert scoring.resolve_call(published["id"], conn)["status"] == "open"
+    row = calls.get(published["id"], conn)
+    assert row["open_reason_code"] == "waiting_for_subject_price"
+    assert row["open_checked_at"] is not None
+
+
+def test_a_subject_whose_series_ended_long_ago_is_named_as_such(caller, monkeypatch):
+    """Delisted and merely-behind cannot be told apart with certainty, and this is a DISCLOSURE on
+    an editable column rather than a verdict -- which is the only place a heuristic belongs here.
+    CLAUDE.md 0z forbids letting the benchmark settle a VERDICT; it does not forbid saying what the
+    data looks like."""
+    caller_id, _handle, conn = caller
+    published = _due(caller_id, conn)
+    dead = [d for d in SESSIONS if d <= date(2026, 1, 20)]
+    _inject(monkeypatch, ABT=_step(100.0, 130.0, days=dead), SPY=_step(200.0, 220.0))
+
+    assert scoring.resolve_call(published["id"], conn)["status"] == "open"
+    row = calls.get(published["id"], conn)
+    assert row["open_reason_code"] == "subject_series_ended"
+    assert "2026-01-20" in row["open_reason"]
+
+
+def test_the_open_reason_is_replaced_as_the_reason_changes(caller, monkeypatch):
+    """A non-sealed column on purpose: the reason a call is open is a live fact, not a commitment."""
+    caller_id, _handle, conn = caller
+    published = _due(caller_id, conn)
+
+    _inject(monkeypatch, ABT=_step(100.0, 130.0), SPY=_without(_step(200.0, 220.0), ENTRY))
+    scoring.resolve_call(published["id"], conn)
+    assert calls.get(published["id"], conn)["open_reason_code"] == "waiting_for_benchmark"
+
+    _inject(monkeypatch, ABT=_step(100.0, 130.0, days=_subject_two_days_behind()),
+            SPY=_step(200.0, 220.0, days=_benchmark_just_past_horizon()))
+    scoring.resolve_call(published["id"], conn)
+    assert calls.get(published["id"], conn)["open_reason_code"] == "waiting_for_subject_price"
+
+
+def test_no_price_series_at_all_is_still_the_one_thing_that_seals(caller, monkeypatch):
+    """The rule has to have teeth on both sides: an unpriceable symbol is a real, permanent fact
+    about the call and must still be sealed, or the record fills up with rows that never resolve."""
+    caller_id, _handle, conn = caller
+    published = _due(caller_id, conn)
+    _inject(monkeypatch, SPY=_step(200.0, 220.0))          # ABT resolves to an empty series
+
+    out = scoring.resolve_call(published["id"], conn)
+    row = calls.get(published["id"], conn)
+    assert out["verdict"] == "unscoreable"
+    assert row["verdict"] == "unscoreable" and row["resolved_at"] is not None
+    assert "ABT" in row["verdict_note"]
+
+
+# ------------------------------------------------------------------ case 6: the strict floor
+
+def test_the_noise_floor_is_strict_so_exactly_two_percent_is_a_hit():
+    """`docs/receipts_gap_analysis.md` stated this as |excess| <= 2%. The code is `<`, measured.
+    The document was corrected rather than the code: a move that reaches the floor has cleared it."""
+    assert scoring.NOISE_FLOOR == 0.02
+    assert scoring.verdict_for("up", 0.02)[0] == "hit"
+    assert scoring.verdict_for("up", -0.02)[0] == "miss"
+    assert scoring.verdict_for("down", -0.02)[0] == "hit"
+    assert scoring.verdict_for("up", 0.019999)[0] == "inconclusive"
+
+
+def test_a_call_landing_exactly_on_the_floor_resolves_hit(caller, monkeypatch):
+    caller_id, _handle, conn = caller
+    published = _due(caller_id, conn)
+    # +12% subject against +10% benchmark = exactly +2.000000% excess
+    _inject(monkeypatch, ABT=_step(100.0, 112.0), SPY=_step(200.0, 220.0))
+
+    out = scoring.resolve_call(published["id"], conn)
+    row = calls.get(published["id"], conn)
+    assert row["excess_return"] == pytest.approx(0.02, abs=1e-9)
+    assert out["verdict"] == "hit"
+    assert "noise floor" not in (row["verdict_note"] or "")
+
+
+def test_a_note_never_contradicts_itself_at_the_floor(caller):
+    """The note printed "moved +2.00% vs SPY, inside the 2% noise floor" for 0.019959, because
+    {:+.2%} rounds up. On a product whose pitch is that its numbers mean exactly what they say, a
+    self-contradicting sentence is a real defect."""
+    for excess in (0.019959, -0.019992, 0.0199999):
+        verdict, note = scoring.verdict_for("up", excess)
+        assert verdict == "inconclusive"
+        assert "2.00%" not in note, f"{excess} rendered as 2.00% beside a 2% floor: {note}"
+        assert "noise floor" in note

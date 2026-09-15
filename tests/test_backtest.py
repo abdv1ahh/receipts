@@ -83,3 +83,56 @@ def test_wilson_interval_bounds():
     lo, hi = wilson_interval(21, 30)
     assert 0.0 <= lo <= hi <= 1.0
     assert wilson_interval(0, 0) is None
+
+
+# ------------------------------------------------------------------ whose gap is it
+#
+# Part A's proof run found the defect these pin. `excess_return` returned "no_entry_price" both
+# when the SUBJECT had no session after the claim and when the BENCHMARK was missing that one
+# session, and Receipts read the merged answer as a permanent fact about the subject. It sealed
+# `unscoreable` on a healthy, liquid symbol because SPY had a single hole, with a note naming the
+# wrong ticker, and the append-only trigger made both unchangeable.
+#
+# The two causes are opposite in kind: a subject with no price is a fact about the call; a
+# benchmark with no price is a fact about our ingestion. They must never share a reason string.
+
+def _cal(n: int = 180):
+    return [date(2025, 1, 1) + timedelta(days=i) for i in range(n)]
+
+
+def test_a_missing_benchmark_entry_is_not_reported_as_a_missing_subject_entry():
+    days = _cal()
+    sym = Series.from_rows([(d, 100.0) for d in days])
+    spy = Series.from_rows([(d, 200.0) for d in days if d != date(2025, 1, 2)])
+    val, reason = excess_return(sym, spy, date(2025, 1, 1), 30)
+    assert val is None
+    assert reason == "no_benchmark_entry_price"
+    assert reason != "no_entry_price", "the subject is fine; blaming it is the defect"
+
+
+def test_a_missing_benchmark_exit_is_not_reported_as_an_open_subject_horizon():
+    days = _cal()
+    sym = Series.from_rows([(d, 100.0) for d in days])
+    # SPY stops before the horizon closes; the subject reaches it comfortably.
+    spy = Series.from_rows([(d, 200.0) for d in days if d <= date(2025, 1, 10)])
+    val, reason = excess_return(sym, spy, date(2025, 1, 1), 30)
+    assert val is None
+    assert reason == "no_benchmark_exit_price"
+
+
+def test_the_subject_reasons_are_unchanged():
+    """The Ledger plane reads these two strings and its notes are built from them."""
+    days = _cal()
+    spy = Series.from_rows([(d, 200.0) for d in days])
+    ends_early = Series.from_rows([(d, 100.0) for d in days if d <= date(2025, 1, 10)])
+    assert excess_return(ends_early, spy, date(2025, 6, 1), 30)[1] == "no_entry_price"
+    assert excess_return(ends_early, spy, date(2025, 1, 1), 30)[1] == "horizon_open_or_delisted"
+
+
+def test_every_reason_names_exactly_one_side():
+    """A reason that does not say whose gap it is cannot be acted on, and a reader cannot check
+    it against the database."""
+    for reason in ("no_entry_price", "horizon_open_or_delisted"):
+        assert "benchmark" not in reason
+    for reason in ("no_benchmark_entry_price", "no_benchmark_exit_price"):
+        assert "benchmark" in reason

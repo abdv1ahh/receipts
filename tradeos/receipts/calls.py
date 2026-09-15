@@ -42,10 +42,17 @@ DEFAULT_BENCHMARK = "SPY"
 # "up" and "looks good", which carry no information a reader could later hold anyone to.
 MIN_THESIS_CHARS = 40
 
-# How far behind the benchmark a symbol's last close may sit before publishing warns about it.
-# Five sessions is comfortably more than a weekend plus a holiday, so it does not fire on normal
-# calendar gaps, and comfortably less than the eleven day backlog a paced top-up leaves behind.
+# How far behind a symbol's last close may sit before publishing warns about it. Five sessions is
+# comfortably more than a weekend plus a holiday, so it does not fire on normal calendar gaps, and
+# comfortably less than the eleven day backlog a paced top-up leaves behind.
 STALE_TOLERANCE_DAYS = 5
+
+# The same question asked of the BENCHMARK, and asked far more strictly, because the two are not
+# symmetrical in consequence: one stale symbol affects one call, while a stale benchmark affects
+# every call ever published. SPY is also the one symbol fetched first on every top-up (CLAUDE.md
+# 0h) precisely for that reason, so any lag at all means the pass that protects it failed. Three
+# days covers a long weekend and nothing more.
+BENCHMARK_TOLERANCE_DAYS = 3
 
 _ALLOWED_KEYS = {"symbol", "direction", "horizon_days", "confidence", "thesis"}
 
@@ -116,40 +123,66 @@ def scoreability(symbol: str, conn: psycopg.Connection,
     """
     symbol = (symbol or "").strip().upper()
     if not symbol:
-        return {"scoreable": False, "permanent": True, "symbol": symbol,
+        return {"scoreable": False, "permanent": True, "blocks_publish": True, "symbol": symbol,
                 "reason": "no symbol was given."}
 
     sym_last, sym_rows = _last_close(conn, symbol)
     bench_last, bench_rows = _last_close(conn, benchmark)
 
     if not bench_rows:
-        return {"scoreable": False, "permanent": False, "symbol": symbol,
-                "benchmark": benchmark, "reason":
+        return {"scoreable": False, "permanent": False, "blocks_publish": True,
+                "symbol": symbol, "benchmark": benchmark, "reason":
                 f"there are no {benchmark} prices loaded, and {benchmark} is the benchmark every "
                 f"call is measured against. This is a gap on our side, not a problem with your "
-                f"symbol."}
+                f"symbol. Please publish again shortly."}
 
     if not sym_rows:
-        return {"scoreable": False, "permanent": True, "symbol": symbol,
+        return {"scoreable": False, "permanent": True, "blocks_publish": False, "symbol": symbol,
                 "benchmark": benchmark, "benchmark_last_close": bench_last.isoformat(),
                 "reason": f"no price series is loaded for {symbol}, so a call on it could never "
                           f"be scored. It will be sealed as unscoreable, with this reason, and "
                           f"published anyway so the record stays complete."}
 
-    behind = (bench_last - sym_last).days if (bench_last and sym_last) else 0
-    if behind > STALE_TOLERANCE_DAYS:
-        return {"scoreable": False, "permanent": False, "symbol": symbol,
-                "benchmark": benchmark, "rows": sym_rows,
-                "symbol_last_close": sym_last.isoformat(),
-                "benchmark_last_close": bench_last.isoformat(), "days_behind": behind,
-                "reason": f"{symbol} has {sym_rows} price rows but the newest is {sym_last}, "
-                          f"which is {behind} days behind {benchmark} at {bench_last}. Our price "
-                          f"feed is catching up. The call will publish and stay open, and it will "
-                          f"be scored once the feed reaches its horizon."}
+    # SYMMETRIC, measured from whichever side is more current rather than from the benchmark.
+    #
+    # This was `(bench_last - sym_last).days`, so when the BENCHMARK was the one behind the number
+    # went NEGATIVE and sailed through the `> tolerance` check: the Part A proof run measured
+    # `days_behind: -25, scoreable: true` while SPY was twenty-five days stale. The gate could see
+    # a lagging symbol and was structurally blind to a lagging benchmark, which is the more
+    # dangerous of the two by a wide margin.
+    #
+    # The reference is the newer of the two closes. No extra query, and it directly answers "is
+    # one of these two behind the other". A whole feed that has stalled evenly shows 0 here and is
+    # caught instead by `scoring.benchmark_health`, which compares against the market's sessions.
+    reference = max(sym_last, bench_last)
+    symbol_behind = (reference - sym_last).days
+    benchmark_behind = (reference - bench_last).days
+    common = {"symbol": symbol, "benchmark": benchmark, "rows": sym_rows,
+              "symbol_last_close": sym_last.isoformat(),
+              "benchmark_last_close": bench_last.isoformat(),
+              "days_behind": symbol_behind, "benchmark_days_behind": benchmark_behind}
 
-    return {"scoreable": True, "permanent": False, "symbol": symbol, "benchmark": benchmark,
-            "rows": sym_rows, "symbol_last_close": sym_last.isoformat(),
-            "benchmark_last_close": bench_last.isoformat(), "days_behind": behind,
+    # A lagging benchmark BLOCKS the publish rather than publishing open with a warning. Every
+    # other gap here is about one symbol and costs one call a few hours of waiting; this one means
+    # we cannot price any commitment at all right now. Taking a permanent, sealed commitment while
+    # unable to show the caller a trustworthy entry price against it is the wrong trade, and unlike
+    # a sealed verdict, a refused publish costs them only the time it takes us to catch up.
+    if benchmark_behind > BENCHMARK_TOLERANCE_DAYS:
+        return {**common, "scoreable": False, "permanent": False, "blocks_publish": True,
+                "reason": f"our {benchmark} series ends {bench_last}, which is {benchmark_behind} "
+                          f"days behind {symbol} at {sym_last}. {benchmark} is the benchmark every "
+                          f"call is measured against, so we cannot price a commitment right now. "
+                          f"This is a gap on our side and it is being caught up — please publish "
+                          f"again shortly."}
+
+    if symbol_behind > STALE_TOLERANCE_DAYS:
+        return {**common, "scoreable": False, "permanent": False, "blocks_publish": False,
+                "reason": f"{symbol} has {sym_rows} price rows but the newest is {sym_last}, "
+                          f"which is {symbol_behind} days behind {benchmark} at {bench_last}. Our "
+                          f"price feed is catching up. The call will publish and stay open, and it "
+                          f"will be scored once the feed reaches its horizon."}
+
+    return {**common, "scoreable": True, "permanent": False, "blocks_publish": False,
             "reason": f"{symbol} has {sym_rows} daily closes through {sym_last} and can be scored "
                       f"against {benchmark}."}
 
@@ -207,6 +240,12 @@ def publish(caller_id: int, spec: dict, conn: psycopg.Connection,
         payload, digest = chain.seal(sealed, prev_hash)
 
         score = scoreability(fields["symbol"], conn)
+        if score.get("blocks_publish"):
+            # Refused, not published-and-warned. `blocks_publish` is set only where the fault is
+            # OURS and affects every call equally (no benchmark prices, or a lagging benchmark),
+            # so there is nothing the caller could change about this call to make it work and
+            # nothing we could honestly promise about how it would be scored.
+            raise PublishError([score["reason"]])
         # Only the PERMANENT case is sealed as unscoreable here. See the module docstring for why
         # the operational case must not be.
         verdict = "unscoreable" if score["permanent"] else None
@@ -252,7 +291,7 @@ _LIST_COLUMNS = sql.SQL(", ").join(map(sql.Identifier, (
     "benchmark_symbol", "published_at", "knowable_time", "prev_hash", "content_hash",
     "entry_session", "exit_session", "entry_price", "exit_price", "benchmark_entry",
     "benchmark_exit", "subject_return", "benchmark_return", "excess_return", "verdict",
-    "verdict_note", "resolved_at")))
+    "verdict_note", "resolved_at", "open_reason_code", "open_reason", "open_checked_at")))
 
 
 def _row(r: tuple) -> dict:
@@ -269,6 +308,11 @@ def _row(r: tuple) -> dict:
         "subject_return": num(r[19]), "benchmark_return": num(r[20]),
         "excess_return": num(r[21]), "verdict": r[22], "verdict_note": r[23],
         "resolved_at": r[24].isoformat() if r[24] else None,
+        # Why a past-horizon call is still open. On the row rather than only in a log line: a call
+        # thirty days past its horizon showing no verdict and no explanation reads, to a sceptic,
+        # exactly like a result being withheld.
+        "open_reason_code": r[25], "open_reason": r[26],
+        "open_checked_at": r[27].isoformat() if r[27] else None,
     }
 
 
@@ -285,6 +329,9 @@ _SUMMARY_FIELDS = frozenset({
     # explanation — a reader seeing that chip with no reason beside it has been told less than
     # nothing. The weight was never here: it was `thesis`, several hundred characters per call.
     "verdict_note",
+    # And the open-reason trio, for the same reason `verdict_note` is here: an open row past its
+    # horizon with nothing beside it is the one state a reader is entitled to be suspicious of.
+    "open_reason_code", "open_reason", "open_checked_at",
 })
 
 
