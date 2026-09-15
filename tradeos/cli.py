@@ -587,6 +587,21 @@ def cmd_preflight(_args) -> None:
         warnings.append("DATABASE_URL uses the dev-default password 'tradeos' — set a strong POSTGRES_PASSWORD in production.")
     if "@" not in os.environ.get("SEC_USER_AGENT", ""):
         problems.append("SEC_USER_AGENT must be like 'YourName you@example.com' (SEC fair-access policy).")
+    # The share card's absolute URL. A hard problem rather than a warning: unset, every `og:image`
+    # and `og:url` this instance emits points at localhost, so a caller's shared record renders as
+    # a bare text link on every platform — which is the whole distribution model, silently off.
+    if not config.public_base_url_configured():
+        problems.append("PUBLIC_BASE_URL is not set, so every share card and og:url would point at "
+                        "http://localhost:8000. Set it to the origin this instance is reachable at, "
+                        "e.g. https://rhumb.example.")
+    else:
+        try:
+            base = config.public_base_url()
+            if base.startswith("http://") and "localhost" not in base and "127.0.0.1" not in base:
+                warnings.append(f"PUBLIC_BASE_URL is {base} — an http:// origin means link "
+                                f"previews are fetched over plaintext and some platforms skip them.")
+        except config.ConfigError as e:
+            problems.append(str(e))
     # Validate the whole provider chain, not just its first entry. This check used to reject
     # 'openai' (which ships) and offer 'anthropic' (which does not) — a confidently wrong check is
     # worse than no check, because it tells an operator a working config is broken.

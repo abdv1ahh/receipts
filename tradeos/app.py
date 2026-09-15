@@ -67,6 +67,7 @@ from . import (
 from . import scheduler as scheduler_mod
 from . import social as social_mod
 from .receipts import calls as receipts_calls
+from .receipts import card as receipts_card
 from .receipts import chain as receipts_chain
 from .receipts import record as receipts_record
 from .receipts import scoring as receipts_scoring
@@ -3058,6 +3059,44 @@ def library_entry(slug: str) -> dict:
 
 # --------------------------------------------------------------- shareable cards (Slice C)
 
+def _og_tags(*, title: str, description: str, path: str, image_path: str,
+             image_type: str = "image/png") -> str:
+    """The Open Graph and Twitter block, built once for every share page.
+
+    EVERY URL HERE IS ABSOLUTE, and that is the defect this exists to fix. `og:image` on both share
+    pages pointed at a RELATIVE path -- `/api/card/receipt/x.svg` -- and the protocol requires an
+    absolute URL, so Facebook, X, LinkedIn, Slack and Discord all declined to resolve it against
+    the page. Compounding it, the image was an SVG, which no major platform renders as a preview.
+    Either defect alone produces a bare text link, both were present, and the mechanism the whole
+    growth model rests on had therefore never worked once.
+
+    `og:image:width` and `:height` are declared because a scraper that knows the dimensions before
+    it fetches can lay out the card immediately; without them some platforms render a small
+    thumbnail on first sight and only upgrade it after a later crawl, which is the one impression
+    that matters shown at its worst.
+
+    Built in one place so the two pages cannot drift -- `/s/{symbol}` had this bug because
+    `/r/{handle}` did, copied verbatim.
+    """
+    base = config.public_base_url()
+    e = receipts_card._xml_escape
+    return (f'<meta property="og:type" content="website">\n'
+            f'<meta property="og:site_name" content="{e(config.brand_name())}">\n'
+            f'<meta property="og:title" content="{e(title)}">\n'
+            f'<meta property="og:description" content="{e(description)}">\n'
+            f'<meta property="og:url" content="{e(base + path)}">\n'
+            f'<meta property="og:image" content="{e(base + image_path)}">\n'
+            f'<meta property="og:image:type" content="{e(image_type)}">\n'
+            f'<meta property="og:image:width" content="{receipts_card.WIDTH}">\n'
+            f'<meta property="og:image:height" content="{receipts_card.HEIGHT}">\n'
+            f'<meta property="og:image:alt" content="{e(title)}">\n'
+            f'<meta name="twitter:card" content="summary_large_image">\n'
+            f'<meta name="twitter:title" content="{e(title)}">\n'
+            f'<meta name="twitter:description" content="{e(description)}">\n'
+            f'<meta name="twitter:image" content="{e(base + image_path)}">\n'
+            f'<meta name="twitter:image:alt" content="{e(title)}">\n'
+            f'<link rel="canonical" href="{e(base + path)}">')
+
 def _card_data(cur, symbol: str) -> dict | None:
     ent = _resolve_symbol(cur, symbol)
     if ent is None:
@@ -3099,12 +3138,14 @@ def share_page(symbol: str) -> str:
     brand = config.brand_name()
     title = f"{sym} · Smart Money Score {d['score']}" if d.get("score") is not None else f"{sym} · {brand}"
     card = f"/api/card/{sym}.svg"
+    # This page's card is still SVG -- it belongs to the convergence plane, which is being retired,
+    # so it gets the absolute URLs and the tag block and no new renderer. The tags are what was
+    # broken; a PNG here would be work on a surface scheduled for deletion.
+    tags = _og_tags(title=title, description=d.get("headline") or "",
+                    path=f"/s/{sym}", image_path=card, image_type="image/svg+xml")
     return f'''<!doctype html><html lang="en"><head><meta charset="utf-8">
 <title>{e(title)}</title>
-<meta property="og:title" content="{e(title)}">
-<meta property="og:description" content="{e(d.get('headline') or '')}">
-<meta property="og:image" content="{card}">
-<meta name="twitter:card" content="summary_large_image">
+{tags}
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>body{{background:#090b11;color:#d7e0ee;font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:flex;flex-direction:column;align-items:center;gap:22px;padding:44px 16px}}img{{max-width:100%;width:640px;border-radius:16px;border:1px solid #222b3a}}a{{color:#5b8cff;text-decoration:none;font-weight:600;font-size:18px}}p{{color:#7a8699;font-size:13px;max-width:560px;text-align:center;line-height:1.5}}</style>
 </head><body>
@@ -3254,7 +3295,16 @@ def my_caller(response: Response, tos_session: str | None = Cookie(None)) -> dic
             response.status_code = 401
             return {"error": "sign in first"}
         caller = _caller_for_user(conn, user["id"])
+        published = 0
+        if caller:
+            with conn.cursor() as cur:
+                cur.execute("SELECT count(*) FROM calls WHERE caller_id = %s", (caller["id"],))
+                published = cur.fetchone()[0]
         return {"caller": caller,
+                # How many calls exist, so the publish surface can decide whether a panel about
+                # PROVING an identity makes sense yet. `summary.counts` cannot answer it: a caller
+                # with only unscoreable calls has zero in every scoreable bucket.
+                "published": published,
                 "summary": receipts_record.summary(caller["id"], conn) if caller else None,
                 # Served rather than typed into the client. A second copy of this sentence is the
                 # one that would drift, and it is the sentence that keeps this an analytics tool.
@@ -3481,23 +3531,63 @@ def receipts_board() -> dict:
                 "disclaimer": RECEIPTS_DISCLAIMER}
 
 
-@app.get("/api/card/receipt/{handle}.svg")
-def receipt_card(handle: str) -> Response:
-    """The share card for a record. Public, and it may never print a rate on a gated record."""
+def _receipt_card_args(handle: str) -> dict | None:
+    """Everything either renderer needs, read once. None if no such handle.
+
+    Shared so the PNG and the SVG cannot drift into showing different records for the same
+    caller — and in particular so the sample gate is applied once. `record.summary` refuses to
+    return a rate below the gate, so neither renderer can print one that has not cleared it.
+    """
     with db.connect() as conn:
         caller = receipts_record.caller(handle, conn)
         if not caller:
-            return Response(content="<svg xmlns='http://www.w3.org/2000/svg'/>",
-                            media_type="image/svg+xml", status_code=404)
+            return None
         summary = receipts_record.summary(caller["id"], conn)
         links = len(receipts_calls.for_chain(caller["id"], conn))
-    svg = presentation.receipt_card_svg(
-        handle=caller["handle"], display_name=caller["display_name"], counts=summary["counts"],
-        hit_rate=summary["hit_rate"], hit_rate_ci=summary["hit_rate_ci"],
-        resolved_scoreable=summary["resolved_scoreable"], links=links,
-        brand=config.brand_name(), verified=caller["verified_at"] is not None,
-        is_house=caller["is_house"])
-    return Response(content=svg, media_type="image/svg+xml",
+    return {"handle": caller["handle"], "display_name": caller["display_name"],
+            "counts": summary["counts"], "hit_rate": summary["hit_rate"],
+            "hit_rate_ci": summary["hit_rate_ci"],
+            "resolved_scoreable": summary["resolved_scoreable"], "links": links,
+            "brand": config.brand_name(), "verified": caller["verified_at"] is not None,
+            "is_house": caller["is_house"]}
+
+
+@app.get("/api/card/receipt/{handle}.png")
+def receipt_card_png(handle: str) -> Response:
+    """THE share card: what a link preview actually renders.
+
+    PNG rather than SVG because no major platform renders SVG as a preview image — X's card spec
+    accepts JPG, PNG, WEBP and GIF, and Facebook's scraper does not accept SVG either. The SVG
+    below is kept for the page body, where a browser renders it sharper at any size.
+    """
+    args = _receipt_card_args(handle)
+    if not args:
+        # A 1x1 rather than an empty body: a scraper that follows og:image for a deleted handle
+        # should get a valid image it can discard, not a decode error.
+        return Response(content=receipts_card.receipt_card_png(
+            handle=handle, display_name="No record here", counts={}, hit_rate=None,
+            hit_rate_ci=None, resolved_scoreable=0, links=0, brand=config.brand_name()),
+            media_type="image/png", status_code=404)
+    return Response(content=receipts_card.receipt_card_png(**args), media_type="image/png",
+                    headers={"Cache-Control": "public, max-age=300"})
+
+
+@app.get("/api/card/receipt/{handle}.svg")
+def receipt_card(handle: str) -> Response:
+    """The same card as SVG, for the page body. Public, and it may never print a rate on a gated
+    record.
+
+    Served from `receipts.card` rather than `presentation`, which is not tidying: `presentation`
+    opens with `from .signals.convergence import DEFAULT_PARAMS`, so this route imported the dead
+    convergence plane. `docs/receipts_gap_analysis.md` §5.3 found it by measurement after
+    `docs/receipts_protected.md` had recorded `signals/` as not a dependency -- the dependency ran
+    through the ROUTE, which a package graph rooted at `receipts/` cannot see.
+    """
+    args = _receipt_card_args(handle)
+    if not args:
+        return Response(content="<svg xmlns='http://www.w3.org/2000/svg'/>",
+                        media_type="image/svg+xml", status_code=404)
+    return Response(content=receipts_card.receipt_card_svg(**args), media_type="image/svg+xml",
                     headers={"Cache-Control": "public, max-age=300"})
 
 
@@ -3511,7 +3601,11 @@ def receipt_share_page(handle: str) -> str:
     with db.connect() as conn:
         caller = receipts_record.caller(handle, conn)
         summary = receipts_record.summary(caller["id"], conn) if caller else None
-    e = presentation._xml_escape
+    # From `receipts.card`, not `presentation`. The escape is one line and duplicating it is the
+    # smaller cost: `presentation` imports `signals.convergence`, so borrowing a helper from it
+    # would leave the Receipts share page holding the dead plane open. The duplicate disappears
+    # when `presentation` does.
+    e = receipts_card._xml_escape
     brand = config.brand_name()
     if not caller:
         return (f'<!doctype html><html lang="en"><head><meta charset="utf-8">'
@@ -3532,13 +3626,14 @@ def receipt_share_page(handle: str) -> str:
     # Escaped like everything else here. The handle regex makes a quote impossible to store today,
     # but that regex lives three hundred lines away in a different function, and a second way to
     # create a caller would break this silently.
+    # PNG in the tags, SVG in the page body: the tags are read by scrapers that will not render
+    # SVG, and the body is read by a browser that renders it sharper than any raster.
+    png = f"/api/card/receipt/{caller['handle']}.png"
     card = e(f"/api/card/receipt/{caller['handle']}.svg")
+    tags = _og_tags(title=title, description=line, path=f"/r/{caller['handle']}", image_path=png)
     return f'''<!doctype html><html lang="en"><head><meta charset="utf-8">
 <title>{e(title)}</title>
-<meta property="og:title" content="{e(title)}">
-<meta property="og:description" content="{e(line)}">
-<meta property="og:image" content="{card}">
-<meta name="twitter:card" content="summary_large_image">
+{tags}
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>body{{background:#05060c;color:#eaecf4;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;display:flex;flex-direction:column;align-items:center;gap:22px;padding:44px 16px}}img{{max-width:100%;width:660px;border-radius:16px;border:1px solid #1b2130}}a{{color:#6e8cff;text-decoration:none;font-weight:600;font-size:18px}}p{{color:#8b93ab;font-size:13px;max-width:600px;text-align:center;line-height:1.6}}</style>
 </head><body>

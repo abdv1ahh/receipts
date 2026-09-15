@@ -25,6 +25,7 @@ try:
     from tradeos import db, presentation
     from tradeos.app import app
     from tradeos.receipts import calls as receipts_calls
+    from tradeos.receipts import card as receipts_card
     _IMPORTS_OK = True
 except Exception:                                             # pragma: no cover
     _IMPORTS_OK = False
@@ -237,7 +238,7 @@ def test_an_ungated_card_shows_the_rate_and_the_chain(client):
 def test_the_card_refuses_a_rate_whenever_one_was_withheld_upstream():
     """`record.summary` returns None for a gated hit rate, and that None is the only signal the
     card needs. Asserted directly so a future caller cannot pass a rate around the gate."""
-    svg = presentation.receipt_card_svg(
+    svg = receipts_card.receipt_card_svg(
         handle="someone", display_name="Someone", counts={"hit": 3, "miss": 2, "inconclusive": 1,
                                                           "unscoreable": 0, "open": 4},
         hit_rate=None, hit_rate_ci=None, resolved_scoreable=5, links=10, brand="Rhumb")
@@ -246,7 +247,7 @@ def test_the_card_refuses_a_rate_whenever_one_was_withheld_upstream():
 
 
 def test_the_card_escapes_what_a_caller_typed():
-    svg = presentation.receipt_card_svg(
+    svg = receipts_card.receipt_card_svg(
         handle="a&b", display_name="<script>alert(1)</script>",
         counts={"hit": 0, "miss": 0, "inconclusive": 0, "unscoreable": 0, "open": 0},
         hit_rate=None, hit_rate_ci=None, resolved_scoreable=0, links=0, brand="Rhumb")
@@ -257,7 +258,7 @@ def test_the_card_escapes_what_a_caller_typed():
 def test_no_card_carries_the_pre_rebrand_name():
     """The share card is the most public string in the product: the image a shared link renders in
     every feed. It had the old name welded in as markup for eight phases."""
-    for svg in (presentation.receipt_card_svg(
+    for svg in (receipts_card.receipt_card_svg(
                     handle="h", display_name="D",
                     counts={"hit": 0, "miss": 0, "inconclusive": 0, "unscoreable": 0, "open": 0},
                     hit_rate=None, hit_rate_ci=None, resolved_scoreable=0, links=0, brand="Rhumb"),

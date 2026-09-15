@@ -480,6 +480,51 @@ function Form({ caller, onPublished, onOpenCall }) {
   );
 }
 
+/** Claiming a handle, at its own address.
+ *
+ *  There was no route for this: the only path was to open "Publish a call", discover you had no
+ *  handle, and meet a claim form where the publish form should have been. Reasonable once you know
+ *  it; odd the first time, and impossible to link to -- which matters because "claim your handle"
+ *  is the one thing this product ever needs to ask a stranger to do.
+ *
+ *  Shares `ClaimHandle` with the publish surface rather than copying it, so the attestation
+ *  checkbox and the https-only audience rule cannot exist in two versions.
+ */
+export function ClaimView({ user, onLogin, onOpenRecord, onNav }) {
+  const [state, setState] = useState(null);
+  const [failed, setFailed] = useState(false);
+
+  const load = () => {
+    setFailed(false);
+    fetchMyCaller().then(setState).catch(() => setFailed(true));
+  };
+  useEffect(() => { if (user) load(); }, [user]);
+
+  if (!user) {
+    return (
+      <EmptyState title="Sign in to claim a handle"
+                  action={<button className="act act-on" onClick={onLogin}>Sign in</button>}>
+        Reading every record is free and needs no account. Holding one needs a handle, so that what
+        you say is attached to a name that keeps it.
+      </EmptyState>
+    );
+  }
+  if (failed) return <LoadError what="your record" onRetry={load} />;
+  if (!state) return <div className="rc-skel"><div className="skel" style={{ width: 300, height: 44 }} /></div>;
+  if (state.caller) {
+    return (
+      <EmptyState title={`You already hold @${state.caller.handle}`}
+                  action={<button className="act act-on" onClick={() => onNav("publish")}>
+                    Publish a call
+                  </button>}>
+        One handle per account, and a handle cannot change once a call has been published under it
+        — it is the address every link you share points at.
+      </EmptyState>
+    );
+  }
+  return <div className="pb-page"><ClaimHandle onClaimed={(c) => onOpenRecord(c.handle)} /></div>;
+}
+
 export function PublishView({ user, onLogin, onOpenCall, onOpenRecord }) {
   const [state, setState] = useState(null);
   const [failed, setFailed] = useState(false);
@@ -520,7 +565,12 @@ export function PublishView({ user, onLogin, onOpenCall, onOpenRecord }) {
           It is still on this page, below, because it is the cheapest credibility a caller can
           earn -- just not before the thing they came to do. */}
       <Form caller={state.caller} onPublished={load} onOpenCall={onOpenCall} />
-      <Verify caller={state.caller} onChanged={load} />
+      {/* Only once something has been published. The panel opens "Your record is live and sealed",
+          which on a screen with zero calls is a sentence contradicting itself -- there is no record
+          yet and nothing has been sealed. It is also the wrong order of business: proving who you
+          are matters once there is something to attach it to. `published` comes from the caller
+          payload rather than a second request. */}
+      {state.published > 0 && <Verify caller={state.caller} onChanged={load} />}
       {/* From the server, never typed here: one sentence, one source, no copy to drift. */}
       <Disclaimer text={state.disclaimer} />
     </div>

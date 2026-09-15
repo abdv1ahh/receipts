@@ -25,7 +25,8 @@ import { OnboardingCard } from "./onboarding.jsx";
 // Surfaces the first-run Radar setup must not cover. `auth` because a signup screen with a
 // configuration card on it is absurd; the Receipts surfaces because the card is about a different
 // product and it was taking their entire first screen on a phone.
-const ONBOARDING_SUPPRESSED = new Set(["auth", "publish", "record", "board", "call", "methodology"]);
+const ONBOARDING_SUPPRESSED = new Set(["auth", "publish", "claim", "record", "board",
+                                       "call", "methodology"]);
 import { ResetView, VerifyView } from "./account.jsx";
 import { GlobeView } from "./globe.jsx";
 import { ExposureView } from "./exposure.jsx";
@@ -33,7 +34,7 @@ import { CalendarView } from "./calendar.jsx";
 import { LedgerView } from "./ledger.jsx";
 import { BoardView } from "./board.jsx";
 import { RecordView, MyRecord } from "./record.jsx";
-import { PublishView } from "./publish.jsx";
+import { ClaimView, PublishView } from "./publish.jsx";
 import { CallDetailView } from "./calldetail.jsx";
 import { ReceiptsMethodologyView } from "./methodology.jsx";
 import { ErrorBoundary, useRoute } from "./shell.jsx";
@@ -137,6 +138,13 @@ function CommandPalette({ onGo, onClose }) {
 // stale bookmark lands somewhere sensible instead of a blank page.
 const ROUTES = new Set([...Object.keys(NAV_LABELS), "auth", "pricing", "notifications",
                         "asset", "profile", "admin", "call",
+                        // ADDRESSABLE, deliberately not on the rail. "Claim a handle" is a
+                        // one-time act, so a permanent nav item for it is dead weight for everyone
+                        // who has already done it -- but it needs a URL, because it is the one
+                        // thing this product ever asks a stranger to do and it could not be linked
+                        // to at all. The publish surface still routes a handle-less caller to the
+                        // same form.
+                        "claim",
                         // Reached from an email. Without these the link fell through to the SPA
                         // catch-all and landed on the marketing page with the token ignored.
                         "verify", "reset",
@@ -448,6 +456,9 @@ export default function App() {
           ) : view === "publish" ? (
             <PublishView user={user} onLogin={() => go("auth")} onOpenCall={openCall}
                          onOpenRecord={openRecord} />
+          ) : view === "claim" ? (
+            <ClaimView user={user} onLogin={() => go("auth")} onOpenRecord={openRecord}
+                       onNav={go} />
           ) : view === "call" ? (
             <CallDetailView callId={callId} onBack={() => window.history.back()}
                             onOpenRecord={openRecord} />

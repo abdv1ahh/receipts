@@ -15,6 +15,24 @@ RUN npm run build
 # --- stage 2: the API image, serving the built bundle from tradeos/static ---
 FROM python:3.12-slim
 WORKDIR /app
+# ONE OS PACKAGE, AND IT IS FOR THE SHARE CARD.
+#
+# `receipts/card.py` renders the Open Graph image with Pillow. Pillow 12 ships a scalable embedded
+# face (Aileron), which is enough to draw a card -- but measured against a private-use codepoint to
+# find its tofu signature, Aileron renders U+00E9 (e-acute) as a BOX, along with the em dash, the
+# bullet, the check mark and every arrow. A caller whose name carries an accent would have seen
+# tofu boxes where their own name should be, on the one asset this product asks them to post. That
+# is precisely the failure that makes a distribution model not work.
+#
+# DejaVu is ~3MB and covers Latin-1, Latin Extended, Greek and Cyrillic, in three families, so the
+# card also regains the serif/mono contrast its SVG twin gets from the browser.
+# `--no-install-recommends` and the cache cleanup keep the layer to what was asked for. This is an
+# OS package, not a Python dependency: `requirements.txt` is untouched and its ten-line rule is not
+# in play.
+RUN apt-get update \
+ && apt-get install --no-install-recommends -y fonts-dejavu-core \
+ && apt-get clean \
+ && find /var/lib/apt/lists -type f -delete
 COPY requirements.txt .
 # pip is upgraded first: the version bundled with the base image carries its own advisories, and
 # although it only ever runs at build time (the container runs as a non-root user that never

@@ -13,6 +13,44 @@ def database_url() -> str:
     return url
 
 
+# The URL this instance is reachable at from OUTSIDE it, and the reason it has to exist.
+#
+# There was no base URL anywhere in this repository. Measured across `config.py`, `app.py` and
+# `docker-compose.yml`, the only matches for BASE_URL / SITE_URL / PUBLIC_URL were
+# `OPENAI_BASE_URL` and a per-request `request.base_url` used by Stripe checkout. The consequence
+# was that `og:image` on `/r/{handle}` and `/s/{symbol}` pointed at a RELATIVE path, which the Open
+# Graph protocol does not accept, so a shared record produced a bare text link on every platform
+# and the entire distribution model had never worked once.
+#
+# NOT derived from `request.base_url`. That comes from the Host header, which any client can set,
+# and this value is written into a cached public meta tag — so it would be a host-header injection
+# into the one artefact this product asks strangers to trust. Stripe's use of `request.base_url` is
+# a redirect the user immediately follows and is a different risk.
+_DEV_BASE_URL = "http://localhost:8000"
+
+
+def public_base_url() -> str:
+    """The absolute origin, with no trailing slash. Falls back to localhost for development.
+
+    Deliberately does NOT raise when unset, unlike `database_url`: a missing base URL must not stop
+    a developer running the app, and the cost of being wrong is an unresolvable preview image
+    rather than a leaked secret or a corrupted write. `preflight` fails on it instead, which is
+    where a production misconfiguration belongs — see `public_base_url_configured`.
+    """
+    url = (os.environ.get("PUBLIC_BASE_URL") or "").strip().rstrip("/")
+    if not url:
+        return _DEV_BASE_URL
+    if not url.startswith(("http://", "https://")):
+        # Refused rather than coerced. Guessing the scheme would silently emit `http://` for a
+        # site served over TLS, and a mixed-content preview image is not fetched at all.
+        raise ConfigError(f"PUBLIC_BASE_URL must start with http:// or https:// (got {url!r})")
+    return url
+
+
+def public_base_url_configured() -> bool:
+    return bool((os.environ.get("PUBLIC_BASE_URL") or "").strip())
+
+
 def _flag(name: str) -> bool:
     return os.environ.get(name, "false").strip().lower() in ("1", "true", "yes")
 

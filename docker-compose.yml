@@ -22,6 +22,10 @@ services:
       DATABASE_URL: postgresql://tradeos:${POSTGRES_PASSWORD}@db:5432/tradeos
       UPLOADS_DIR: /app/uploads
       SEC_USER_AGENT: ${SEC_USER_AGENT}
+      # The origin this instance is reachable at from outside. Every og:image and
+      # og:url is built from it, so unset means every shared record previews as a
+      # bare text link. Enumerated in BOTH services (CLAUDE.md 0i).
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
       TIINGO_API_KEY: ${TIINGO_API_KEY:-}
       # Alpaca is the price source; Tiingo above is kept as a fallback. Both halves of the
       # Alpaca credential are required — a key id without its secret is an anonymous client
@@ -63,6 +67,10 @@ services:
     environment:
       DATABASE_URL: postgresql://tradeos:${POSTGRES_PASSWORD}@db:5432/tradeos
       SEC_USER_AGENT: ${SEC_USER_AGENT}
+      # The origin this instance is reachable at from outside. Every og:image and
+      # og:url is built from it, so unset means every shared record previews as a
+      # bare text link. Enumerated in BOTH services (CLAUDE.md 0i).
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
       TIINGO_API_KEY: ${TIINGO_API_KEY:-}
       # Alpaca is the price source; Tiingo above is kept as a fallback. Both halves of the
       # Alpaca credential are required — a key id without its secret is an anonymous client

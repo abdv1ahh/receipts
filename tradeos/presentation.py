@@ -202,83 +202,17 @@ def score_card_svg(symbol: str, name: str, score: int | None, bucket: str | None
 
 # ------------------------------------------------------------------ Receipts share card
 #
-# A different object from the score card above, and it looks different on purpose. That one sells a
-# signal; this one is a certificate. Registry typography, tabular figures, generous space, and
-# muted verdict colours: a miss is a normal outcome and must not be painted as an alarm, because a
-# record that makes its own losses look like emergencies is a record nobody will publish honestly.
+# The RECEIPTS share card used to live here and now lives in `tradeos/receipts/card.py`.
 #
-# THE ONE RULE THIS FUNCTION MUST NEVER BREAK: a gated record shows counts and the words Low N, and
-# never a percentage. A share card is the part of this product that travels furthest from its own
-# context, so it is the worst possible place to print a rate the sample cannot support.
-
-_RECEIPT_INK = {
-    "bg": "#05060c", "panel": "#0e111b", "border": "#1b2130",
-    "text": "#eaecf4", "muted": "#8b93ab", "faint": "#7b83a0",
-    # Low saturation on purpose. Neon green for a hit and alarm red for a miss would put a thumb on
-    # the scale of how a reader feels about a number that is meant to be read, not reacted to.
-    "hit": "#7fb69a", "miss": "#c98a95", "accent": "#6e8cff",
-}
-_SERIF = "Instrument Serif, Iowan Old Style, Georgia, serif"
-_MONO = "IBM Plex Mono, ui-monospace, SF Mono, Menlo, Consolas, monospace"
-_SANS = "Inter, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif"
-
-
-def _count_block(x: int, label: str, value: int, colour: str) -> str:
-    return (f'<text x="{x}" y="330" font-family="{_MONO}" font-size="58" font-weight="600" '
-            f'fill="{colour}">{value}</text>'
-            f'<text x="{x}" y="364" font-family="{_SANS}" font-size="19" fill="{_RECEIPT_INK["faint"]}" '
-            f'letter-spacing="1.5">{_xml_escape(label)}</text>')
-
-
-def receipt_card_svg(handle: str, display_name: str, counts: dict, hit_rate: float | None,
-                     hit_rate_ci: list | None, resolved_scoreable: int, links: int,
-                     brand: str, verified: bool = False, is_house: bool = False) -> str:
-    """The share card for one public record. Pure: every value is passed in from a real query.
-
-    `hit_rate` arriving as None IS the gated case, and it is the only signal this function needs:
-    `record.summary` already refuses to return a rate below the sample gate, so a percentage can
-    never reach this card without having cleared it upstream.
-    """
-    ink = _RECEIPT_INK
-    gated = hit_rate is None
-
-    if gated:
-        headline = (f'<text x="80" y="470" font-family="{_MONO}" font-size="40" fill="{ink["muted"]}" '
-                    f'letter-spacing="2">LOW N</text>'
-                    f'<text x="230" y="470" font-family="{_SANS}" font-size="23" fill="{ink["faint"]}">'
-                    f'{resolved_scoreable} resolved so far. A rate is not shown below 25.</text>')
-    else:
-        ci = ""
-        if hit_rate_ci:
-            ci = (f'<text x="330" y="470" font-family="{_MONO}" font-size="25" fill="{ink["faint"]}">'
-                  f'95% interval {hit_rate_ci[0]:.1%} to {hit_rate_ci[1]:.1%}</text>')
-        headline = (f'<text x="80" y="478" font-family="{_MONO}" font-size="62" font-weight="600" '
-                    f'fill="{ink["text"]}">{hit_rate:.1%}</text>'
-                    f'<text x="330" y="440" font-family="{_SANS}" font-size="23" fill="{ink["muted"]}">'
-                    f'right on {resolved_scoreable} resolved calls</text>{ci}')
-
-    house = ""
-    if is_house:
-        house = (f'<text x="80" y="212" font-family="{_SANS}" font-size="20" fill="{ink["accent"]}" '
-                 f'letter-spacing="1.5">OUR OWN SIGNAL ENGINE</text>')
-
-    mark = "&#10003; verified" if verified else "unverified"
-    return f'''<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
-  <rect width="1200" height="630" fill="{ink["bg"]}"/>
-  <rect x="40" y="40" width="1120" height="550" rx="18" fill="{ink["panel"]}" stroke="{ink["border"]}"/>
-  <text x="80" y="112" font-family="{_SANS}" font-size="21" font-weight="700" fill="{ink["accent"]}" letter-spacing="3">{_xml_escape(brand.upper())}</text>
-  <text x="1120" y="112" font-family="{_SANS}" font-size="19" fill="{ink["faint"]}" text-anchor="end">{mark}</text>
-  <line x1="80" y1="140" x2="1120" y2="140" stroke="{ink["border"]}"/>
-  {house}
-  <text x="80" y="{"268" if is_house else "250"}" font-family="{_SERIF}" font-size="60" fill="{ink["text"]}">{_xml_escape(display_name)}</text>
-  <text x="80" y="{"306" if is_house else "288"}" font-family="{_MONO}" font-size="25" fill="{ink["muted"]}">@{_xml_escape(handle)}</text>
-  {_count_block(80, "HIT", counts.get("hit", 0), ink["hit"])}
-  {_count_block(240, "MISS", counts.get("miss", 0), ink["miss"])}
-  {_count_block(400, "INCONCLUSIVE", counts.get("inconclusive", 0), ink["muted"])}
-  {_count_block(690, "UNSCOREABLE", counts.get("unscoreable", 0), ink["muted"])}
-  {_count_block(960, "OPEN", counts.get("open", 0), ink["muted"])}
-  <line x1="80" y1="400" x2="1120" y2="400" stroke="{ink["border"]}"/>
-  {headline}
-  <text x="1120" y="470" font-family="{_MONO}" font-size="23" fill="{ink["accent"]}" text-anchor="end">{links} sealed calls, chained</text>
-  <text x="80" y="548" font-family="{_SANS}" font-size="19" fill="{ink["faint"]}">Past performance does not predict future results. This measures public statements and is not investment advice.</text>
-</svg>'''
+# Not tidying. This module opens with `from .signals.convergence import DEFAULT_PARAMS`, so the
+# route serving a caller's share card imported the convergence signal -- the plane that is being
+# retired. `docs/receipts_protected.md` had recorded `signals/` as "NOT A DEPENDENCY. Not in the
+# graph, not referenced"; `docs/receipts_gap_analysis.md` §5.3 corrected that by measurement, with
+# `tradeos.signals.convergence` removed from `sys.modules` breaking
+# `GET /api/card/receipt/{handle}`. The dependency ran through the ROUTE, one hop further than a
+# package-level graph rooted at `receipts/` can see.
+#
+# `_BUCKETS` above is read only by `smart_money_score`, and the receipts card never touched it, so
+# moving the two functions severed `presentation` AND `signals` from Receipts in one step. The
+# palette, `_count_block` and `receipt_card_svg` went with them; `_xml_escape`, `_wrap` and the
+# font stacks stay because `score_card_svg` -- which is convergence's own card -- still needs them.
