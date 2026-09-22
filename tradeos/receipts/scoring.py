@@ -2,7 +2,7 @@
 
 The arithmetic is deliberately boring and deliberately borrowed. `backtest.engine.excess_return` is
 the one implementation of "how did this move against SPY over this window" in the codebase, and
-`ledger.verdict_for` is the one implementation of "does that count as a hit". Both are reused here
+`prices.verdict_for` is the one implementation of "does that count as a hit". Both are reused here
 rather than reimplemented, because a scoring rule that exists twice is a scoring rule that will
 eventually disagree with itself, and the whole product is a claim that this number can be trusted.
 
@@ -44,14 +44,14 @@ from datetime import date, datetime, timedelta
 import psycopg
 from psycopg import sql
 
-from .. import ledger
+from .. import prices, stats
 from ..backtest.engine import Series, entry_day_after, excess_return, exit_day_for
-from ..ledger import price_series as _series
-from ..ledger import truncated_pct
+from ..prices import price_series as _series
+from ..prices import truncated_pct
 
 # One definition, not a second 2%. Bound to the Ledger's floor so the two planes of this product
 # can never drift into scoring the same move differently.
-NOISE_FLOOR = ledger.NOISE_FLOOR
+NOISE_FLOOR = stats.NOISE_FLOOR
 
 # The ONE reason a resolution is sealed. Deliberately a single entry rather than a table: every
 # time this dict grew another key, that key became another way to stamp a permanent verdict on an
@@ -117,14 +117,14 @@ def entry_exit_sessions(published_at: datetime, horizon_days: int, symbol: str,
 
 def verdict_for(direction: str, excess: float | None,
                 reason: str | None = None) -> tuple[str, str]:
-    """(verdict, a sentence saying why). Thin wrapper over `ledger.verdict_for`.
+    """(verdict, a sentence saying why). Thin wrapper over `prices.verdict_for`.
 
     The decision itself is the Ledger's, unchanged. What is added here is that the reason is
     ALWAYS present, including on a hit or a miss, where the Ledger returns None because its own
     surfaces render the number beside it. A record page shows one call on its own, and a bare
     verdict with no arithmetic beside it is the thing a sceptic is entitled to distrust.
     """
-    verdict, note = ledger.verdict_for(direction, excess, reason)
+    verdict, note = prices.verdict_for(direction, excess, reason)
     if note:
         return verdict, note
     moved = "up" if (excess or 0) > 0 else "down"

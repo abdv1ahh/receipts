@@ -1,40 +1,26 @@
-# TradeOSS — one-command demo build and common tasks.
-# Prereqs: Docker with Compose; a .env with SEC_USER_AGENT (and optional TIINGO_API_KEY,
-# GEMINI_API_KEY for prices + LLM explanations).
+# Receipts — common tasks.
+# Prereqs: Docker with Compose, and a .env carrying an Alpaca key pair. `./scripts/setup.sh`
+# writes the .env; `make quickstart` does the rest.
 
 X = docker compose exec -T api python -m tradeos.cli
 
-.PHONY: demo test test-js dev web site lint fix up down logs seed backfill-full
+.PHONY: quickstart test test-js dev web lint fix up down logs
 
-# Reproducible demo from scratch. Uses a QUICK data window (a few weeks) so it finishes in
-# minutes; the full 24-month backfill (backfill-full) is a separate overnight job.
-demo:
+# Everything a stranger needs on a fresh clone: migrate, then load enough recent price history to
+# publish a call on. 400 symbols over one year is ~19 seconds measured, which is the right size for
+# a first run — the full 13,170-symbol universe takes about 3.5 hours and is documented in the
+# README as an overnight job rather than put in anybody's way here.
+#
+# `--universe` reads Alpaca's own asset endpoint and no research table, which is why this works on
+# a database that has only ever run `migrate`.
+quickstart:
 	docker compose up -d --build
 	$(X) migrate
-	$(X) sync-tickers
-	$(X) backfill-13dg --from 2026-05-11 --to 2026-06-12
-	$(X) backfill-form4 --from 2026-05-11 --to 2026-06-12
-	$(X) resolve-entities
-	$(X) ingest-13f --date 2026-07-14 --limit 60
-	$(X) resolve-cusips --limit 700
-	$(X) ingest-short-interest --start 2026-05-01
-	$(X) signals-register --changelog "convergence v1 (initial)"
-	$(X) compute-signals --daily --from 2026-05-11 --to 2026-06-12
-	$(X) compute-signals
-	$(X) ingest-prices --symbols-from-clusters --start 2026-01-01
-	$(X) run-backtest
-	$(X) sync-library
-	$(X) create-invites --n 5
+	$(X) ingest-prices --universe --limit 400 --start $$(python3 -c "import datetime;print(datetime.date.today()-datetime.timedelta(days=365))")
 	@echo ""
-	@echo "TradeOSS demo ready at http://localhost:8000"
-	@echo "Next: create the admin (prompts for a password):"
-	@echo "  docker compose exec api python -m tradeos.cli seed-admin --email you@example.com"
-
-# The deep, publishable calibration sample (runs for hours; do before any public launch).
-backfill-full:
-	$(X) backfill-13dg --from 2024-07-01 --to 2026-07-14
-	$(X) backfill-form4 --from 2024-07-01 --to 2026-07-14
-	$(X) resolve-entities
+	@echo "Ready at http://localhost:8000 — register, claim a handle, publish a call."
+	@echo "Optional, to put our own 473-call record on your board:"
+	@echo "  docker compose exec api python -m tradeos.cli seed-house-records"
 
 # tests/ is deliberately NOT copied into the image (test files have no business in a production
 # artifact), so the suite runs against a mount. `make test` used to fail with "file or directory
@@ -62,11 +48,6 @@ dev:
 
 web:
 	cd frontend && npm run build
-
-# The marketing site (Phase 7). A sibling Vite project; same 0.3s loop as `web` under `make dev`,
-# served at /site. First run needs `cd site && npm install`.
-site:
-	cd site && npm run build
 
 # Ruff is the linter. It is deliberately NOT the formatter here — see the note in pyproject.toml.
 lint:

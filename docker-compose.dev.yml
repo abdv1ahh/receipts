@@ -15,8 +15,6 @@ services:
       # path at the locally built one. `cd frontend && npm run build` (~0.3s) is then enough to
       # serve a UI change — no image rebuild.
       - ./frontend/dist:/app/tradeos/static:ro
-      # Same trick for the marketing site (Phase 7): `make site` rebuilds it in ~0.3s.
-      - ./site/dist:/app/tradeos/site_static:ro
       - uploads:/app/uploads
     environment:
       # Vite dev server runs on a different origin; allow it through the CSRF origin check.

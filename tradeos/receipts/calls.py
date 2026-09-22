@@ -17,7 +17,7 @@ Stamping `unscoreable` on the operational case would be a serious error, because
 trigger makes a verdict permanent. A call marked unscoreable at 10am because the feed was eleven
 days behind could never be corrected at 11am when the feed caught up. So an operational gap
 publishes OPEN, carries a visible warning at publish time, and is decided by the scorer when the
-horizon actually closes. `ledger.py` already draws this exact line between "no price series for
+horizon actually closes. `prices.UNSCOREABLE_REASONS` draws this exact line between "no price series for
 this subject" and "the price feed ends before the claim", for the same reason.
 """
 from __future__ import annotations

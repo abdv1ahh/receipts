@@ -15,8 +15,6 @@ venv/
 node_modules/
 frontend/dist/
 tradeos/static/
-site/dist/
-tradeos/site_static/
 
 # OS / editor
 .DS_Store

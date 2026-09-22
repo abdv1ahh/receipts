@@ -34,7 +34,7 @@ from __future__ import annotations
 import psycopg
 from psycopg.types.json import Json
 
-from .. import ledger
+from .. import stats
 from . import chain, context
 
 # handle -> (display name, the model_version rows it imports, bio)
@@ -132,9 +132,9 @@ def seed_house_records(conn: psycopg.Connection) -> dict:
                     "direction": predicted,
                     "horizon_days": horizon_days,
                     # The stored confidence is a probability; the record's vocabulary is three
-                    # buckets. `ledger.confidence_bucket` is the one mapping between them, so
+                    # buckets. `stats.confidence_bucket` is the one mapping between them, so
                     # calibration on this record means the same thing as calibration on the Ledger.
-                    "confidence": ledger.confidence_bucket(float(confidence)),
+                    "confidence": stats.confidence_bucket(float(confidence)),
                     "thesis": mechanism,
                     "benchmark_symbol": "SPY",
                     "published_at": created_at,

@@ -1,6 +1,6 @@
 """Composing the public record: counts, intervals, calibration, and the board.
 
-Every statistic here already exists in `ledger.py` and `backtest/engine.py` and is imported rather
+Every statistic here already exists in `stats.py` and `backtest/engine.py` and is imported rather
 than rewritten. That is not tidiness. This product's only asset is that its numbers are the same
 numbers everywhere, and the fastest way to lose that is a second Wilson interval.
 
@@ -8,9 +8,10 @@ THE SAMPLE GATE IS THE MOST IMPORTANT THING IN THIS FILE. Below 25 resolved scor
 hit rate is returned at all: `hit_rate` is None and the surfaces render counts. A percentage on
 nine calls is not a weaker version of a percentage on nine hundred, it is a different kind of
 statement, and every scoreboard that has ever misled anybody did it by printing the first as
-though it were the second. `ledger.py` already refuses percentages on thin slices and
-`backtest/engine.py` carries MIN_EPISODES for the same reason; this is the same discipline with
-the same reasoning, applied to a public record.
+though it were the second. `backtest/engine.py` carries MIN_EPISODES for the same reason, and
+`stats.mean_ci` exists because this project has published a point estimate without its interval
+and drawn the wrong conclusion from it in both directions; this is the same discipline applied to
+a public record.
 
 What the gate is NOT is a hiding place. A gated caller still shows every count, every call, and
 every miss. What is withheld is one derived number that the sample cannot support.
@@ -20,7 +21,7 @@ from __future__ import annotations
 import psycopg
 from psycopg import sql
 
-from .. import ledger
+from .. import stats
 from ..backtest.engine import wilson_interval
 from . import calls as calls_mod
 from . import chain, scoring
@@ -114,7 +115,7 @@ def _compute(counts: tuple, followed: list[float]) -> dict:
 
     scoreable = hit + miss
     gated = scoreable < SAMPLE_GATE
-    ci = ledger.mean_ci(followed)
+    ci = stats.mean_ci(followed)
     wilson = wilson_interval(hit, scoreable) if scoreable else None
 
     return {
@@ -136,10 +137,10 @@ def _compute(counts: tuple, followed: list[float]) -> dict:
         # spans zero. An average that cannot be told apart from no effect is not an effect.
         "expectancy_significant": (not gated) and ci["significant"],
         "expectancy_sd": ci["sd"],
-        "z_vs_coinflip": None if gated else ledger.proportion_z(hit, scoreable),
+        "z_vs_coinflip": None if gated else stats.proportion_z(hit, scoreable),
         # Printed next to the sample actually held, so "we do not know yet" comes with a number
         # attached rather than being an excuse.
-        "sample_needed_1pct": ledger.sample_needed(ci["sd"] or 0, 0.01),
+        "sample_needed_1pct": stats.sample_needed(ci["sd"] or 0, 0.01),
         "gated": gated,
         "gate_reason": GATE_REASON if gated else None,
         # The gate, and HOW FAR OFF IT IS. Returned rather than left for a surface to subtract,
@@ -177,11 +178,11 @@ def calibration(caller_id: int, conn: psycopg.Connection) -> list[dict]:
     reading. Someone whose high confidence calls do worse than their low confidence ones is not,
     however good their headline looks.
 
-    The numeric ranges come from `ledger.CONFIDENCE_BUCKETS` so that low, medium and high mean the
+    The numeric ranges come from `stats.CONFIDENCE_BUCKETS` so that low, medium and high mean the
     same thing on this record as they do in the Ledger. Calls store the bucket as text rather than
     a probability, so there is nothing to bucket here, only a shared vocabulary to honour.
     """
-    ranges = {name: [lo, hi] for lo, hi, name in ledger.CONFIDENCE_BUCKETS}
+    ranges = {name: [lo, hi] for lo, hi, name in stats.CONFIDENCE_BUCKETS}
     with conn.cursor() as cur:
         cur.execute("""SELECT confidence,
                               count(*) FILTER (WHERE verdict = 'hit'),
@@ -192,7 +193,7 @@ def calibration(caller_id: int, conn: psycopg.Connection) -> list[dict]:
         rows = {c: (h, m) for c, h, m in cur.fetchall()}
 
     out = []
-    for _lo, _hi, name in ledger.CONFIDENCE_BUCKETS:
+    for _lo, _hi, name in stats.CONFIDENCE_BUCKETS:
         hit, miss = rows.get(name, (0, 0))
         n = hit + miss
         wilson = wilson_interval(hit, n) if n else None
@@ -207,7 +208,7 @@ def calibration(caller_id: int, conn: psycopg.Connection) -> list[dict]:
 def recent_misses(caller_id: int, limit: int, conn: psycopg.Connection) -> list[dict]:
     """The misses, newest first.
 
-    A separate function because the record page leads with them. `ledger.jsx` already does this and
+    A separate function because the record page leads with them. The retired Ledger surface did
     it is the whole argument: a scoreboard that shows you its losses first is making a claim about
     itself that a scoreboard showing wins first cannot make.
     """

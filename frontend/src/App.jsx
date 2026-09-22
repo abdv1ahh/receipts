@@ -80,7 +80,9 @@ export default function App() {
   const openRecord = (handle) => { setRecordHandle(handle); setView("record", { handle }); };
   const openCall = (id) => { setCallId(String(id)); setView("call", { id }); };
   const onAuthed = (u) => { setUser(u); setView("board"); };
-  const doLogout = async () => { await authLogout(); setUser(null); window.location.assign("/site/"); };
+  // Signing out lands on the Board, not on a marketing page: the Board is the product's
+  // front door now and it is public, so a signed-out reader sees the thing they came for.
+  const doLogout = async () => { await authLogout(); setUser(null); go("board"); };
 
   // "My record" is the signed-in caller's own. Reading somebody else's record uses the same route
   // with a handle, so highlighting the rail item there would tell the reader they are looking at
@@ -136,7 +138,7 @@ export default function App() {
             <ResetView onDone={go} />
           ) : view === "auth" ? (
             <AuthPanel onAuthed={onAuthed}
-                       onBack={() => (user ? go("board") : window.location.assign("/site/"))}
+                       onBack={() => go("board")}
                        initialInvite={refCode} />
           ) : view === "record" ? (
             // "My record" with no handle resolves to the signed-in caller's own; PublishView is

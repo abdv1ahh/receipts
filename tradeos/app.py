@@ -16,7 +16,7 @@ import secrets
 from pathlib import Path
 
 from fastapi import BackgroundTasks, Cookie, FastAPI, Request, Response
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from psycopg import sql
 from pydantic import BaseModel
@@ -1087,42 +1087,20 @@ def _receipt_document(title: str, tags: str, body: str) -> str:
             f'</head><body>{body}</body></html>')
 
 
-# ------------------------------------------------------------------- marketing site (Phase 7)
-#
-# Mounted BEFORE the app's own "/" mount, because that one is a catch-all: anything registered
-# after it is unreachable. Two separate bundles on one origin, which is what makes both verifiable
-# locally; Phase 8 puts the site on the apex domain and the app on a subdomain, the split the brief
-# implies by calling it "a separate public application".
-#
-# Built from `site/`, which is gitignored like `frontend/dist` — absent in a checkout until
-# `npm --prefix site run build`, so the mount is conditional rather than a hard dependency.
-
-_SITE_DIR = Path(__file__).parent / "site_static"
-if (_SITE_DIR / "index.html").exists():
-    app.mount("/site", StaticFiles(directory=str(_SITE_DIR), html=True), name="marketing")
-
-
 # ------------------------------------------------------------------- frontend (SPA)
+#
+# THE MARKETING SITE IS GONE AND "/" IS THE BOARD. `site/` was a 44 MB sibling Vite project that
+# pitched the research terminal, and a signed-out stranger arriving at "/" was redirected into it
+# on the presence of a session cookie. Deleting it without repointing "/" would have left a
+# stranger on a 404, and repointing it anywhere but the Board would have been worse than that: the
+# Board IS the pitch now. It is the only surface guaranteed to have something on it from a cold
+# start, because our own record is always on it — 473 sealed calls, 43.2% right, below a coin flip,
+# which is a more honest introduction than any landing page could be.
+#
+# So "/" falls through to the SPA mount below like every other path, the redirect and its
+# cookie-sniffing are deleted, and signing out sends the reader to "/" rather than to "/site/".
 
 _STATIC_DIR = Path(__file__).parent / "static"
-
-# The front door. A signed-out visitor arriving at "/" is a STRANGER, and the thing built to explain
-# this product to a stranger is the marketing site — so send them there rather than to the app's own
-# landing screen, which still pitched the pre-rebrand product and which nothing else links to.
-#
-# The test is "is there a session cookie", not "is the session valid": deciding a redirect does not
-# need a database round trip, and the only case it gets wrong — an expired cookie — lands on the app,
-# which asks the reader to sign in. That is the right destination for an expired session anyway.
-# Authorization is unaffected; every API route still checks the session itself.
-#
-# Registered BEFORE the "/" mount below, because that mount is a catch-all and swallows anything
-# registered after it.
-if (_SITE_DIR / "index.html").exists() and (_STATIC_DIR / "index.html").exists():
-    @app.get("/", include_in_schema=False)
-    def root(request: Request):
-        if request.cookies.get(SESSION_COOKIE):
-            return FileResponse(_STATIC_DIR / "index.html")
-        return RedirectResponse("/site/", status_code=307)
 
 if (_STATIC_DIR / "index.html").exists():
     class _SpaFiles(StaticFiles):
