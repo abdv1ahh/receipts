@@ -670,7 +670,14 @@ def _rules(methodology: dict) -> str:
             f'that said up in a week when the whole market rose is not credited with the market\'s '
             f'move. A move inside plus or minus {methodology["noise_floor"]:.0%} against SPY is '
             f'recorded as inconclusive rather than counted either way. No rate is published below '
-            f'{methodology["sample_gate"]} resolved calls.</p>')
+            f'{methodology["sample_gate"]} resolved calls.</p>'
+            # Every number above this paragraph is a score with no price beside it, so the reason
+            # and the replacement are both stated here rather than left to be noticed. One place on
+            # the page, not four: it belongs with the rules the numbers were produced by, and a
+            # licensing sentence repeated under every figure would read as an excuse.
+            f'<p class="pr-rules"><b>Why there are no prices here.</b> '
+            f'{e(methodology["price_source"]["no_prices"])} '
+            f'{e(methodology["price_source"]["recompute"])}</p>')
 
 
 # ------------------------------------------------------------------ the page

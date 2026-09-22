@@ -1605,8 +1605,11 @@ def asset(symbol: str) -> dict:
         )
         history = [{"cluster_id": r[0], "as_of": r[1].isoformat(), "score": float(r[2]), "bucket": r[3]}
                    for r in cur.fetchall()]
-        cur.execute("SELECT day, close FROM prices_eod WHERE symbol=%s ORDER BY day DESC LIMIT 130", (sym,))
-        prices = [{"day": d.isoformat(), "close": float(c)} for d, c in reversed(cur.fetchall())]
+        # The 130 daily closes this used to return are gone: a public route handing out four
+        # months of one exchange's prints is redistribution however the page draws it. The DAYS
+        # stay, because the cluster markers are positioned by date and that is our own data.
+        cur.execute("SELECT day FROM prices_eod WHERE symbol=%s ORDER BY day DESC LIMIT 130", (sym,))
+        prices = [{"day": d.isoformat()} for (d,) in reversed(cur.fetchall())]
         cur.execute(
             """SELECT count(o.excess_30), avg(CASE WHEN o.excess_30>0 THEN 1.0 ELSE 0 END)
                FROM signal_outcomes o JOIN signal_clusters c ON c.id=o.cluster_id
@@ -3463,7 +3466,10 @@ def call_preview(response: Response, symbol: str, horizon_days: int = 30,
         if horizon_days not in receipts_calls.SCOREABLE_HORIZONS:
             response.status_code = 400
             return {"error": "the horizon has to be 7, 30 or 90 days."}
-        return receipts_calls.preview(symbol, horizon_days, conn)
+        # The panel used to print our last close for the symbol and for SPY. A caller who notices
+        # they are gone is owed the reason rather than left to assume we lost the data.
+        return {**receipts_calls.preview(symbol, horizon_days, conn),
+                "no_prices": receipts_record.NO_PRICES}
 
 
 @app.get("/api/calls/{call_id}")
@@ -3484,6 +3490,11 @@ def one_call(call_id: int, response: Response) -> dict:
                 "context_snapshot": snapshot,
                 "caller": {"handle": handle, "display_name": name, "kind": kind,
                            "is_house": is_house, "verified": verified_at is not None},
+                # This response carries a score, so it carries the line that tells a reader how to
+                # check it without our prices. Sent from here rather than typed into the React
+                # proof panel, so the page and the methodology cannot come to say different things.
+                "recompute": receipts_record.RECOMPUTE_NOTE,
+                "no_prices": receipts_record.NO_PRICES,
                 "disclaimer": RECEIPTS_DISCLAIMER}
 
 

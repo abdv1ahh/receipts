@@ -34,6 +34,37 @@ GATE_REASON = ("A hit rate is not shown until 25 calls have resolved as a hit or
                "be trying to judge, so a percentage would suggest a precision the sample cannot "
                "support. The counts are shown instead, and every call is listed.")
 
+# WHY NO PRICE APPEARS ANYWHERE A READER CAN SEE. Stated once, here, for the same reason
+# GATE_REASON is: it is quoted by the methodology page, by the call detail, by the server-rendered
+# record page and by `docs/known_gaps.md`, and four hand-written copies of a licensing position is
+# four chances to describe the licence differently.
+#
+# The source is the market-data vendor's own published answer to "Can I redistribute Alpaca API
+# data via my platform?", dated November 2022: "Unfortunately, you cannot redistribute Alpaca API
+# data." One sentence, no personal/commercial split, no exception for display, no qualification of
+# any kind. Their terms additionally incorporate the NASDAQ display-service agreements by
+# reference. Publishing an entry close on a page anyone can read is redistribution on the ordinary
+# meaning of the word, and nothing they publish carves out an exception this could rely on.
+#
+# A self-hoster running their own key is in exactly the same position, which is why this is a
+# property of the product rather than a note to one operator.
+NO_PRICES = ("No prices are shown anywhere on this site. They come from a market-data vendor "
+             "whose terms do not permit redistributing their data, and those terms carry no "
+             "exception for displaying it. What is published is the measurement; the prices it "
+             "was measured from are kept, sealed and unchangeable, so a verdict can still be "
+             "answered for.")
+
+# The line that has to appear wherever a score does. Removing the prices takes away the reader's
+# ability to check the arithmetic, and a number a reader cannot check is a number they are being
+# asked to trust — which is the one thing this product is built not to ask for. The session dates
+# are what replaces them, and they are strictly better: they are exact, they are not the vendor's
+# data, and two dates plus a benchmark ticker is enough to reproduce the excess return from any
+# feed in the world.
+RECOMPUTE_NOTE = ("Both session dates are shown so you can recompute this yourself from any price "
+                  "source you choose: take the close on the entry session and on the exit session "
+                  "for the symbol, do the same for the benchmark, and subtract the benchmark's "
+                  "move from the symbol's.")
+
 # Composed with psycopg.sql for the same reason as the column list in calls.py: the scope fragments
 # below are literals written in this module, never anything a caller supplies, and the rule that
 # composed SQL goes through psycopg.sql holds regardless.
@@ -344,6 +375,10 @@ def methodology() -> dict:
         "price_source": {
             "measured_divergence_pct": 0.391,
             "worst_symbol_divergence_pct": 2.86,
+            # The same two strings every other surface quotes. A methodology page that described
+            # the licence in its own words would be the fifth copy, and the first to drift.
+            "no_prices": NO_PRICES,
+            "recompute": RECOMPUTE_NOTE,
             "text": (f"Prices are end-of-day closes from a single free feed, which carries one "
                      f"exchange's prints rather than the consolidated tape. Measured 2026-09-14 "
                      f"against an independent feed over 961 day-pairs, closes differ by 0.391% on "

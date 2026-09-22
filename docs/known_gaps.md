@@ -129,3 +129,65 @@ it say no.
 **What closing gap 5 needs.** The same anchor gap 3 needs, from the other side: publishing the
 chain head somewhere we cannot revise. Until that exists, this page is tamper-evident against the
 caller and trust-based against us, and says so in those words.
+
+---
+
+## 6. No price appears anywhere a reader can see
+
+Added 2026-09-23, alongside the price-redistribution sweep.
+
+**State.** The four component prices on a resolved call — `entry_price`, `exit_price`,
+`benchmark_entry`, `benchmark_exit` — and the two component returns computed from them are stored,
+sealed by migration 035, and **never served**. `receipts/calls._LIST_COLUMNS` does not select them,
+so nothing downstream can serialise them. The publish screen's commitment panel used to print our
+last close for the symbol and for SPY, live from `prices_eod`; it now prints the DATE our series
+runs through instead. `/api/asset/{symbol}` used to return 130 daily closes on a public route; it
+now returns the days only.
+
+**Why it is a gap and not a feature.** The old proof panel was genuinely stronger for a sceptic:
+four prices, two returns, a subtraction and a noise floor is arithmetic anyone can redo on the spot.
+What replaces it is one step longer, because the reader has to fetch two closes themselves. That is
+a real loss and it is not pretended otherwise.
+
+**What a reader is told,** in one place — `receipts.record.NO_PRICES`, quoted by the methodology
+page, by the call detail, by the server-rendered `/r/{handle}` and by the publish screen, all of
+which read the constant rather than writing their own copy:
+
+> No prices are shown anywhere on this site. They come from a market-data vendor whose terms do not
+> permit redistributing their data, and those terms carry no exception for displaying it. What is
+> published is the measurement; the prices it was measured from are kept, sealed and unchangeable,
+> so a verdict can still be answered for.
+
+The source is the vendor's own published answer to "Can I redistribute Alpaca API data via my
+platform?", dated November 2022: *"Unfortunately, you cannot redistribute Alpaca API data."* One
+sentence, no personal/commercial split, no exception for display. Their terms additionally
+incorporate the NASDAQ display-service agreements by reference.
+
+**And what replaces them,** wherever a score appears — `receipts.record.RECOMPUTE_NOTE`, read from
+the same module by the same surfaces:
+
+> Both session dates are shown so you can recompute this yourself from any price source you choose:
+> take the close on the entry session and on the exit session for the symbol, do the same for the
+> benchmark, and subtract the benchmark's move from the symbol's.
+
+**Why the dates are enough, and in one way better.** The entry and exit sessions are exact, they
+are ours to publish, and they are the whole input to the measurement. A reader who prices those two
+sessions from a feed of their own choosing reproduces the excess return *without* having to trust
+our copy of the closes — which is more than the old panel offered, since the old panel asked them
+to believe our four numbers. What they lose is convenience, not verifiability.
+
+**A self-hoster is in the same position,** running their own key against the same vendor. This is
+why the rule lives in the product rather than in a note to one operator.
+
+**What closing it would need.** A price source whose licence permits redistribution. There is no
+free one that covers this universe; a paid data licence is the only path, and it is not worth it
+for a portfolio project.
+
+**Pinned by.** `tests/test_price_redistribution.py` plants six-decimal prices on a resolved call
+and a scratch symbol in `prices_eod`, renders **every** route the app serves — anonymous and
+signed in — and fails if any planted value or any of the six column names appears in the bytes.
+It is a sweep rather than six assertions because the leak it closes was never a field anyone chose
+to print: `/api/calls/{id}` returned the whole row and the prices came along invisibly, NULL on all
+474 sealed rows, waiting for the first resolution to start publishing them.
+Also `tests/test_receipts.py::test_the_components_that_arithmetic_used_never_reach_the_payload`
+and `::test_the_stored_arithmetic_reconciles`, which check the same numbers from opposite sides.

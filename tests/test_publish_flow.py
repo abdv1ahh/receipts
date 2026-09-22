@@ -70,10 +70,10 @@ def caller():
 # ================================================================== the universe (pure)
 
 UNIVERSE = [
-    {"symbol": "AAP", "last_close": "2026-09-14", "days_behind": 0, "fresh": True},
-    {"symbol": "AAPXYZ", "last_close": "2026-09-14", "days_behind": 0, "fresh": True},
-    {"symbol": "AASP", "last_close": "2026-09-01", "days_behind": 13, "fresh": False},
-    {"symbol": "ABT", "last_close": "2026-09-14", "days_behind": 0, "fresh": True},
+    {"symbol": "AAP", "last_session": "2026-09-14", "days_behind": 0, "fresh": True},
+    {"symbol": "AAPXYZ", "last_session": "2026-09-14", "days_behind": 0, "fresh": True},
+    {"symbol": "AASP", "last_session": "2026-09-01", "days_behind": 13, "fresh": False},
+    {"symbol": "ABT", "last_session": "2026-09-14", "days_behind": 0, "fresh": True},
 ]
 
 
@@ -158,8 +158,22 @@ def test_the_preview_never_claims_an_entry_price():
         out = calls.preview("ABT", 30, conn)
     assert "entry_price" not in out
     assert "entry_session" not in out
-    assert out["last_close"] is not None and out["last_close_day"] is not None
+    assert out["last_session"] is not None
     assert "first session AFTER you publish" in out["entry_rule"]
+
+
+def test_the_preview_carries_no_price_at_all():
+    """The other half of the same rule, and the reason the panel now dates its data rather than
+    pricing it: these are the vendor's closes and the publish screen is a screen. The panel kept
+    the question a caller was really asking of them -- how current is your feed -- as a date."""
+    with db.connect() as conn:
+        out = calls.preview("ABT", 30, conn)
+    for key in ("last_close", "last_close_day", "benchmark_last_close",
+                "benchmark_last_close_day"):
+        assert key not in out, f"{key} puts a vendor price back on the publish screen"
+    # What replaced them: the DATE our series runs through, which is the thing a caller
+    # deciding whether to commit was actually reading the close for.
+    assert out["last_session"] and out["benchmark_last_session"]
 
 
 def test_the_preview_dates_the_horizon_rather_than_leaving_it_a_duration():
@@ -174,14 +188,14 @@ def test_the_preview_shows_the_benchmark_it_will_be_measured_against():
     with db.connect() as conn:
         out = calls.preview("ABT", 7, conn)
     assert out["benchmark"] == "SPY"
-    assert out["benchmark_last_close"] is not None
+    assert out["benchmark_last_session"] is not None
 
 
 def test_the_preview_carries_the_scoreability_verdict_for_a_symbol_we_cannot_price():
     with db.connect() as conn:
         out = calls.preview("ZZZQQQ", 30, conn)
     assert out["scoreability"]["permanent"] is True
-    assert out["last_close"] is None
+    assert out["last_session"] is None
 
 
 # ================================================================== the thesis rule
@@ -393,7 +407,7 @@ def test_the_commitment_panel_never_labels_anything_an_entry_price():
     src = _code("publish.jsx")
     commit = src[src.index("function Commitment("):src.index("function Form(")]
     assert "entry price" not in commit.lower()
-    assert "last close we hold" in commit
+    assert "our data runs through" in commit
     assert "the next session's close" in commit
 
 

@@ -51,7 +51,7 @@ def _load(conn: psycopg.Connection, benchmark: str) -> list[dict]:
     out = []
     for symbol, last in rows:
         behind = (bench_last - last).days if (bench_last and last) else 0
-        out.append({"symbol": symbol, "last_close": last.isoformat() if last else None,
+        out.append({"symbol": symbol, "last_session": last.isoformat() if last else None,
                     "days_behind": max(0, behind), "fresh": behind <= STALE_DAYS})
     return out
 

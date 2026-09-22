@@ -12,6 +12,7 @@ outside our control.
 """
 from __future__ import annotations
 
+import decimal
 import secrets
 from datetime import UTC, date, datetime, timedelta
 
@@ -239,19 +240,46 @@ def test_entry_is_the_session_after_publication_never_the_one_in_progress(caller
     assert row["entry_session"] > published_at.date().isoformat()
 
 
-def test_the_proof_panel_arithmetic_reconciles(caller):
-    """An investor should be able to check this with a calculator, so the stored components have to
-    actually produce the stored excess return."""
+def test_the_stored_arithmetic_reconciles(caller):
+    """The components have to actually produce the stored excess return.
+
+    READ FROM THE DATABASE, not from `calls.get`. The six component columns are no longer in any
+    payload — a market-data vendor's closes may not be redistributed and every surface here is a
+    surface — so the assertion has to go to where they still live. That is the point of keeping
+    them: a verdict nobody can see the components of is a verdict the operator cannot answer a
+    challenge to, and this test is the operator making that check.
+    """
+    caller_id, _handle, conn = caller
+    published = calls.publish(caller_id, VALID, conn, now=datetime.now(UTC) - timedelta(days=200))
+    scoring.resolve_call(published["id"], conn)
+
+    with conn.cursor() as cur:
+        cur.execute("""SELECT entry_price, exit_price, benchmark_entry, benchmark_exit,
+                              subject_return, benchmark_return, excess_return, verdict
+                         FROM calls WHERE id = %s""", (published["id"],))
+        e_in, e_out, b_in, b_out, sub, bench, excess, verdict = (
+            float(v) if isinstance(v, decimal.Decimal) else v for v in cur.fetchone())
+
+    assert verdict in ("hit", "miss", "inconclusive")
+    assert sub == pytest.approx(e_out / e_in - 1, abs=1e-6)
+    assert bench == pytest.approx(b_out / b_in - 1, abs=1e-6)
+    assert excess == pytest.approx(sub - bench, abs=1e-5)
+
+
+def test_the_components_that_arithmetic_used_never_reach_the_payload(caller):
+    """The same call, from the reader's side. The numbers above are real, stored and sealed; none
+    of them may be served. `tests/test_price_redistribution.py` sweeps the whole app for this —
+    here it is pinned at the one function every Receipts surface reads its calls through."""
     caller_id, _handle, conn = caller
     published = calls.publish(caller_id, VALID, conn, now=datetime.now(UTC) - timedelta(days=200))
     scoring.resolve_call(published["id"], conn)
     r = calls.get(published["id"], conn)
 
-    assert r["verdict"] in ("hit", "miss", "inconclusive")
-    assert r["subject_return"] == pytest.approx(r["exit_price"] / r["entry_price"] - 1, abs=1e-6)
-    assert r["benchmark_return"] == pytest.approx(
-        r["benchmark_exit"] / r["benchmark_entry"] - 1, abs=1e-6)
-    assert r["excess_return"] == pytest.approx(r["subject_return"] - r["benchmark_return"], abs=1e-5)
+    for column in ("entry_price", "exit_price", "benchmark_entry", "benchmark_exit",
+                   "subject_return", "benchmark_return"):
+        assert column not in r, f"{column} is the vendor's data and left the database"
+    # And what replaces them, which has to survive or the verdict becomes unverifiable.
+    assert r["entry_session"] and r["exit_session"] and r["excess_return"] is not None
 
 
 def test_a_move_inside_the_noise_floor_is_inconclusive_not_a_hit():
@@ -771,12 +799,42 @@ def test_writing_a_verdict_onto_a_resolved_call_reports_a_no_op(caller, monkeypa
 
 
 def test_resolve_due_counts_no_ops_separately(caller, monkeypatch):
+    """SCOPED TO THE SCRATCH CALLER, and that is not tidiness.
+
+    This used to call `resolve_due(conn)` unscoped, against the live database, with `_series`
+    monkeypatched to a fixture. It therefore picked up every OTHER open call that had reached its
+    horizon — including a real stranger's public ABT call — and rewrote that call's public "why is
+    this still open" sentence from prices that do not exist. Under a fixture series that happened
+    to span the horizon it would have sealed a permanent verdict on it instead.
+    """
     caller_id, _handle, conn = caller
     _due(caller_id, conn)
     _inject(monkeypatch, ABT=_step(100.0, 130.0), SPY=_step(200.0, 220.0))
     monkeypatch.setattr(scoring, "market_sessions", lambda _conn, _since: SESSIONS)
-    assert scoring.resolve_due(conn)["resolved"] == 1
-    assert "no_ops" in scoring.resolve_due(conn)
+    assert scoring.resolve_due(conn, caller_id=caller_id)["resolved"] == 1
+    assert "no_ops" in scoring.resolve_due(conn, caller_id=caller_id)
+
+
+def test_resolve_due_scoped_to_one_caller_touches_no_other_row(caller, monkeypatch):
+    """The guard on the accident above, so it cannot come back by someone dropping the argument."""
+    caller_id, _handle, conn = caller
+    _due(caller_id, conn)
+    _inject(monkeypatch, ABT=_step(100.0, 130.0), SPY=_step(200.0, 220.0))
+    monkeypatch.setattr(scoring, "market_sessions", lambda _conn, _since: SESSIONS)
+
+    with conn.cursor() as cur:
+        cur.execute("SELECT id, open_checked_at FROM calls "
+                    "WHERE verdict IS NULL AND caller_id <> %s", (caller_id,))
+        before = dict(cur.fetchall())
+
+    scoring.resolve_due(conn, caller_id=caller_id)
+
+    with conn.cursor() as cur:
+        cur.execute("SELECT id, open_checked_at, verdict FROM calls "
+                    "WHERE id = ANY(%s)", (list(before) or [-1],))
+        for cid, checked, verdict in cur.fetchall():
+            assert verdict is None, f"call {cid} was sealed by a scoped batch"
+            assert checked == before[cid], f"call {cid} had its disclosure rewritten"
 
 
 # ------------------------------------------------------------------ case 5: the open reason

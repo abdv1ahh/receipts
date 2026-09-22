@@ -267,10 +267,10 @@ function SymbolPicker({ value, onPick }) {
             <button key={m.symbol} className="pb-sugg-row" onClick={() => pick(m.symbol)}>
               <span className="num pb-sugg-sym">{m.symbol}</span>
               {m.fresh ? (
-                <span className="pb-sugg-ok">priced to {m.last_close}</span>
+                <span className="pb-sugg-ok">priced through {m.last_session}</span>
               ) : (
                 <span className="pb-sugg-stale">
-                  our prices stop at {m.last_close}, {m.days_behind} days behind
+                  our prices stop at {m.last_session}, {m.days_behind} days behind
                 </span>
               )}
             </button>
@@ -306,18 +306,18 @@ function Commitment({ preview, horizon }) {
               small lie this product could tell. */}
           <b>the next session's close</b>
         </div>
+        {/* These two rows used to print our last close for the symbol and for SPY. They were the
+            vendor's prices on a screen; see `record.NO_PRICES`. What the caller actually needed
+            from them was never the number, it was how CURRENT our data is before they take a
+            permanent commitment — so the rows now carry the DATE of the last session we hold,
+            which answers that exactly and is ours to publish. */}
         <div>
-          <span>last close we hold</span>
-          <b className="num">
-            {preview.last_close == null ? "—" : preview.last_close}
-            <small> {preview.last_close_day}</small>
-          </b>
+          <span>our data runs through</span>
+          <b className="num">{preview.last_session || "—"}</b>
         </div>
         <div>
-          <span>{preview.benchmark} at that close</span>
-          <b className="num">
-            {preview.benchmark_last_close == null ? "—" : preview.benchmark_last_close}
-          </b>
+          <span>{preview.benchmark} runs through</span>
+          <b className="num">{preview.benchmark_last_session || "—"}</b>
         </div>
         <div>
           <span>scored on or after</span>
@@ -325,6 +325,7 @@ function Commitment({ preview, horizon }) {
         </div>
       </div>
       <p className="pb-commit-rule">{preview.entry_rule}</p>
+      <p className="pb-commit-rule">{preview.no_prices}</p>
       {!s.scoreable && (
         <p className={`pb-commit-warn ${s.permanent ? "bad" : "warn"}`}>{s.reason}</p>
       )}

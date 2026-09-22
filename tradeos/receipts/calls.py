@@ -151,7 +151,7 @@ def scoreability(symbol: str, conn: psycopg.Connection,
 
     if not sym_rows:
         return {"scoreable": False, "permanent": True, "blocks_publish": False, "symbol": symbol,
-                "benchmark": benchmark, "benchmark_last_close": bench_last.isoformat(),
+                "benchmark": benchmark, "benchmark_last_session": bench_last.isoformat(),
                 "reason": f"no price series is loaded for {symbol}, so a call on it could never "
                           f"be scored. It will be sealed as unscoreable, with this reason, and "
                           f"published anyway so the record stays complete."}
@@ -171,8 +171,8 @@ def scoreability(symbol: str, conn: psycopg.Connection,
     symbol_behind = (reference - sym_last).days
     benchmark_behind = (reference - bench_last).days
     common = {"symbol": symbol, "benchmark": benchmark, "rows": sym_rows,
-              "symbol_last_close": sym_last.isoformat(),
-              "benchmark_last_close": bench_last.isoformat(),
+              "symbol_last_session": sym_last.isoformat(),
+              "benchmark_last_session": bench_last.isoformat(),
               "days_behind": symbol_behind, "benchmark_days_behind": benchmark_behind}
 
     # A lagging benchmark BLOCKS the publish rather than publishing open with a warning. Every
@@ -210,10 +210,19 @@ def preview(symbol: str, horizon_days: int, conn: psycopg.Connection,
     close under the label "entry price" would be the single most damaging small lie this product
     could tell, because the whole proposition is that its numbers mean exactly what they say.
 
-    So this returns three true things instead, which together make the commitment unambiguous:
+    AND WHAT IT NO LONGER SHOWS, for a different reason. It used to return `last_close` and
+    `benchmark_last_close` — the most recent closes we hold for the symbol and for SPY, live from
+    `prices_eod` — so a caller could see roughly where they were entering. Those are the vendor's
+    prices, and this panel is a screen. `record.NO_PRICES` states the rule; the panel keeps the
+    thing that was actually load-bearing, which is how CURRENT our data is, now expressed as the
+    date of the last session we hold rather than the number printed at it. A caller deciding
+    whether to publish needs to know our feed is four days stale; they do not need our copy of
+    the close to learn that, and they can read the price itself anywhere.
 
-      the last close WE HOLD    labelled as what it is, with its date, so the caller knows roughly
-                                where they are entering and can see how current our data is
+    So this returns three true things, which together make the commitment unambiguous:
+
+      the last SESSION we hold  as a date, for the symbol and for the benchmark, so the caller can
+                                see how current our data is before taking a permanent commitment
       the entry RULE            stated in words, because the rule is knowable even when the price
                                 is not. The date is not asserted either: whether the next session
                                 is tomorrow depends on a trading calendar this database does not
@@ -233,17 +242,17 @@ def preview(symbol: str, horizon_days: int, conn: psycopg.Connection,
                         f"{(now.date() + timedelta(days=horizon_days)).isoformat()}, "
                         f"{horizon_days} days from today.",
            "benchmark": benchmark}
+    # `max(day)`, not `day, close ... LIMIT 1`. The close is not selected at all, for the same
+    # reason `_LIST_COLUMNS` does not select the six sealed prices: a value never loaded cannot be
+    # serialised by the next person to add a field to this payload.
     with conn.cursor() as cur:
-        cur.execute("""SELECT day, close FROM prices_eod WHERE symbol = %s
-                        ORDER BY day DESC LIMIT 1""", ((symbol or "").strip().upper(),))
+        cur.execute("SELECT max(day) FROM prices_eod WHERE symbol = %s",
+                    ((symbol or "").strip().upper(),))
         row = cur.fetchone()
-        cur.execute("""SELECT day, close FROM prices_eod WHERE symbol = %s
-                        ORDER BY day DESC LIMIT 1""", (benchmark,))
+        cur.execute("SELECT max(day) FROM prices_eod WHERE symbol = %s", (benchmark,))
         bench = cur.fetchone()
-    out["last_close"] = float(row[1]) if row else None
-    out["last_close_day"] = row[0].isoformat() if row else None
-    out["benchmark_last_close"] = float(bench[1]) if bench else None
-    out["benchmark_last_close_day"] = bench[0].isoformat() if bench else None
+    out["last_session"] = row[0].isoformat() if row and row[0] else None
+    out["benchmark_last_session"] = bench[0].isoformat() if bench and bench[0] else None
     return out
 
 
@@ -346,11 +355,23 @@ def publish(caller_id: int, spec: dict, conn: psycopg.Connection,
 # literal written here and holds nothing a caller supplies, so the risk is theoretical — but the
 # repository's rule is that composed SQL goes through psycopg.sql without exceptions, and ruff's
 # S608 enforces it. An exception granted for a safe case is how the rule stops being a rule.
+#
+# THE SIX PRICE COLUMNS ARE NOT SELECTED HERE, and the omission is the enforcement rather than a
+# preference. `entry_price`, `exit_price`, `benchmark_entry`, `benchmark_exit`, `subject_return`
+# and `benchmark_return` still exist on the row, are still written by `scoring._write` and are
+# still sealed by migration 035. They are simply never loaded into anything that can be serialised
+# to a reader. `record.NO_PRICES` states why, in the words every surface quotes.
+#
+# Leaving them out of the SELECT rather than filtering them at the route is deliberate. The leak
+# this closes was never a field somebody chose to print: `/api/calls/{id}` returned this row
+# wholesale and the prices came with it, invisibly, because all 474 sealed rows had them NULL and
+# nothing had yet resolved through the scorer. The first resolution would have started publishing
+# them on a public route with no code change and no review. A filter at the edge has the same hole
+# one route later; a column that is never read has none.
 _LIST_COLUMNS = sql.SQL(", ").join(map(sql.Identifier, (
     "id", "caller_id", "seq", "symbol", "direction", "horizon_days", "confidence", "thesis",
     "benchmark_symbol", "published_at", "knowable_time", "prev_hash", "content_hash",
-    "entry_session", "exit_session", "entry_price", "exit_price", "benchmark_entry",
-    "benchmark_exit", "subject_return", "benchmark_return", "excess_return", "verdict",
+    "entry_session", "exit_session", "excess_return", "verdict",
     "verdict_note", "resolved_at", "open_reason_code", "open_reason", "open_checked_at")))
 
 
@@ -361,18 +382,18 @@ def _row(r: tuple) -> dict:
         "horizon_days": r[5], "confidence": r[6], "thesis": r[7], "benchmark_symbol": r[8],
         "published_at": r[9].isoformat(), "knowable_time": r[10].isoformat(),
         "prev_hash": r[11], "content_hash": r[12],
+        # The two session dates are what replaces the four prices, and they are strictly better
+        # for the reader: exact, not the vendor's data, and enough to price the same two sessions
+        # from any feed and arrive at the same excess return. See `record.RECOMPUTE_NOTE`.
         "entry_session": r[13].isoformat() if r[13] else None,
         "exit_session": r[14].isoformat() if r[14] else None,
-        "entry_price": num(r[15]), "exit_price": num(r[16]),
-        "benchmark_entry": num(r[17]), "benchmark_exit": num(r[18]),
-        "subject_return": num(r[19]), "benchmark_return": num(r[20]),
-        "excess_return": num(r[21]), "verdict": r[22], "verdict_note": r[23],
-        "resolved_at": r[24].isoformat() if r[24] else None,
+        "excess_return": num(r[15]), "verdict": r[16], "verdict_note": r[17],
+        "resolved_at": r[18].isoformat() if r[18] else None,
         # Why a past-horizon call is still open. On the row rather than only in a log line: a call
         # thirty days past its horizon showing no verdict and no explanation reads, to a sceptic,
         # exactly like a result being withheld.
-        "open_reason_code": r[25], "open_reason": r[26],
-        "open_checked_at": r[27].isoformat() if r[27] else None,
+        "open_reason_code": r[19], "open_reason": r[20],
+        "open_checked_at": r[21].isoformat() if r[21] else None,
     }
 
 

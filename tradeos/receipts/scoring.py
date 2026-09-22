@@ -42,6 +42,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 
 import psycopg
+from psycopg import sql
 
 from .. import ledger
 from ..backtest.engine import Series, entry_day_after, excess_return, exit_day_for
@@ -177,7 +178,7 @@ def benchmark_health(conn: psycopg.Connection, benchmark: str = "SPY",
     """
     spy = _series(conn, benchmark)
     if not spy.days:
-        return {"ok": False, "benchmark": benchmark, "last_close": None, "market_last": None,
+        return {"ok": False, "benchmark": benchmark, "last_session": None, "market_last": None,
                 "missing_sessions": [],
                 "reason": f"there are no {benchmark} prices loaded at all, and every call is "
                           f"measured against {benchmark}. Nothing can be scored until that is "
@@ -192,7 +193,7 @@ def benchmark_health(conn: psycopg.Connection, benchmark: str = "SPY",
     if missing:
         shown = ", ".join(d.isoformat() for d in missing[:5])
         more = f" and {len(missing) - 5} more" if len(missing) > 5 else ""
-        return {"ok": False, "benchmark": benchmark, "last_close": spy.days[-1].isoformat(),
+        return {"ok": False, "benchmark": benchmark, "last_session": spy.days[-1].isoformat(),
                 "market_last": market_last.isoformat() if market_last else None,
                 "missing_sessions": [d.isoformat() for d in missing],
                 "reason": f"our {benchmark} series is missing {len(missing)} session(s) the market "
@@ -201,12 +202,12 @@ def benchmark_health(conn: psycopg.Connection, benchmark: str = "SPY",
                           f"because a benchmark with holes produces wrong verdicts and a verdict "
                           f"cannot be taken back."}
     if behind > 0:
-        return {"ok": False, "benchmark": benchmark, "last_close": spy.days[-1].isoformat(),
+        return {"ok": False, "benchmark": benchmark, "last_session": spy.days[-1].isoformat(),
                 "market_last": market_last.isoformat(), "missing_sessions": [],
                 "reason": f"our {benchmark} series ends {spy.days[-1]} but the market traded "
                           f"through {market_last}, so the benchmark is {behind} day(s) behind. "
                           f"Nothing is scored against a lagging benchmark."}
-    return {"ok": True, "benchmark": benchmark, "last_close": spy.days[-1].isoformat(),
+    return {"ok": True, "benchmark": benchmark, "last_session": spy.days[-1].isoformat(),
             "market_last": market_last.isoformat() if market_last else None,
             "missing_sessions": [],
             "reason": f"{benchmark} holds every one of the {len(sessions)} sessions the market "
@@ -372,7 +373,8 @@ def _write(conn: psycopg.Connection, call_id: int, verdict: str, note: str,
 
 # ------------------------------------------------------------------ the batch
 
-def resolve_due(conn: psycopg.Connection, limit: int = 100) -> dict:
+def resolve_due(conn: psycopg.Connection, limit: int = 100,
+                caller_id: int | None = None) -> dict:
     """Resolve every call whose horizon has elapsed and which has no verdict yet.
 
     Returns counts BY VERDICT, not a bare success. A scheduler job that produced nothing is
@@ -386,12 +388,31 @@ def resolve_due(conn: psycopg.Connection, limit: int = 100) -> dict:
     silently deferring the rest hides it. Refusing is always recoverable: the calls stay open, the
     reason is named with its dates in `job_runs.detail`, and the next pass scores everything once
     the gap is filled.
+
+    `caller_id` SCOPES THE BATCH, and it exists because of a measured accident rather than a
+    feature request. This is a batch over the WHOLE table, and the suite runs against the live
+    database: `test_resolve_due_counts_no_ops_separately` called it unscoped while `_series` was
+    monkeypatched to a fixture, so it picked up @a-real-stranger's real, public, open ABT call and
+    wrote that call's public "why is this still open" sentence from fixture prices. Measured
+    2026-09-23: the row on the live board read "its newest close is 2026-08-14" while ABT's actual
+    series ran to 2026-09-22.
+
+    Nothing sealed was touched -- `_stay_open` writes only disclosure columns -- but the same path
+    reaches `_write`, and under a fixture series that happened to span the horizon it would have
+    sealed a PERMANENT VERDICT on a stranger's public call from prices that are not real. A verdict
+    cannot be taken back (CLAUDE.md 0z), so the near miss is the whole argument. Production passes
+    nothing and behaves exactly as before; tests pass their own scratch caller.
     """
+    scope = sql.SQL("AND caller_id = {}").format(sql.Placeholder()) if caller_id else sql.SQL("")
+    params = ((caller_id, limit) if caller_id else (limit,))
     with conn.cursor() as cur:
-        cur.execute("""SELECT id, published_at::date FROM calls
-                        WHERE verdict IS NULL
-                          AND published_at::date + make_interval(days => horizon_days) <= now()
-                     ORDER BY published_at LIMIT %s""", (limit,))
+        cur.execute(sql.SQL("""SELECT id, published_at::date FROM calls
+                                WHERE verdict IS NULL
+                                  AND published_at::date
+                                      + make_interval(days => horizon_days) <= now()
+                                  {scope}
+                             ORDER BY published_at LIMIT {lim}""").format(
+            scope=scope, lim=sql.Placeholder()), params)
         due = cur.fetchall()
     ids = [r[0] for r in due]
 
@@ -404,14 +425,14 @@ def resolve_due(conn: psycopg.Connection, limit: int = 100) -> dict:
     health = benchmark_health(conn, since=min((d for _, d in due), default=None))
     if not health["ok"]:
         return {**base, "refused": True, "warning": health["reason"],
-                "benchmark_last_close": health["last_close"],
+                "benchmark_last_session": health["last_session"],
                 "market_last_session": health["market_last"],
                 "missing_benchmark_sessions": health["missing_sessions"],
                 "note": f"nothing was scored. {health['reason']}"}
 
     if not ids:
         return {**base, "note": "no call had reached its horizon.",
-                "benchmark_last_close": health["last_close"]}
+                "benchmark_last_session": health["last_session"]}
 
     spy = _series(conn, "SPY")
     still_open = no_ops = 0
@@ -431,7 +452,7 @@ def resolve_due(conn: psycopg.Connection, limit: int = 100) -> dict:
 
     resolved = sum(counts.values())
     detail = {**base, "resolved": resolved, "still_open": still_open, "no_ops": no_ops,
-              **counts, "benchmark_last_close": health["last_close"]}
+              **counts, "benchmark_last_session": health["last_session"]}
     if still_open:
         detail["note"] = (f"{still_open} call(s) reached their horizon but the prices have not, so "
                           f"they stay open with a stored reason rather than being sealed.")

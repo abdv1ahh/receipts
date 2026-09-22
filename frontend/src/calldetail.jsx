@@ -1,19 +1,23 @@
 // One call, with its proof.
 //
-// The test this page has to pass: an investor with a calculator can check the arithmetic. Not
-// "trust the verdict", not "here is a chart" — the four prices, the two returns, the difference,
-// the noise floor, and the rule that turned that into a word. If any of those is missing the
-// verdict is an assertion, and an assertion is what every other track record already offers.
+// The test this page has to pass: a sceptic with a calculator can check the arithmetic. Not "trust
+// the verdict", not "here is a chart" — the two sessions, the excess against SPY, the noise floor,
+// and the rule that turned that into a word. If any of those is missing the verdict is an
+// assertion, and an assertion is what every other track record already offers.
 //
-// Where a value genuinely is not held, the panel says so and says why. The imported house calls
-// carry an excess return and an entry session but not the component prices, because those were
-// never stored; back-filling them now would mean recomputing a lookup today and presenting the
-// result as what was measured then.
+// IT USED TO SHOW THE FOUR COMPONENT PRICES AND THE TWO COMPONENT RETURNS, and that was the
+// stronger panel right up until the licence was read: the prices come from a market-data vendor
+// whose terms permit no redistribution and carry no exception for display, and this page is
+// public. So the panel now hands over the two SESSION DATES instead, and they turn out to be the
+// better answer anyway — a reader who prices those two sessions from a feed of their own choosing
+// reproduces the number without having to trust our copy of it, which is more than the old panel
+// offered. Both explanatory strings come from `receipts/record.py` through the API; see
+// `record.NO_PRICES` and `record.RECOMPUTE_NOTE`.
 import { useEffect, useState } from "react";
 import { fetchCall } from "./api";
 import { Icon } from "./icons.jsx";
 import { EmptyState, LoadError } from "./shell.jsx";
-import { Disclaimer, VerdictChip, day, price, shortHash, signed } from "./receiptsui.jsx";
+import { Disclaimer, VerdictChip, day, shortHash, signed } from "./receiptsui.jsx";
 
 function Field({ label, value, missing, mono = true, wide = false }) {
   return (
@@ -91,7 +95,6 @@ export function CallDetailView({ callId, onBack, onOpenRecord }) {
   }
 
   const c = data.call;
-  const imported = c.excess_return != null && c.entry_price == null;
 
   return (
     <div className="cd-page">
@@ -119,9 +122,11 @@ export function CallDetailView({ callId, onBack, onOpenRecord }) {
 
       <section className="cd-proof">
         <h2 className="rc-h2">The proof</h2>
+        {/* "Everything the verdict was computed from" was true when the four component prices
+            were in this grid. It is not true now and the lede must not outlive the panel. */}
         <p className="rc-lede">
-          Everything the verdict was computed from. Entry is the close of the first session strictly
-          after publication, never the session in progress.
+          What the verdict was computed over, and the rule it was computed by. Entry is the close of
+          the first session strictly after publication, never the session in progress.
         </p>
 
         <div className="cd-grid">
@@ -133,23 +138,15 @@ export function CallDetailView({ callId, onBack, onOpenRecord }) {
           <Field label="content hash" value={c.content_hash} wide />
         </div>
 
+        {/* The four component prices and the two component returns used to sit in this grid.
+            They were the vendor's data on a public page; see `record.NO_PRICES`. What a sceptic
+            needs is not our copy of the closes but the two SESSIONS, which are exact, are ours to
+            publish, and let them price the same window from any feed they like. */}
         <div className="cd-grid">
           <Field label="entry session" value={c.entry_session ? day(c.entry_session) : null}
                  missing="not scored yet" />
           <Field label="exit session" value={c.exit_session ? day(c.exit_session) : null}
                  missing="not scored yet" />
-          <Field label="entry price" value={price(c.entry_price)}
-                 missing={imported ? "not stored at the time" : "not scored yet"} />
-          <Field label="exit price" value={price(c.exit_price)}
-                 missing={imported ? "not stored at the time" : "not scored yet"} />
-          <Field label="benchmark at entry" value={price(c.benchmark_entry)}
-                 missing={imported ? "not stored at the time" : "not scored yet"} />
-          <Field label="benchmark at exit" value={price(c.benchmark_exit)}
-                 missing={imported ? "not stored at the time" : "not scored yet"} />
-          <Field label="the symbol moved" value={c.subject_return == null ? null : signed(c.subject_return)}
-                 missing={imported ? "not stored at the time" : "not scored yet"} />
-          <Field label="the benchmark moved" value={c.benchmark_return == null ? null : signed(c.benchmark_return)}
-                 missing={imported ? "not stored at the time" : "not scored yet"} />
           <Field label="excess against the benchmark"
                  value={c.excess_return == null ? null : signed(c.excess_return)}
                  missing="not scored yet" />
@@ -157,14 +154,11 @@ export function CallDetailView({ callId, onBack, onOpenRecord }) {
                  value={`plus or minus ${(data.noise_floor * 100).toFixed(0)}%`} />
         </div>
 
-        {imported && (
-          <p className="cd-imported">
-            This call was imported from our own signal engine's ledger, where it was scored when its
-            horizon closed. The excess return and the entry session are what was recorded at the
-            time. The component prices were not stored then, and they are shown as absent rather
-            than recomputed today and presented as if they had been.
-          </p>
-        )}
+        {/* Both strings come from the server, which reads them from `record.py`. Typing them here
+            would be the copy that drifts, on the panel whose entire job is to be checkable. */}
+        <p className="cd-recompute">
+          <b>Why there are no prices here.</b> {data.no_prices} {data.recompute}
+        </p>
 
         {c.verdict_note && (
           <div className="cd-note">
