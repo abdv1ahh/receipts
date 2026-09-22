@@ -1,0 +1,104 @@
+{
+  "handle": "fixture-caller",
+  "fields": [
+    "caller_id",
+    "seq",
+    "symbol",
+    "direction",
+    "horizon_days",
+    "confidence",
+    "thesis",
+    "benchmark_symbol",
+    "published_at",
+    "knowable_time"
+  ],
+  "genesis": "0000000000000000000000000000000000000000000000000000000000000000",
+  "links": [
+    {
+      "seq": 1,
+      "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "content_hash": "facfbff609e393e75c60e0d205361a7e5b51fa6171be88ab0fa61a228c4cd700",
+      "values": {
+        "caller_id": "42",
+        "seq": "1",
+        "symbol": "AAPL",
+        "direction": "up",
+        "horizon_days": "7",
+        "confidence": "low",
+        "thesis": "a thesis with more than forty characters in it, so a reader could actually judge it",
+        "benchmark_symbol": "SPY",
+        "published_at": "2026-05-02T14:30:00.123456Z",
+        "knowable_time": "2026-05-02T14:30:00.123456Z"
+      }
+    },
+    {
+      "seq": 2,
+      "prev_hash": "facfbff609e393e75c60e0d205361a7e5b51fa6171be88ab0fa61a228c4cd700",
+      "content_hash": "6e7c0d6ed948359642a547fb6d87b33134c8db80727644b9424c0c3a339c0bfa",
+      "values": {
+        "caller_id": "42",
+        "seq": "2",
+        "symbol": "GEF-B",
+        "direction": "down",
+        "horizon_days": "30",
+        "confidence": "medium",
+        "thesis": "",
+        "benchmark_symbol": "SPY",
+        "published_at": "2026-05-03T14:30:00.123456Z",
+        "knowable_time": "2026-05-03T14:30:00.123456Z"
+      }
+    },
+    {
+      "seq": 3,
+      "prev_hash": "6e7c0d6ed948359642a547fb6d87b33134c8db80727644b9424c0c3a339c0bfa",
+      "content_hash": "be54b817d72811064b4b91461e441b3ce240676ac9fc03e02e0246f208ad3d48",
+      "values": {
+        "caller_id": "42",
+        "seq": "3",
+        "symbol": "BRK.B",
+        "direction": "up",
+        "horizon_days": "90",
+        "confidence": "high",
+        "thesis": "unicode in the reasoning: a 4-byte emoji sits here 📈 and a caret ^ and a newline is not allowed but a colon: is",
+        "benchmark_symbol": "SPY",
+        "published_at": "2026-05-04T14:30:00.123456Z",
+        "knowable_time": "2026-05-04T14:30:00.123456Z"
+      }
+    },
+    {
+      "seq": 4,
+      "prev_hash": "be54b817d72811064b4b91461e441b3ce240676ac9fc03e02e0246f208ad3d48",
+      "content_hash": "1c132daaf4639c5cd5ac61b821a1e99234464042cce942925e9f57879f75d802",
+      "values": {
+        "caller_id": "42",
+        "seq": "4",
+        "symbol": "NVDA",
+        "direction": "down",
+        "horizon_days": "7",
+        "confidence": "medium",
+        "thesis": "a caller could try to smuggle structure: seq:2:9 symbol:4:FAKE and it must not be mistaken for a field",
+        "benchmark_symbol": "SPY",
+        "published_at": "2026-05-05T14:30:00.123456Z",
+        "knowable_time": "2026-05-05T14:30:00.123456Z"
+      }
+    },
+    {
+      "seq": 5,
+      "prev_hash": "1c132daaf4639c5cd5ac61b821a1e99234464042cce942925e9f57879f75d802",
+      "content_hash": "793aebe95b07c16ee25283a3985b1b08e0e2b116885218bd254d1741769557b7",
+      "values": {
+        "caller_id": "42",
+        "seq": "5",
+        "symbol": "SPY",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "the last one, ordinary and long enough to be a real reason a reader could hold somebody to",
+        "benchmark_symbol": "SPY",
+        "published_at": "2026-05-06T14:30:00.123456Z",
+        "knowable_time": "2026-05-06T14:30:00.123456Z"
+      }
+    }
+  ],
+  "framing": "each field as name:byte-length-of-value:value, joined with newline; sha256 of (prev_hash + payload), hex"
+}

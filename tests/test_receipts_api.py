@@ -54,6 +54,23 @@ def client():
     return TestClient(app)
 
 
+def _scrub(conn, caller_id: int) -> None:
+    """Take a scratch caller back off the public board.
+
+    Roll back FIRST. A test that fails inside a cursor leaves the transaction aborted, and every
+    statement after it then errors with "current transaction is aborted" — so the teardown
+    silently does nothing and the scratch caller is left on the board. That happened: six of them
+    accumulated before this line existed.
+    """
+    conn.rollback()
+    with conn.cursor() as cur:
+        cur.execute("ALTER TABLE calls DISABLE TRIGGER calls_append_only_trg")
+        cur.execute("DELETE FROM calls WHERE caller_id = %s", (caller_id,))
+        cur.execute("ALTER TABLE calls ENABLE TRIGGER calls_append_only_trg")
+        cur.execute("DELETE FROM callers WHERE id = %s", (caller_id,))
+    conn.commit()
+
+
 @pytest.fixture
 def thin_caller():
     """A real caller with one real call: the gated case, which cannot be faked into existence."""
@@ -66,17 +83,7 @@ def thin_caller():
         conn.commit()
         receipts_calls.publish(caller_id, VALID, conn)
         yield caller_id, handle
-        # Roll back FIRST. A test that fails inside a cursor leaves the transaction aborted, and
-        # every statement below then errors with "current transaction is aborted" — so the teardown
-        # silently does nothing and the scratch caller is left on the public board. That happened:
-        # six of them accumulated before this line existed.
-        conn.rollback()
-        with conn.cursor() as cur:
-            cur.execute("ALTER TABLE calls DISABLE TRIGGER calls_append_only_trg")
-            cur.execute("DELETE FROM calls WHERE caller_id = %s", (caller_id,))
-            cur.execute("ALTER TABLE calls ENABLE TRIGGER calls_append_only_trg")
-            cur.execute("DELETE FROM callers WHERE id = %s", (caller_id,))
-        conn.commit()
+        _scrub(conn, caller_id)
 
 
 # ------------------------------------------------------------------ the public boundary
@@ -140,7 +147,16 @@ def test_the_admin_review_queue_is_admin_only(client):
 def test_a_missing_handle_is_a_404_and_not_a_500(client):
     assert client.get("/api/receipts/nobody-holds-this").status_code == 404
     assert client.get("/api/receipts/nobody-holds-this/verify").status_code == 404
-    assert client.get("/r/nobody-holds-this").status_code == 200      # a readable page, not an error
+    assert client.get("/api/receipts/nobody-holds-this/chain").status_code == 404
+
+    # The share page answers 404 too, and still renders something a person can read. This asserted
+    # 200 for "a readable page, not an error" — but a 200 tells a crawler a mistyped link is a real
+    # record, and left a link checker unable to tell a dead handle from a live one while the API
+    # 404'd on the same input. The status is for machines, the body is for people.
+    dead = client.get("/r/nobody-holds-this")
+    assert dead.status_code == 404
+    assert "No record here" in dead.text
+    assert "cannot be deleted once it is published" in dead.text
 
 
 # ------------------------------------------------------------------ what the record says
@@ -315,14 +331,34 @@ def test_the_record_page_refuses_to_render_a_link_it_did_not_vet():
     assert "href={caller.audience_url}" not in src
 
 
-def test_the_share_page_escapes_every_interpolation():
-    """The card path was the one value on /r/{handle} that was not escaped. It is safe today only
-    because of a regex three hundred lines away in a different function."""
-    import inspect
+def test_the_share_page_escapes_what_a_caller_typed(client):
+    """The public record page renders a display name, a bio and a thesis — three strings a caller
+    controls — on the one document this product asks them to post everywhere.
 
-    import tradeos.app as app_mod
-    src = inspect.getsource(app_mod.receipt_share_page)
-    assert 'card = e(f"/api/card/receipt/' in src
-    # Nothing else may be interpolated raw into an attribute on that page.
-    for raw in ('content="{title}"', 'content="{line}"', 'href="/record?handle={caller'):
-        assert raw not in src
+    Written against a caller inserted straight into the table, past every validator, because that
+    is the case the escaping exists for: a row created by a path that does not exist yet must
+    still be unable to put markup on this page. The previous version of this test read the
+    handler's source for one `e(...)` call, which stopped meaning anything the moment the page
+    started rendering somewhere else.
+    """
+    handle = f"test-{secrets.token_hex(6)}"
+    with db.connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""INSERT INTO callers (handle, display_name, bio, kind,
+                                                jurisdiction_attested)
+                           VALUES (%s, %s, %s, 'human', true) RETURNING id""",
+                        (handle, "<script>alert(1)</script>", 'bio" onload="alert(2)'))
+            caller_id = cur.fetchone()[0]
+        conn.commit()
+        receipts_calls.publish(caller_id, VALID, conn)
+        try:
+            html = client.get(f"/r/{handle}").text
+            assert "<script>alert(" not in html
+            assert 'onload="alert' not in html
+            assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html
+            assert "&quot; onload=&quot;alert(2)" in html
+        finally:
+            _scrub(conn, caller_id)
+    # A thesis is the fourth caller-controlled string on that page and it renders only on a
+    # resolved miss, so it is covered where it can actually be reached — see
+    # `test_public_record.py::test_every_string_a_caller_controls_is_escaped`.

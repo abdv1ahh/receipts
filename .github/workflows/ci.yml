@@ -46,3 +46,13 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run build
+      # The cross-language guard on the sealed wire format, and the ONLY place it runs
+      # automatically. `chain.py` and `receipts/verify.js` must produce byte-identical payloads
+      # forever — the public record page lets a visitor recompute the chain in their own browser,
+      # and a JS framing that disagrees by one byte reports every intact record as broken. The
+      # `test` job above cannot check it: no node, and no database, so the tests that would reach
+      # it skip. This job already has node, and the script needs no npm dependencies and no
+      # network — it reads a committed fixture that Python is pinned to from the other side.
+      - name: the sealed wire format, checked from JavaScript
+        working-directory: .
+        run: node tests/verify_js_check.mjs

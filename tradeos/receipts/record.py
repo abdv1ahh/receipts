@@ -93,7 +93,14 @@ def _compute(counts: tuple, followed: list[float]) -> dict:
         "hit_rate": None if gated else round(hit / scoreable, 4),
         "hit_rate_ci": None if gated else list(wilson) if wilson else None,
         "expectancy": None if gated else ci["mean"],
-        "expectancy_ci": None if gated else [ci["lo"], ci["hi"]],
+        # None, never [None, None]. `mean_ci` reports lo and hi as None when there is nothing to
+        # measure — a caller past the sample gate whose resolved calls all carry a NULL excess
+        # return — and wrapping those in a list produces a thing that LOOKS like an interval to
+        # every consumer. It crashed the public record page (`eci[0] < 0 < eci[1]`, TypeError, a
+        # 500 on the page a stranger lands on) and the React surface read the list as truthy and
+        # rendered "this sample does show an effect of not scored per call", which is a false
+        # statement about somebody else's record. Fixed here rather than in each surface.
+        "expectancy_ci": None if gated or ci["lo"] is None else [ci["lo"], ci["hi"]],
         # Reported whichever way it points, and reported as NOT significant whenever the interval
         # spans zero. An average that cannot be told apart from no effect is not an effect.
         "expectancy_significant": (not gated) and ci["significant"],

@@ -89,3 +89,43 @@ product decision, not an implementation detail — is whether an annotation may 
 must not: a record full of excused misses is worth less than one without the feature.
 
 `docs/receipts_gap_analysis.md` §GAP 8.
+
+---
+
+## 5. The browser check does not close the hole it makes most visible
+
+Added 2026-09-22, alongside Part E (the public record page).
+
+**State.** `/r/{handle}`'s Verify button recomputes the whole chain in the visitor's own browser
+(`receipts/verify.js` over `/api/receipts/{handle}/chain`, which hands over the sealed fields and
+states no verdict). That is a real improvement over asking our server whether our own record is
+intact, and it is worth being precise about what it does and does not move:
+
+| against | before | after |
+|---|---|---|
+| the CALLER editing, deleting, reordering or backdating | caught, by our server | caught, **by the visitor's own machine** |
+| US rewriting the record and recomputing every hash after it | not caught | **still not caught** |
+
+**Why the second row does not move.** We hold every field. A browser can only hash what it is
+given, so an operator who rewrites a call and recomputes the chain from that point hands over a
+self-consistent chain and every client agrees it is intact. Moving the arithmetic off our server
+removes us from the *checking*; it cannot remove us from the *data*.
+
+**What a reader is told.** The caveat is printed directly beneath the Verify result, unprompted, at
+the moment a visitor is most impressed — the one string, from `record.methodology()["chain"]
+["does_not_prove"]`, which every surface reads rather than copying:
+
+> The chain does not prove that WE have not rewritten it. We hold every field, so this operator
+> could edit a call and recompute the whole chain after it. Making that impossible needs an anchor
+> outside our control, publishing the chain head daily somewhere we cannot revise, and that is not
+> built yet. This is not a blockchain and we do not call it one.
+
+**The one thing the panel does add against the operator.** It offers to break the record in front
+of you: "Now show me it failing" changes one character of one thesis in your browser and reruns the
+same code, which reports the tamper and names the call. A check that can only ever say yes is
+indistinguishable from a green sticker, and a visitor has no way to tell them apart unless they see
+it say no.
+
+**What closing gap 5 needs.** The same anchor gap 3 needs, from the other side: publishing the
+chain head somewhere we cannot revise. Until that exists, this page is tamper-evident against the
+caller and trust-based against us, and says so in those words.

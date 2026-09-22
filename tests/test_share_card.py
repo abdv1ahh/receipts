@@ -234,12 +234,16 @@ def test_the_verification_panel_waits_until_something_is_published():
     assert "state.published > 0 && <Verify" in pub
 
 
-@_frontend
-def test_the_record_page_prefers_the_png_card_in_its_tags():
-    """The SVG stays in the page BODY, where a browser renders it sharper than any raster; the tags
-    get the PNG, because a scraper will not render SVG at all."""
+def test_the_record_page_puts_the_png_card_in_its_tags_and_the_record_in_its_body():
+    """A scraper will not render an SVG, so the link preview must name the PNG.
+
+    The SVG used to be the page BODY as well — the whole of it, a picture of the record with a
+    link underneath. Part E replaced that with the record itself, so the body now carries the
+    counts and every call rather than an image of them, and the `.svg` endpoint is left serving
+    callers who want to embed the card somewhere of their own.
+    """
     app = (SRC.parents[1] / "tradeos" / "app.py").read_text()
-    share = app[app.index('def receipt_share_page('):]
-    share = share[:share.index("# ----")]
-    assert 'image_path=png' in share
-    assert '.png"' in share and '.svg"' in share, "the body should still use the SVG"
+    share = app[app.index("def receipt_share_page("):]
+    share = share[:share.index("def _receipt_document(")]
+    assert ".png" in share
+    assert ".svg" not in share, "a scraper cannot render the SVG, and the body is no longer a card"

@@ -23,8 +23,21 @@ outcome is known, it is sealed into a per-caller SHA256 hash chain, and a databa
 every delete and every update to a sealed column. It resolves automatically against Tiingo prices,
 benchmarked to SPY, with a 2% noise floor and a 25 call sample gate. Anyone can hit **Verify chain**
 and watch every hash recompute. Surfaces: `/board` (the landing route) `/record` `/publish`
-`/call` `/methodology`, plus the public share page `/r/{handle}` and card
-`/api/card/receipt/{handle}.svg`.
+`/call` `/methodology`.
+
+**`/r/{handle}` is THE PUBLIC RECORD and it is server rendered, not the app bundle**
+(`receipts/page.py`, Part E). It is where every shared link lands, so it is the one page written
+for someone with no account: no sidebar, no search, no upgrade button, no bell, and exactly one
+outbound link in the whole document — `/claim`. It carries the counts, the rate or the reason there
+is none, the losses ahead of the breakdowns, every open call with the stored reason and the time we
+last looked, and every call. **Its Verify button recomputes the chain in the VISITOR'S browser**
+(`receipts/verify.js` over `/api/receipts/{handle}/chain`), which hands over the sealed fields and
+states no verdict of its own — a server answering `intact: true` is the operator asking to be
+trusted, on the page whose argument is that you need not. It also offers to break the record in
+front of you, in your browser, so the check is visibly capable of saying no. A test asserts the
+document holds no app chrome and exactly one internal link. The share CARD
+(`/api/card/receipt/{handle}.png`, `.svg`) is now only the link preview; nothing in the product
+embeds the SVG any more.
 
 **The first two records on the board are OURS** — `@convergence-v3` (323 calls) and
 `@convergence-v4` (150), imported from the signal plane's own resolved claims by
@@ -94,7 +107,8 @@ The app is at <http://localhost:8000>. Demo login: `demo@tradeos.app` / `<genera
 ### Tests
 
 ```bash
-make test     # 904 tests, ~3.6s. Offline except the DB-backed authz and Receipts integrity tests
+make test     # 991 tests, ~5.3s. Offline except the DB-backed authz and Receipts integrity tests
+make test-js  # the cross-language guard on the sealed wire format. Runs on the HOST, needs node
 make lint     # ruff; zero errors is the standard
 make dev      # reload-in-place stack; then `make web` for a UI change
 make fix      # ruff --fix
@@ -102,6 +116,17 @@ make fix      # ruff --fix
 
 `tests/` is deliberately not copied into the production image, so the suite runs against a mount.
 `make test` does that for you.
+
+**`make test-js` is not optional and `make test` cannot replace it.** `chain.py` and
+`receipts/verify.js` must produce byte-identical payloads forever, because the public record page
+lets a visitor recompute the chain in their own browser — a JS framing that disagrees by one byte
+reports every intact record as broken. `make test` runs inside the API image, which carries no node
+(the frontend is built in a separate Docker stage), and the host that has node has no Python
+dependencies, so neither place can run both languages. Both sides check one committed fixture
+instead (`tests/fixtures/receipt_chain.json`, five links including an empty thesis, a four-byte
+emoji, and a thesis that spells out a field header to try to smuggle structure past the framing):
+`test_receipts_chain.py` pins Python to it, `tests/verify_js_check.mjs` pins JavaScript to it.
+**Run both after touching either side.**
 
 ### Frontend
 
@@ -196,7 +221,11 @@ tradeos/                  the Python package (all backend code)
   smartmoney_claims.py    convergence signals expressed as scoreable claims.
   watchlist_accounts.py   the consequential-accounts influence list.
   receipts/               THE PRODUCT. chain.py (pure, the wire format) calls.py scoring.py
-                          record.py verification.py seed.py context.py
+                          record.py verification.py seed.py context.py card.py universe.py
+                          page.py   the server-rendered public record at /r/{handle}. No bundle.
+                          verify.js the visitor's own check, run in THEIR browser. Served as a
+                                    file at /receipt-verify.js, because script-src 'self' refuses
+                                    an inline script silently. Imported by node in tests/.
   migrations/             001..036 ordered .sql; NEVER edit an applied migration, and every
                           file MUST insert its own schema_migrations row
   (surface modules)       dashboard, brief, news, social, sentiment, crypto, events,
@@ -342,6 +371,40 @@ fastest:
    while BATCH is 100, so the symbol that actually failed may not even appear in the log line.
    Delisted and OTC names are NOT this problem — they return 200 with no bars and count as
    `no_data`.
+
+0y2. **THE WIRE FORMAT NOW HAS A SECOND IMPLEMENTATION, IN A LANGUAGE THE TEST SUITE CANNOT RUN.**
+   `receipts/verify.js` reframes and rehashes the chain in the visitor's browser, so `chain.py` and
+   it must agree byte for byte forever — disagree by one and every intact record reports as broken,
+   on the interaction the product is sold on. The framing (`name:byte-length:value`, newline
+   joined, `sha256(prev_hash + payload)`) is duplicated ON PURPOSE: it is the part worth computing
+   independently, and the server renders the VALUES (`chain.rendered_fields`) so no client has to
+   reinvent how a timestamp is spelled — a JS `Date` round trip drops the microseconds and the
+   trailing Z, both of which are sealed bytes. Two traps: the length is in **bytes, not
+   characters** (a four-byte emoji in a thesis is one character), and `make test` cannot check any
+   of this, because the API image has no node and the host has no Python deps. **`make test-js` is
+   the guard**; both sides are pinned to `tests/fixtures/receipt_chain.json`.
+
+0y3. **`script-src 'self'` means an inline `<script>` is refused with NOTHING in our logs.** The
+   public record page's verifier is served as a file from `/receipt-verify.js` for that reason
+   alone; inlined it would have been a dead button behind a clean 200 and a green test suite. A
+   test asserts the page carries no inline script.
+
+   Related, and it cost twenty minutes twice: **`--reload-include '*.js'` DOES NOT WORK HERE.**
+   That flag needs `watchfiles`, which is not in `requirements.txt`, so uvicorn falls back to
+   `StatReload` — which only `rglob`s `*.py` — and logs *"--reload-include and --reload-exclude
+   have no effect unless watchfiles is installed"*. Reading `verify.js` once at import therefore
+   served the OLD bytes behind a clean 200 while the file on disk moved, and adding the flag looked
+   like a fix while changing nothing. `app.py:_verify_js()` now caches on the file's **mtime**: one
+   `stat()` per request on a route the browser caches for five minutes, and in production the read
+   still happens once per process because the file never changes between deploys.
+
+0y4. **WebCrypto is undefined outside a SECURE CONTEXT, and `localhost` hides it.** `crypto.subtle`
+   exists on https and on localhost and nowhere else — so the browser-side verifier works
+   perfectly in development and is dead on a plain-http LAN address, which is exactly what a bare
+   `docker compose up` with no proxy serves. `verify.js` checks for it before wiring the button and
+   says which of the two things is wrong ("nothing is wrong with the record — open this page over
+   https"), because the alternative was the flagship interaction dying mid-walk with a frozen
+   progress bar and no message. Found by `/code-review`.
 
 0y. **`receipts/chain.py`'s canonical payload is a WIRE FORMAT and its field order is frozen
    forever.** Adding a sealed field, reordering two, or changing how a timestamp renders would

@@ -8,6 +8,8 @@ says "something is wrong somewhere" is not evidence a reader can use.
 from __future__ import annotations
 
 import copy
+import json
+import pathlib
 from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
@@ -204,3 +206,69 @@ def test_the_first_break_is_the_one_reported():
     calls[2]["symbol"] = "MSFT"
     calls[7]["symbol"] = "TSLA"
     assert chain.verify_chain(calls)["broken_at_seq"] == 3
+
+
+# ------------------------------------------------------------------ handing the payload to a browser
+
+def test_the_rendered_fields_reassemble_into_the_canonical_payload():
+    """A browser cannot be sent a datetime, and it must not be asked to reinvent how one is
+    rendered: microseconds and the trailing Z are part of the sealed bytes, and a JavaScript Date
+    round trip drops both. So the server renders each field and the browser only frames and hashes.
+
+    This pins the two against each other. If `rendered_fields` ever stops reproducing
+    `canonical_payload` exactly, every visitor's own check would report an intact record broken.
+    """
+    call = make_call(1)
+    rendered = chain.rendered_fields(call)
+    assert list(rendered) == list(chain.SEALED_FIELDS)
+    assert all(isinstance(v, str) for v in rendered.values())
+    framed = "\n".join(f"{k}:{len(v.encode('utf-8'))}:{v}" for k, v in rendered.items())
+    assert framed == chain.canonical_payload(call)
+
+
+def test_the_rendered_timestamp_keeps_its_microseconds_and_its_z():
+    """The two halves a Date round trip loses, asserted on their own so the reason is visible when
+    this fails rather than buried in a payload comparison."""
+    rendered = chain.rendered_fields(make_call(1))
+    assert rendered["published_at"] == "2026-05-02T14:30:00.123456Z"
+
+
+# ------------------------------------------------------------------ the cross-language fixture
+
+FIXTURE = pathlib.Path(__file__).resolve().parent / "fixtures" / "receipt_chain.json"
+
+
+def test_python_still_reproduces_every_hash_in_the_shared_fixture():
+    """The Python half of the guard against `chain.py` and `receipts/verify.js` drifting apart.
+
+    `make test` runs inside the API image, which carries no node, and the host that has node has no
+    Python dependencies — so no single place can run both. Both sides check this one committed
+    fixture instead: five links sealed by `chain.seal`, including an empty thesis, a four-byte
+    emoji, and a thesis that spells out a field header to try to smuggle structure past the
+    framing. `tests/verify_js_check.mjs` (via `make test-js`) asserts JavaScript reproduces it.
+    Pinning both to one file pins them to each other.
+
+    If this fails, the wire format has changed and every chain ever published is now unverifiable.
+    That is not a test to update — see the module docstring in `chain.py`.
+    """
+    body = json.loads(FIXTURE.read_text())
+    assert body["fields"] == list(chain.SEALED_FIELDS)
+    assert body["genesis"] == chain.GENESIS_HASH
+
+    prev = chain.GENESIS_HASH
+    for link in body["links"]:
+        payload = "\n".join(f"{name}:{len(value.encode('utf-8'))}:{value}"
+                            for name, value in link["values"].items())
+        assert link["prev_hash"] == prev
+        assert chain.content_hash(payload, prev) == link["content_hash"], link["seq"]
+        prev = link["content_hash"]
+
+
+def test_the_fixture_exercises_the_cases_the_framing_exists_for():
+    """A fixture of five ordinary calls would pass under a verifier that used character counts and
+    under one that joined with a delimiter. These are the three rows that make it a real test."""
+    values = [link["values"] for link in json.loads(FIXTURE.read_text())["links"]]
+    theses = [v["thesis"] for v in values]
+    assert any(t == "" for t in theses), "an empty thesis must be in the fixture"
+    assert any(len(t.encode("utf-8")) != len(t) for t in theses), "a multi-byte thesis must be in"
+    assert any(":" in t and "seq:" in t for t in theses), "a thesis imitating a field header"

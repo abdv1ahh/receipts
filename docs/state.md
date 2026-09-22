@@ -1,5 +1,75 @@
 # docs/state.md — where the work stands
 
+## Updated 2026-09-22: PART E — the public record page
+
+Branch `receipts-caller-path`. **991 tests** plus `make test-js`, lint clean, checked in a real
+browser at 375px with no console errors and no horizontal overflow.
+
+**What changed.** `/r/{handle}` was a card image and an "open the full record" link into the app.
+A stranger following a shared link therefore clicked twice to see anything they could judge, and
+landed inside the research terminal — eleven nav items that 401 for them, a search field, an
+upgrade button and a bell. It is now the record itself, server rendered by `receipts/page.py`, with
+no app chrome and exactly one outbound link in the document (`/claim`). A test asserts both.
+
+**Server rendered rather than the bundle, and the reason is measured.** The app ships 434KB of JS
+and 137KB of CSS for eleven surfaces this visitor will never open. The page is one document with
+its stylesheet inline. Measured on a throttled phone (Slow 4G, 4x CPU, 375px): **TTFB 19 ms, first
+contentful paint 620 ms, LCP 747 ms, fully loaded 1.22 s, CLS 0.00** — against a two second budget.
+The document is 11.2KB compressed (111KB raw).
+
+**The Verify button now runs in the VISITOR'S browser.** `/api/receipts/{handle}/chain` hands over
+the sealed fields rendered by `chain.rendered_fields` and states no verdict; `receipts/verify.js`
+does the SHA-256 and the chain walk on their machine. `/api/receipts/{handle}/verify` still exists
+and is still tested — it is simply no longer what the public page rests on, because a server
+answering `intact: true` about its own record is the operator asking to be trusted. Measured:
+**323 links recomputed in 10–11 ms** in the browser; click to answer 1.6 s on Slow 4G, most of it
+the deliberate readable replay. The panel also offers "Now show me it failing", which changes one
+character in the browser and reruns the same code so the check is visibly capable of saying no.
+What this does NOT close is in `docs/known_gaps.md` §5, and the caveat prints under every result.
+
+**Compression was added on that measurement** (`GZipMiddleware`, Starlette, no new dependency).
+The chain payload for our own record is 350KB of mostly prose uncompressed and 23.7KB compressed;
+before it, the flagship interaction spent 2.5 s of its 3.4 s transferring. Production already
+compresses at the edge (`deploy/Caddyfile`), so this changes nothing there — it makes the measured
+number the one every deployment gets, including a bare `docker compose up` with no proxy.
+
+**What `/code-review high` found, and what changed.** Seven findings, six acted on:
+
+1. **`--reload-include '*.js'` was a no-op** and the comment claiming it fixed the stale-verifier
+   trap was worse than the trap. It needs `watchfiles`, which is not a dependency; uvicorn logs
+   *"...have no effect unless watchfiles is installed"* and falls back to `StatReload`. Replaced
+   with an mtime-keyed cache in `app.py:_verify_js()`, then proved by editing the file with no
+   restart and watching the served bytes change. CLAUDE.md §0y3.
+2. **The verify panel could hang with no message.** Only the fetch was inside the `try`, so a throw
+   in the hashing, replay or render left `busy` true and the button disabled forever. Concretely
+   reachable: `crypto.subtle` is undefined outside a secure context, so on a plain-http LAN address
+   every hash throws. Whole run guarded with `finally`, plus an up-front secure-context check that
+   says *"nothing is wrong with the record — open this page over https"*. CLAUDE.md §0y4.
+3. **`make test-js` was not run by anything automatic** — CI's pytest job has no database, so every
+   test that would reach the verifier skipped. Added to the `web` job, which already has node.
+4. **`verify.js`'s header claimed the Python suite runs it.** It cannot. Corrected in both places
+   it was stated.
+5. **GZip re-compresses the share card PNG.** Measured: 0.8ms to save 5.7% on 58KB. Kept, with the
+   number written down; `compresslevel` dropped from Starlette's 9 to 6 on the same measurement
+   (the record page: 12,149 bytes in 0.4ms against 11,620 in 1.5ms).
+6. **The replay counter could contradict the result**, stopping at "400 of 1000" one beat before
+   "all 1000 recomputed". The bar is now driven by the run's totals, not by the display sample.
+7. **An unknown handle answered HTTP 200** while `/api/receipts/{handle}` answered 404 for the same
+   input. Now 404 **with** the readable page: the status is for machines, the body is for people.
+
+**Found separately, by probing edge cases the review did not reach:** `record._compute` returned
+`expectancy_ci: [None, None]` for a caller past the gate whose resolved calls all carry a NULL
+excess return. That crashed the public page with a TypeError and made the React surface print "this
+sample does show an effect of not scored per call". It returns `None` now — one fix, both surfaces.
+
+**Also guarded:** `make test` can never run the JavaScript half of the wire format, so `make
+test-js` and a shared fixture exist — CLAUDE.md §0y2.
+
+**Also:** `frontend/src/record.jsx` rendered open calls above the misses while its own comment said
+the opposite. The losses now come first on both surfaces.
+
+---
+
 ## Updated 2026-09-02: RECEIPTS SHIPPED, and it is now the product
 
 Branch `receipts`, five commits, **818 tests**, lint clean, all 20 mechanical acceptance criteria

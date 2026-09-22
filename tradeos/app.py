@@ -25,6 +25,7 @@ from psycopg import sql
 from psycopg.types.json import Json
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.middleware.gzip import GZipMiddleware
 
 from . import (
     admin,
@@ -69,6 +70,7 @@ from . import social as social_mod
 from .receipts import calls as receipts_calls
 from .receipts import card as receipts_card
 from .receipts import chain as receipts_chain
+from .receipts import page as receipts_page
 from .receipts import record as receipts_record
 from .receipts import scoring as receipts_scoring
 from .receipts import universe as receipts_universe
@@ -405,6 +407,37 @@ def _limit_bucket(path: str, method: str = "GET") -> str | None:
     if path.endswith("/image") or path.endswith("/chart-analysis"):
         return "upload"
     return None
+
+
+# Compression, from Starlette — no new dependency, and `requirements.txt` is untouched.
+#
+# Added on a measurement rather than as hygiene. The public record page's Verify button downloads
+# every sealed call so the browser can hash them, which for our own 323-call record is 350KB of
+# mostly prose. On a throttled phone that was 2.5 SECONDS of transfer before the flagship
+# interaction of the product said anything, out of 3.4s for the whole click. The page itself goes
+# from 111KB to 12KB.
+#
+# Production already compresses at the edge (`deploy/Caddyfile`: `encode gzip zstd`), and Caddy
+# passes an upstream `Content-Encoding` through rather than re-encoding it, so this changes nothing
+# there. What it buys is that the number above is the one EVERY deployment gets, including a bare
+# `docker compose up` with no proxy in front, rather than a property of one reverse-proxy config
+# that a later deploy could drop without anyone noticing.
+#
+# 800 bytes because below roughly that the header and the CPU cost more than the saving, and the
+# research surfaces are full of small JSON responses that would pay it for nothing.
+#
+# LEVEL 6, NOT STARLETTE'S DEFAULT OF 9. Measured on the three payloads that matter: the chain JSON
+# 24,182 vs 23,733 bytes (1.3ms vs 1.7ms), the record page 12,149 vs 11,620 (0.4ms vs 1.5ms). Level
+# 9 spends roughly three times the CPU on the page for four percent fewer bytes, which on a
+# throttled connection is around one millisecond of transfer.
+#
+# There is NO content-type filter, which means an already-compressed response is re-compressed:
+# measured, `/api/card/receipt/{handle}.png` pays 0.8ms to save 5.7% on a 58KB image. That endpoint
+# is the link preview, so every social scraper hits it — the number is recorded here rather than
+# left to intuition, because it is small enough not to be worth a subclass of the middleware and
+# large enough that someone will eventually wonder. Revisit if card traffic ever becomes real
+# volume; Starlette offers no content-type option, so the fix would be a `GZipResponder` subclass.
+app.add_middleware(GZipMiddleware, minimum_size=800, compresslevel=6)
 
 
 @app.middleware("http")
@@ -3463,6 +3496,44 @@ def receipts_methodology() -> dict:
                 "disclaimer": RECEIPTS_DISCLAIMER}
 
 
+def _record_payload(caller: dict, conn) -> dict:
+    """One caller's whole record, assembled once.
+
+    Shared by `/api/receipts/{handle}` and by the server-rendered public page at `/r/{handle}`, so
+    the two cannot drift into showing different records for the same caller — and so the sample
+    gate, which lives in `record.summary`, is applied in one place that neither surface can route
+    around.
+    """
+    cid = caller["id"]
+    # `listing` is newest first, so its first row carries the chain head. Reading the calls a
+    # second time through `for_chain` would double the work of the heaviest query on this page
+    # for a count and one hash. `for_chain` is still the only input to actual VERIFICATION,
+    # where reading exactly the sealed fields and nothing else is the whole point.
+    listing = receipts_calls.listing(cid, conn, full=False)
+    out = {
+        "caller": caller,
+        "summary": receipts_record.summary(cid, conn),
+        "misses": receipts_record.recent_misses(cid, 10, conn),
+        "calibration": receipts_record.calibration(cid, conn),
+        "calls": listing,
+        # The open ones, split out rather than left for a surface to filter. They get their own
+        # panel because Part A gave them a stored REASON (migration 036) and a blank row past
+        # its horizon is indistinguishable, to a sceptic, from a result being withheld. Oldest
+        # first: the one that has been waiting longest is the one a reader should see first,
+        # which is the opposite of the newest-first ordering the full list wants.
+        "open_calls": [c for c in reversed(listing) if c["verdict"] is None],
+        "chain_links": len(listing),
+        "chain_head": listing[0]["content_hash"] if listing else receipts_chain.GENESIS_HASH,
+        "disclaimer": RECEIPTS_DISCLAIMER,
+    }
+    if caller["is_house"]:
+        # Whose record is this. The pooled house figure is the one the banner quotes, and a
+        # surface that showed one version's rate under a sentence about the other would be
+        # repeating the exact mistake the marketing site made with the Ledger.
+        out["house"] = receipts_record.house_summary(conn)
+    return out
+
+
 @app.get("/api/receipts/{handle}")
 def receipts_for(handle: str, response: Response) -> dict:
     """One caller's whole record. Public, and misses come first."""
@@ -3471,34 +3542,7 @@ def receipts_for(handle: str, response: Response) -> dict:
         if not caller:
             response.status_code = 404
             return {"error": "no such record."}
-        cid = caller["id"]
-        # `listing` is newest first, so its first row carries the chain head. Reading the calls a
-        # second time through `for_chain` would double the work of the heaviest query on this page
-        # for a count and one hash. `for_chain` is still the only input to actual VERIFICATION,
-        # where reading exactly the sealed fields and nothing else is the whole point.
-        listing = receipts_calls.listing(cid, conn, full=False)
-        out = {
-            "caller": caller,
-            "summary": receipts_record.summary(cid, conn),
-            "misses": receipts_record.recent_misses(cid, 10, conn),
-            "calibration": receipts_record.calibration(cid, conn),
-            "calls": listing,
-            # The open ones, split out rather than left for a surface to filter. They get their own
-            # panel because Part A gave them a stored REASON (migration 036) and a blank row past
-            # its horizon is indistinguishable, to a sceptic, from a result being withheld. Oldest
-            # first: the one that has been waiting longest is the one a reader should see first,
-            # which is the opposite of the newest-first ordering the full list wants.
-            "open_calls": [c for c in reversed(listing) if c["verdict"] is None],
-            "chain_links": len(listing),
-            "chain_head": listing[0]["content_hash"] if listing else receipts_chain.GENESIS_HASH,
-            "disclaimer": RECEIPTS_DISCLAIMER,
-        }
-        if caller["is_house"]:
-            # Whose record is this. The pooled house figure is the one the banner quotes, and a
-            # surface that showed one version's rate under a sentence about the other would be
-            # repeating the exact mistake the marketing site made with the Ledger.
-            out["house"] = receipts_record.house_summary(conn)
-        return out
+        return _record_payload(caller, conn)
 
 
 @app.get("/api/receipts/{handle}/verify")
@@ -3514,6 +3558,46 @@ def receipts_verify(handle: str, response: Response) -> dict:
         return {"handle": caller["handle"], **result,
                 "sealed_fields": list(receipts_chain.SEALED_FIELDS),
                 "caveat": receipts_record.methodology()["chain"]["does_not_prove"]}
+
+
+@app.get("/api/receipts/{handle}/chain")
+def receipts_chain_data(handle: str, response: Response) -> dict:
+    """The sealed fields of every call, and NO verdict on them. Public.
+
+    This is the half of verification that belongs to the reader. `/verify` above recomputes the
+    chain on our server and answers `intact: true`, which is the operator of the database asking to
+    be trusted — fine as an API, useless as evidence, and the public record page must not rest on
+    it. So this hands over exactly what was hashed and stops, and `receipts/verify.js` does the
+    SHA-256 in the visitor's own browser.
+
+    The values are rendered by `chain.rendered_fields` rather than sent as JSON types. Two of the
+    ten are timestamps whose sealed spelling includes microseconds and a trailing Z, both of which
+    a JavaScript `Date` round trip drops; asking a client to reinvent that would mean an intact
+    record reporting as broken. The FRAMING — the length prefixes that stop a thesis being mistaken
+    for structure — is deliberately left to the client, because that is the part worth computing
+    independently.
+    """
+    with db.connect() as conn:
+        caller = receipts_record.caller(handle, conn)
+        if not caller:
+            response.status_code = 404
+            return {"error": "no such record."}
+        sealed = receipts_calls.for_chain(caller["id"], conn)
+    response.headers["Cache-Control"] = "public, max-age=60"
+    return {
+        "handle": caller["handle"],
+        "fields": list(receipts_chain.SEALED_FIELDS),
+        "genesis": receipts_chain.GENESIS_HASH,
+        "links": [{"seq": c["seq"], "prev_hash": c["prev_hash"],
+                   "content_hash": c["content_hash"],
+                   "values": receipts_chain.rendered_fields(c)} for c in sealed],
+        # How the client must frame those values before hashing, stated on the wire rather than
+        # only in two codebases. A third implementation — someone checking this record in a
+        # language we never wrote — should not have to read our source to get the bytes right.
+        "framing": ("each field as name:byte-length-of-value:value, joined with newline; "
+                    "sha256 of (prev_hash + payload), hex"),
+        "does_not_prove": receipts_record.methodology()["chain"]["does_not_prove"],
+    }
 
 
 @app.get("/api/board")
@@ -3591,58 +3675,104 @@ def receipt_card(handle: str) -> Response:
                     headers={"Cache-Control": "public, max-age=300"})
 
 
-@app.get("/r/{handle}", response_class=HTMLResponse)
-def receipt_share_page(handle: str) -> str:
-    """Server rendered share page with OG tags, same pattern as /s/{symbol}.
+# The verifier the public record page runs, served as a FILE.
+#
+# `script-src 'self'` means an inline script is refused by the browser, silently and with nothing
+# in our logs — so the flagship interaction of the product would be dead on the page with no
+# symptom anywhere. Registered before the SPA mount, which is a catch-all.
+_VERIFY_JS_PATH = Path(__file__).parent / "receipts" / "verify.js"
+_verify_js_cache: tuple[float, str] | None = None
 
-    A link to a record has to render something in a feed. This page is that preview and a real
-    entry point; the app's own record surface is behind the same URL for anyone with the bundle.
+
+def _verify_js() -> str:
+    """The verifier's source, cached against its own mtime.
+
+    Cached rather than read fresh because this is on the public path; keyed on mtime rather than
+    read once at import because of a trap that cost real time. Under `make dev` uvicorn's
+    `--reload` watches only `*.py` — and `--reload-include '*.js'` does NOT fix it, because that
+    flag needs `watchfiles`, which is not in `requirements.txt`; uvicorn falls back to `StatReload`
+    and logs "--reload-include and --reload-exclude have no effect unless watchfiles is installed".
+    So an import-time read served the OLD bytes behind a clean 200 while the file on disk moved,
+    and edits to the flagship interaction appeared to do nothing.
+
+    One `stat()` per request, on a route the browser caches for five minutes and hits once per page
+    load, is the honest price for never debugging that again. It also costs production nothing: the
+    file never changes between deploys, so the read happens once per process.
     """
+    global _verify_js_cache
+    mtime = _VERIFY_JS_PATH.stat().st_mtime
+    if _verify_js_cache is None or _verify_js_cache[0] != mtime:
+        _verify_js_cache = (mtime, _VERIFY_JS_PATH.read_text())
+    return _verify_js_cache[1]
+
+
+@app.get("/receipt-verify.js", include_in_schema=False)
+def receipt_verify_js() -> Response:
+    return Response(content=_verify_js(), media_type="text/javascript; charset=utf-8",
+                    headers={"Cache-Control": "public, max-age=300"})
+
+
+@app.get("/r/{handle}", response_class=HTMLResponse)
+def receipt_share_page(handle: str, response: Response) -> str:
+    """THE public record. Server rendered, signed out, and stripped of everything that is not the
+    record.
+
+    This is where every shared link lands. It used to be a card image and a link into the app,
+    which meant a stranger clicked twice to see anything they could judge and arrived inside a
+    research terminal with eleven nav items that 401 for them. See `receipts/page.py` for why it is
+    rendered here rather than by the bundle.
+    """
+    brand = config.brand_name()
     with db.connect() as conn:
         caller = receipts_record.caller(handle, conn)
-        summary = receipts_record.summary(caller["id"], conn) if caller else None
-    # From `receipts.card`, not `presentation`. The escape is one line and duplicating it is the
-    # smaller cost: `presentation` imports `signals.convergence`, so borrowing a helper from it
-    # would leave the Receipts share page holding the dead plane open. The duplicate disappears
-    # when `presentation` does.
-    e = receipts_card._xml_escape
-    brand = config.brand_name()
-    if not caller:
-        return (f'<!doctype html><html lang="en"><head><meta charset="utf-8">'
-                f'<title>No such record · {e(brand)}</title>'
-                f'<meta name="viewport" content="width=device-width, initial-scale=1"></head>'
-                f'<body style="background:#05060c;color:#eaecf4;font-family:system-ui;padding:48px">'
-                f'<h1>No record here</h1><p>Nobody holds the handle {e(handle)}.</p>'
-                f'<p><a style="color:#6e8cff" href="/board">See every record</a></p></body></html>')
+        data = _record_payload(caller, conn) if caller else None
 
-    counts = summary["counts"]
+    if not data:
+        # 404 WITH a readable page, not one or the other. The rule this page has always followed is
+        # that a dead handle gets a page a person can read rather than a stack trace \u2014 but it was
+        # doing that with a 200, which tells a crawler the mistyped link is a real record and
+        # leaves a link checker unable to tell a dead handle from a live one. `/api/receipts/
+        # {handle}` already 404s for the same input, so the two surfaces disagreed about the same
+        # fact. The status is for machines and the body is for people; they are not in tension.
+        response.status_code = 404
+        body = receipts_page.not_found(handle, brand)
+        return _receipt_document(title=f"No such record \u00b7 {brand}", tags="", body=body)
+
+    caller = data["caller"]
+    summary, counts = data["summary"], data["summary"]["counts"]
     if summary["gated"]:
-        line = (f'{counts["hit"]} hit, {counts["miss"]} miss, {counts["inconclusive"]} inconclusive. '
-                f'A rate is not shown below {receipts_record.SAMPLE_GATE} resolved calls.')
+        line = (f'{counts["hit"]} hit, {counts["miss"]} miss, {counts["inconclusive"]} '
+                f'inconclusive. A rate is not shown below {receipts_record.SAMPLE_GATE} resolved '
+                f'calls.')
     else:
-        line = (f'{summary["hit_rate"]:.1%} right on {summary["resolved_scoreable"]} resolved calls, '
-                f'measured against SPY.')
-    title = f'{caller["display_name"]} · the record · {brand}'
-    # Escaped like everything else here. The handle regex makes a quote impossible to store today,
-    # but that regex lives three hundred lines away in a different function, and a second way to
-    # create a caller would break this silently.
-    # PNG in the tags, SVG in the page body: the tags are read by scrapers that will not render
-    # SVG, and the body is read by a browser that renders it sharper than any raster.
-    png = f"/api/card/receipt/{caller['handle']}.png"
-    card = e(f"/api/card/receipt/{caller['handle']}.svg")
-    tags = _og_tags(title=title, description=line, path=f"/r/{caller['handle']}", image_path=png)
-    return f'''<!doctype html><html lang="en"><head><meta charset="utf-8">
-<title>{e(title)}</title>
-{tags}
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<style>body{{background:#05060c;color:#eaecf4;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;display:flex;flex-direction:column;align-items:center;gap:22px;padding:44px 16px}}img{{max-width:100%;width:660px;border-radius:16px;border:1px solid #1b2130}}a{{color:#6e8cff;text-decoration:none;font-weight:600;font-size:18px}}p{{color:#8b93ab;font-size:13px;max-width:600px;text-align:center;line-height:1.6}}</style>
-</head><body>
-<img src="{card}" alt="{e(title)}">
-<a href="/record?handle={e(caller['handle'])}">Open the full record on {e(brand)} &#8594;</a>
-<p>{e(line)}</p>
-<p>{e(caller['identity_note'])}</p>
-<p>{e(RECEIPTS_DISCLAIMER)}</p>
-</body></html>'''
+        line = (f'{summary["hit_rate"]:.1%} right on {summary["resolved_scoreable"]} resolved '
+                f'calls, measured against SPY.')
+
+    title = f'{caller["display_name"]} \u00b7 the record \u00b7 {brand}'
+    # PNG in the tags, because no major platform renders an SVG as a link preview.
+    tags = _og_tags(title=title, description=line, path=f"/r/{caller['handle']}",
+                    image_path=f"/api/card/receipt/{caller['handle']}.png")
+    methodology = receipts_record.methodology()
+    return _receipt_document(
+        title=title, tags=tags,
+        body=receipts_page.render(data, brand=brand, methodology=methodology,
+                                  caveat=methodology["chain"]["does_not_prove"]))
+
+
+def _receipt_document(title: str, tags: str, body: str) -> str:
+    """The HTML frame. The stylesheet is inline and the only script is the verifier.
+
+    `receipts.card._xml_escape` rather than a helper from `presentation`: that module opens with
+    `from .signals.convergence import DEFAULT_PARAMS`, so borrowing one line from it would hold the
+    dead convergence plane open from the public record page.
+    """
+    e = receipts_card._xml_escape
+    return (f'<!doctype html><html lang="en"><head><meta charset="utf-8">'
+            f'<title>{e(title)}</title>{tags}'
+            f'<meta name="viewport" content="width=device-width, initial-scale=1">'
+            f'<style>{receipts_page.STYLE}</style>'
+            f'<script type="module" src="/receipt-verify.js" defer></script>'
+            f'</head><body>{body}</body></html>')
 
 
 # ------------------------------------------------------------------- marketing site (Phase 7)

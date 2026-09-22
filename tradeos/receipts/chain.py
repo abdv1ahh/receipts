@@ -79,19 +79,36 @@ def _render(value) -> str:
     return str(value)
 
 
+def rendered_fields(call: dict) -> dict[str, str]:
+    """The sealed fields as canonical TEXT, in order. The half of the wire format a client cannot
+    be asked to reinvent.
+
+    This exists so a visitor's browser can recompute the chain itself. Two of the ten fields are
+    timestamps, and their rendering — microseconds, an explicit trailing Z — is part of the sealed
+    bytes, which a JavaScript `Date` round trip silently drops. Sending rendered text means the
+    browser only has to frame and hash, and the one authority on HOW a value becomes bytes stays
+    here.
+
+    It is deliberately not "the payload, pre-assembled": the framing is what a caller could
+    otherwise smuggle structure through (see the module docstring on length prefixes), so that
+    part is the client's own work and is the part worth checking independently.
+    """
+    out = {}
+    for name in SEALED_FIELDS:
+        if name not in call:
+            raise KeyError(f"sealed field {name!r} is missing; a partial call cannot be sealed")
+        out[name] = _render(call[name])
+    return out
+
+
 def canonical_payload(call: dict) -> str:
     """Deterministic serialisation of the sealed fields, in the fixed order above.
 
     Each field is rendered as `name:byte-length:value` and the fields are joined with newlines.
     The length prefix is what makes this unambiguous for free text; see the module docstring.
     """
-    parts = []
-    for name in SEALED_FIELDS:
-        if name not in call:
-            raise KeyError(f"sealed field {name!r} is missing; a partial call cannot be sealed")
-        text = _render(call[name])
-        parts.append(f"{name}:{len(text.encode('utf-8'))}:{text}")
-    return "\n".join(parts)
+    return "\n".join(f"{name}:{len(text.encode('utf-8'))}:{text}"
+                      for name, text in rendered_fields(call).items())
 
 
 def content_hash(payload: str, prev_hash: str) -> str:

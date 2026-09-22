@@ -4,7 +4,7 @@
 
 X = docker compose exec -T api python -m tradeos.cli
 
-.PHONY: demo test dev web site lint fix up down logs seed backfill-full
+.PHONY: demo test test-js dev web site lint fix up down logs seed backfill-full
 
 # Reproducible demo from scratch. Uses a QUICK data window (a few weeks) so it finishes in
 # minutes; the full 24-month backfill (backfill-full) is a separate overnight job.
@@ -44,6 +44,16 @@ test:
 	  -v "$(CURDIR)/tests:/app/tests" -v "$(CURDIR)/tradeos:/app/tradeos" \
 	  -v "$(CURDIR)/frontend/src:/app/frontend/src:ro" \
 	  api python -m pytest tests/ -q
+
+# The JavaScript half of the cross-language guard on the sealed wire format, run on the HOST.
+#
+# `chain.py` and `receipts/verify.js` must produce byte-identical payloads forever: the public
+# record page lets a visitor recompute the chain in their own browser, and a JS framing that
+# disagrees by one byte would report every intact record as broken. `make test` cannot check that —
+# it runs inside the API image, which carries no node — so both sides check one committed fixture
+# instead (tests/fixtures/receipt_chain.json). Node is already a prerequisite for `make web`.
+test-js:
+	node tests/verify_js_check.mjs
 
 # Development stack: Python reloads in place, tests/ is mounted, and the locally built frontend is
 # served, so a UI change needs only `make web` instead of a full image rebuild.

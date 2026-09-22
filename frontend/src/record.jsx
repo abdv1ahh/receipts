@@ -246,11 +246,27 @@ export function RecordView({ handle, onOpenCall, onNav }) {
         <Rate summary={data.summary} />
       </section>
 
+      {/* Above the breakdowns AND above the open calls. This ordering is the argument, not a
+          layout preference: a resolved loss is a stronger claim on a reader's attention than a
+          pending call, so it comes first.
+
+          The comment on the open-calls section below already said exactly this — "it sits above
+          the breakdowns and below the misses" — while the code rendered open calls first. The
+          public page at /r/{handle} leads with the losses, and two surfaces arguing opposite
+          orders for the same record is the drift an ordering comment exists to prevent. */}
+      <section className="rc-section">
+        <h2 className="rc-h2">Recent misses</h2>
+        <p className="rc-lede">
+          Shown first, and shown in full. Every competitor can copy a feature; none of them can
+          retroactively publish a record they did not keep.
+        </p>
+        <Misses misses={data.misses} onOpenCall={onOpenCall} />
+      </section>
+
       {/* Open calls, and WHY each one is open. Part A made the reason a stored column (migration
           036) precisely so this section could exist: before it, a call thirty days past its stated
           horizon showed a reader no verdict and no explanation, which is indistinguishable from a
-          result being withheld. It sits above the breakdowns and below the misses, because a
-          pending call is a weaker claim on a reader's attention than a resolved loss. */}
+          result being withheld. */}
       {data.open_calls.length > 0 && (
         <section className="rc-section">
           <h2 className="rc-h2">Open calls</h2>
@@ -274,16 +290,6 @@ export function RecordView({ handle, onOpenCall, onNav }) {
           </div>
         </section>
       )}
-
-      {/* Above the breakdowns. This ordering is the argument, not a layout preference. */}
-      <section className="rc-section">
-        <h2 className="rc-h2">Recent misses</h2>
-        <p className="rc-lede">
-          Shown first, and shown in full. Every competitor can copy a feature; none of them can
-          retroactively publish a record they did not keep.
-        </p>
-        <Misses misses={data.misses} onOpenCall={onOpenCall} />
-      </section>
 
       <section className="rc-section">
         <h2 className="rc-h2">Calibration</h2>
