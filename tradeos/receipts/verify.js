@@ -131,10 +131,17 @@ function wire() {
   const row = panel.querySelector("[data-verify-row]");
   const count = panel.querySelector("[data-verify-count]");
   const result = panel.querySelector("[data-verify-result]");
+  // The first-screen control. It is queried from the document, not the panel, because it sits in
+  // the hero above the fold — and it is bound to the SAME `run()` below, so there is one code
+  // path with two views rather than a second verifier that can disagree with the first.
+  const miniGo = document.querySelector("[data-verify-mini-go]");
+  const miniOut = document.querySelector("[data-verify-mini-out]");
 
   // The button is hidden in the stylesheet and revealed here. Without JavaScript it would be a
   // control that visibly does nothing, which on this page is worse than one that is not offered.
   panel.classList.add("ready");
+  // Reveal by CLASS, so the box was always in the layout and nothing below it moves.
+  if (miniGo) miniGo.closest("[data-verify-mini]").classList.add("ready");
 
   // WebCrypto exists only in a SECURE CONTEXT — https, or localhost. Over plain http on a LAN
   // address, which is exactly what a bare `docker compose up` with no proxy in front serves,
@@ -142,6 +149,7 @@ function wire() {
   // of the two possible things is wrong, rather than the button dying mid-walk.
   if (!globalThis.crypto?.subtle) {
     go.disabled = true;
+    if (miniGo) { miniGo.disabled = true; say(miniOut, "needs https to check here"); }
     failure(result, "This page has to be served over HTTPS to check it here.",
             "The arithmetic runs on your device, and browsers only expose the hashing they need "
             + "for it on a secure connection. Nothing is wrong with the record — open this page "
@@ -159,6 +167,8 @@ function wire() {
     result.replaceChildren();
     live.hidden = false;
     go.disabled = true;
+    if (miniGo) miniGo.disabled = true;
+    if (miniOut) { miniOut.className = "pr-mini-out"; say(miniOut, "downloading every sealed call…"); }
     say(count, tamper ? "Fetching the same calls again…" : "Downloading every sealed call…");
     setBar(bar, 0);
 
@@ -193,8 +203,18 @@ function wire() {
       const out = await verifyChain(body, (step) => {
         if (steps.length < SAMPLE_CAP) steps.push(step);
       });
-      await replay(steps, out, { bar, row, count, total: n });
+      await replay(steps, out, { bar, row, count, total: n, mini: miniOut });
       render(result, out, body, tamper, run);
+      if (miniOut) {
+        miniOut.className = `pr-mini-out ${out.intact ? "ok" : "broken"}`;
+        const one = out.checked === 1;
+        say(miniOut, out.intact
+          ? (one ? `recomputed on this device in ${howLong(out.ms)}, and it matched`
+                 : `all ${out.checked} recomputed on this device in ${howLong(out.ms)}, `
+                   + "every one matched")
+            + " — see how, and what it does not prove, below"
+          : `broken at call #${out.broken_at_seq} — the full check is below`);
+      }
     } catch (err) {
       failure(result, "The check could not be run.",
               "That is a problem at our end or on the way here, not a finding about this record. "
@@ -202,11 +222,19 @@ function wire() {
     } finally {
       live.hidden = true;
       go.disabled = false;
+      if (miniGo) miniGo.disabled = false;
       busy = false;
     }
   };
 
   go.addEventListener("click", () => run(false));
+  if (miniGo) {
+    // Answers in place, and does NOT scroll. Jumping a reader 1,300px the instant they press a
+    // button loses their place on the one screen that was just built to hold them. The full panel
+    // is running the same job at the same time, so what they get here is the real answer; the
+    // mini result then POINTS at the walk and the caveat instead of dragging them to it.
+    miniGo.addEventListener("click", () => run(false));
+  }
 }
 
 /** One character of one thesis, changed in the browser and nowhere else.
@@ -250,6 +278,7 @@ async function replay(steps, out, ui) {
                   + `→ ${step.recomputed.slice(0, 12)}…  matches`);
     }
     say(ui.count, `${done} of ${ui.total} fingerprints recomputed in your browser`);
+    if (ui.mini) say(ui.mini, `${done} of ${ui.total} recomputed here…`);
     await sleep(budget / frames);
   }
 }

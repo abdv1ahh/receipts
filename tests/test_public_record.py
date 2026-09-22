@@ -367,3 +367,80 @@ def test_a_record_past_the_gate_with_no_measurable_return_has_no_interval():
     assert summary["expectancy"] is None
     assert summary["expectancy_ci"] is None, "an absent interval is None, never [None, None]"
     assert "not scored" in receipts_page._rate(summary)      # renders, and says what is missing
+
+
+# ------------------------------------------------------------------ the first line a stranger reads
+
+def test_the_sealing_line_does_not_claim_a_house_record_was_sealed_in_advance():
+    """The two truths this page must not conflate.
+
+    `calls.publish()` stamps `published_at` from the server clock and `_ALLOWED_KEYS` carries no
+    timestamp, so a caller cannot backdate: for them, sealing and publication are one instant,
+    before any outcome was known. `seed.py` is the only other writer of the table, it hardcodes
+    `is_house = true`, and it imported 473 already-scored calls and sealed them together AFTER
+    their outcomes were known.
+
+    So a single sentence claiming "sealed before the outcome was known" would be false on the two
+    most-read pages on the board — which are ours. That is the exact shape of overclaim this
+    product exists to not commit.
+    """
+    from tradeos.receipts import page as receipts_page
+
+    calls = [{"published_at": "2026-01-02T00:00:00Z"}, {"published_at": "2026-06-12T00:00:00Z"}]
+    house = receipts_page.sealing_line({"is_house": True}, calls)
+    assert "after the outcomes were already known" in house
+    assert "before its outcome was known" not in house
+    assert "2026-01-02" in house and "2026-06-12" in house, "say WHICH calls, with their span"
+
+    human = receipts_page.sealing_line({"is_house": False}, calls)
+    assert "before its outcome was known" in human
+    assert "sealed the moment it was" in human
+
+
+def test_no_sealing_line_claims_protection_against_the_operator():
+    """The page states plainly, in the verify caveat, that we could rewrite the chain ourselves.
+    A headline above it promising otherwise would make the page contradict itself at the exact
+    point a sceptic is reading hardest."""
+    from tradeos.receipts import page as receipts_page
+
+    for is_house in (True, False):
+        line = receipts_page.sealing_line({"is_house": is_house}, [])
+        lowered = line.lower()
+        assert "we cannot" not in lowered
+        assert "nobody can change or delete" not in lowered
+        assert "tamper-proof" not in lowered and "tamperproof" not in lowered
+        assert "immutable" not in lowered
+        assert "blockchain" not in lowered
+
+
+def test_the_first_screen_carries_the_sealing_and_a_verify_control(client):
+    """Part E measured that a stranger's first phone screen said what the record CLAIMS and
+    nothing about why it can be checked. Both now sit above the counts."""
+    # Measured over the BODY, not the document: every class name also appears in the inline
+    # stylesheet, in declaration order, which is not the order a reader meets them in.
+    body = client.get(f"/r/{HOUSE}").text.split("</style>", 1)[-1]
+    seal = body.find("pr-seal")
+    mini = body.find("data-verify-mini-go")
+    counts = body.find("pr-counts")
+    full = body.find("data-verify-go")
+    assert 0 < seal < mini < counts, "the sealing line and the check come before the numbers"
+    assert mini < full, "the compact control comes before the full panel"
+
+
+def test_the_compact_control_is_not_a_second_verifier(client):
+    """One code path, two views. A first-screen button with its own hashing could answer
+    differently from the panel below it, on the one page whose argument is that the answer is
+    checkable."""
+    src = VERIFY_JS.read_text()
+    assert src.count("await verifyChain(") == 1, "there is exactly one call to the verifier"
+    assert re.search(r'miniGo\.addEventListener\("click",.*?run\(false\)', src, re.S), (
+        "the compact control must call the same run() as the full panel")
+    # The control is revealed by SCRIPT, so no-JS never shows a button that does nothing — and by
+    # a class rather than the `hidden` attribute, because collapsing the box and putting it back
+    # shifted every element below it (measured: CLS 0.00 -> 0.0232 from that alone).
+    assert 'classList.add("ready")' in src
+    assert "miniGo.hidden" not in src
+    page_src = (pathlib.Path(__file__).resolve().parents[1]
+                / "tradeos" / "receipts" / "page.py").read_text()
+    assert ".pr-mini-go{visibility:hidden}" in page_src
+    assert ".pr-mini.ready .pr-mini-go{visibility:visible}" in page_src

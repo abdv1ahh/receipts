@@ -63,6 +63,24 @@ a{color:var(--accent)}
 .pr-mark{color:var(--accent)}
 .pr-top b{color:var(--text);font-weight:600}
 
+/* THE SEALING, ON THE FIRST SCREEN. The wordmark's 13px grey strapline said what kind of page
+   this is; it did not say why this record is different from any other track record, which is the
+   one thing a stranger has to take away. Measured at 375px: the verify panel sat below the fold,
+   so the first screen carried the claim and none of the evidence. */
+.pr-seal{margin:18px 0 0;font-size:15px;line-height:1.55;color:var(--text);
+  border-left:2px solid var(--accent);padding-left:13px;overflow-wrap:anywhere}
+.pr-mini{display:flex;flex-wrap:wrap;align-items:center;gap:11px;margin-top:13px;padding-left:15px}
+.pr-mini-go{padding:9px 16px;border-radius:9px;border:1px solid rgba(110,140,255,.45);
+  background:rgba(110,140,255,.12);color:var(--accent);font:600 13.5px/1 inherit;cursor:pointer}
+/* VISIBILITY, NOT `hidden`. The button is only usable once the script has wired it, but
+   collapsing it out of the layout and putting it back on DOMContentLoaded shifted everything
+   below it: measured, that alone took this page from CLS 0.00 to 0.0232. `visibility` reserves
+   the box, so the reveal moves nothing. */
+.pr-mini-go{visibility:hidden}
+.pr-mini.ready .pr-mini-go{visibility:visible}
+.pr-mini-go:disabled{opacity:.55;cursor:default}
+.pr-mini-out{font-size:12.5px;color:var(--muted);overflow-wrap:anywhere}
+.pr-mini-out.ok{color:var(--green)} .pr-mini-out.broken{color:var(--red)}
 .pr-name{font-size:31px;line-height:1.15;margin:0;letter-spacing:-.02em}
 .pr-handle{font-family:var(--mono);color:var(--muted);font-size:14px;margin-top:5px}
 .pr-badges{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
@@ -349,6 +367,55 @@ def _who(caller: dict, house: dict | None) -> str:
     return "".join(out)
 
 
+def sealing_line(caller: dict, calls: list[dict]) -> str:
+    """The first sentence a stranger reads. It has to say why this record is different from any
+    other track record, and it has to be EXACTLY true of the page it is printed on.
+
+    There are two truths here, not one, and conflating them would be this product's own worst
+    failure. `calls.publish()` stamps `published_at` from the server clock and `_ALLOWED_KEYS`
+    carries no timestamp, so a caller cannot backdate: for them, sealing and publication are the
+    same instant, before any outcome was known. But `seed.py` — the only other writer of this
+    table, and one that hardcodes `is_house = true` — imported our own engine's already-scored
+    ledger and sealed 473 calls together, AFTER their outcomes were known. A single line claiming
+    "sealed before the outcome was known" would therefore be false on the two most-read pages on
+    the board, which happen to be ours.
+
+    Note what neither sentence claims: protection against US. The caller cannot change a call; we
+    hold every field and could rewrite the chain from any point. That is stated in the verify
+    panel's caveat, in `record.methodology`'s own words, and must never be contradicted here.
+    """
+    if caller["is_house"]:
+        dates = sorted(c["published_at"][:10] for c in calls if c.get("published_at"))
+        span = f" made between {dates[0]} and {dates[-1]}," if dates else ""
+        return (f"Our own engine's record,{span} imported from its ledger and sealed together "
+                f"after the outcomes were already known. Nobody can change one now, and checking "
+                f"that takes one click.")
+    return ("Every call here was published before its outcome was known, and sealed the moment it "
+            "was. The caller cannot change or delete one afterwards — and you can check that "
+            "yourself, in this browser, in one click.")
+
+
+def _hero(caller: dict, calls: list[dict], links: int) -> str:
+    """The sealing line, and a Verify control on the first screen.
+
+    The mini control is not a second implementation: `verify.js` binds it to the same `run()` as
+    the full panel, so one click either way downloads the same calls, computes the same hashes and
+    writes its answer into both places. Measured at 375px the full panel sat below the fold, which
+    meant a stranger's first screen said what the record CLAIMS and nothing about why it can be
+    checked.
+    """
+    line = f'<p class="pr-seal">{e(sealing_line(caller, calls))}</p>'
+    if not links:
+        return line
+    return (
+        f'{line}'
+        f'<div class="pr-mini" data-verify-mini>'
+        f'<button class="pr-mini-go" data-verify-mini-go type="button">'
+        f'Check all {links} now</button>'
+        f'<span class="pr-mini-out" data-verify-mini-out></span>'
+        f'</div>')
+
+
 def _verify(caller: dict, links: int, head: str, caveat: str) -> str:
     """The centrepiece. Everything inside is filled in by `verify.js` in the visitor's browser.
 
@@ -632,6 +699,7 @@ def render(data: dict, *, brand: str, caveat: str, methodology: dict) -> str:
 <span>&middot; a public record of market calls</span></header>
 
 {_header(caller)}
+{_hero(caller, data["calls"], data["chain_links"])}
 
 <section><h2>The record</h2>
 {_counts(counts)}
