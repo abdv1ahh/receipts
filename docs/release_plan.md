@@ -1,7 +1,13 @@
 # Release plan — Receipts as a public, self-hostable project
 
-Written 2026-09-22. **This is a plan. Nothing in it has been executed.** The repository is private
-and stays private; no history has been rewritten, no repository created, no visibility changed.
+Written 2026-09-22 as a plan. **Sections A, B, C, E, F, G, H and J were executed on 2026-09-23;
+section K is still only specified.** The repository is private and stays private; no history has
+been rewritten, no repository created, no visibility changed.
+
+**Sections A–J below are left as they were written**, including the places where doing the work
+proved them wrong, because the corrections are worth more than a tidy document. What actually
+happened, and where the plan was mistaken, is in `docs/release_readiness.md`. Section K has been
+rewritten, because it is the only part still to be carried out.
 
 Every number here was measured on this machine on 2026-09-22 against the live stack, not estimated.
 Where a figure is quoted from an earlier measurement its date is given, because undated figures in
@@ -420,73 +426,123 @@ rather than in a note to the owner.
 
 ## K. The history rewrite — specified, NOT executed
 
-Target: a **new, empty repository** that the owner creates. The existing private repository and its
-remote are never force-pushed, rewritten or deleted. This also closes the risk that GitHub keeps
-serving old commits by SHA, because the old objects are never uploaded to the new remote.
+**Updated 2026-09-23, after sections A, B and C were executed.** Still not executed: no history has
+been rewritten, no repository created, no visibility changed. The repository is private.
+
+**THIS SECTION NAMES NO SENSITIVE STRING.** Every literal to be found and replaced lives in
+
+```
+~/receipts_release/expressions.txt        (mode 600, outside the repository, never committed)
+```
+
+in `git filter-repo --replace-text` syntax, one `literal==>replacement` per line. That file is the
+input to K.2 and it is the only place the strings appear. Writing them here would put a copy of
+each secret into the history being rewritten, in the document explaining how to remove it — the
+fifth copy, created by the cleanup. It also means this section can be read by anyone.
+
+### K.0 What HEAD now contains, measured
+
+The sweep the readiness gate runs, over every tracked file at HEAD:
+
+| what | hits at HEAD |
+|---|---:|
+| the owner's email address | **0** |
+| the GDELT operator's email address | **0** |
+| the personal path | **0** |
+| the previous demo password | **0** |
+| the development database password | **1** |
+
+The single remaining hit is a **negative assertion** in `tests/test_sources.py`: it reads
+`docker-compose.yml` and asserts that a connection string carrying the old default password is
+**not** in it. The literal is the thing being forbidden, so the guard cannot be written without it,
+and removing the literal would remove the check that keeps the default from coming back. It is
+listed in `expressions.txt` anyway, because a rewrite that replaces it leaves the assertion reading
+`assert "<replacement>" not in compose`, which still passes and still means the same thing.
+
+The other four are zero **at HEAD** and non-zero **in history**, which is the entire reason this
+section exists. `git log --all -p` still carries them.
 
 ### K.1 Paths to remove from every commit
 
 ```
 docs/TRADEOS_HANDOVER.md
 docs/research/2026-09-14/            (entire directory, including .work/ and the .docx/.pdf files)
-docs/TRADEOS_INVENTORY.md            (superseded; carries the demo password and personal paths)
+docs/TRADEOS_INVENTORY.md
 ```
 
-`docs/archive/` is **kept** — its documents are honest engineering history and the audit found
-nothing in them beyond `~`, which K.2 replaces.
+`docs/archive/` is **kept** — its documents are honest engineering history, and the audit found
+nothing in them beyond the personal path, which K.2 replaces.
+
+**Note added 2026-09-23:** `docs/research/2026-09-14/` also has uncommitted working-tree changes
+parked in `git stash@{0}` from the start of this task. A stash is a ref, so `filter-repo` would
+see it in the source repository — but K.6 operates on a `--no-local` CLONE, and `git clone` does
+not carry stashes. Confirm with `git stash list` in the clone: it must print nothing.
 
 ### K.2 Strings to replace in every commit
 
-| Find | Replace with | Occurrences |
-|---|---|---|
-| the owner's `@gmail.com` address | `contact@example.com` | 3 commits, `tradeos/ingestion/finra.py` |
-| the GDELT operator's `@gmail.com` address | `support@example.invalid` | 1 commit, `tests/test_gdelt.py` |
-| `/path/to/receipts` | `/path/to/tradeos` | 41, across 10 files |
-| `~` | `~` | remainder of the 53 total |
-| `<generated at seed time>` | `<generated at seed time>` | 24 |
-| `POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}` / `postgresql://tradeos:${POSTGRES_PASSWORD}@` | `${POSTGRES_PASSWORD}` form | `docker-compose.yml`, `README.md` |
+Run `git filter-repo --replace-text ~/receipts_release/expressions.txt`. Do **not** use
+`filter-branch`.
 
-Use `git filter-repo --replace-text`, with the literal values in a local file that is **not**
-committed. Do not use `filter-branch`.
+The file covers, in this order: two email addresses, the personal path in two forms (the full
+repository path first, then the home directory, because filter-repo applies replacements in file
+order and the longer match must win), the previous demo password, and two forms of the development
+database password. Seven expressions.
 
 ### K.3 Unreachable objects
 
-Three exist locally: `a180cba` (an abandoned 2026-09-02 draft) and two stashes
-(`e1b462f`, `232bf1c`). **`git filter-repo` operates on refs, so none of them is carried into the
-new repository.** Confirm after cloning the rewritten repo:
-`git fsck --unreachable --no-reflogs` must print nothing, and
-`git cat-file -e a180cba8d7ad070c24f2e7931ccca7a5b84ee295` must fail.
+Three existed locally before this task: an abandoned 2026-09-02 draft commit and two stashes. One
+more stash was created at the start of this task (K.1). **`git filter-repo` operates on refs and
+`git clone --no-local` copies only reachable objects**, so none of them is carried into the new
+repository. Confirm after cloning the rewritten repo:
+
+```bash
+git fsck --unreachable --no-reflogs        # must print nothing
+git stash list                             # must print nothing
+```
 
 ### K.4 Proof that nothing sealed depends on a git SHA or on a rewritten file
 
-This is the question that decides whether the rewrite is safe, so it is answered by construction
-rather than by inspection.
+Answered by construction rather than by inspection, because this is the question that decides
+whether the rewrite is safe.
 
-1. **The chain hashes only ten database columns.** `chain.SEALED_FIELDS` is
-   `caller_id, seq, symbol, direction, horizon_days, confidence, thesis, benchmark_symbol,
-   published_at, knowable_time`. Every one is a value in the `calls` table. **No git SHA, no file
-   path, no file content, no source hash is an input.** `content_hash = sha256(prev_hash + payload)`
-   and nothing else.
-2. **The files being rewritten are documentation and two source files never hashed.**
-   `docs/**`, `finra.py` and `test_gdelt.py`. None is read by `chain.py`, `calls.py` or `scoring.py`.
-3. **The `module_code_hash` guard is on the signal plane, and the signal plane is being deleted.**
-   `signals/definitions.py` hashes `signals/convergence.py`'s source to decide whether to register
-   a new version. It reads that one module's bytes — not a git object, not any file in K.1 or K.2.
-   Nothing in `receipts/` calls it. `main` drops it entirely (section B).
-4. **The empirical proof, to run before and after on the same database:**
+1. **The chain hashes only ten database columns.** `chain.SEALED_FIELDS` is `caller_id, seq,
+   symbol, direction, horizon_days, confidence, thesis, benchmark_symbol, published_at,
+   knowable_time`. Every one is a value in the `calls` table. **No git SHA, no file path, no file
+   content, no source hash is an input.** `content_hash = sha256(prev_hash + payload)`, and nothing
+   else.
+2. **The files being rewritten are documentation and one test fixture.** `docs/**` and
+   `tests/test_gdelt.py`. None is read by `chain.py`, `calls.py` or `scoring.py`. *(The other file
+   named in the previous version of this section, `ingestion/finra.py`, was deleted outright in
+   section B.)*
+3. **The `module_code_hash` guard was on the signal plane, and the signal plane is gone.**
+   `signals/definitions.py` hashed `signals/convergence.py`'s source to decide whether to register
+   a new version. It read that one module's bytes — not a git object, not any file in K.1 or K.2.
+   Nothing in `receipts/` called it, and section B deleted it.
+4. **The empirical proof, run before and after on the same database:**
+
    ```
    cli verify-chain convergence-v3    # 323 links, head c9f480e0a79a28c7
    cli verify-chain convergence-v4    # 150 links, head 24df0daed4f23ccd
    cli verify-chain a-real-stranger   #   1 link,  head 79de970e41a46b35
-   make test-js                       # the wire format, from JavaScript
+   make test-js                       # the wire format, from JavaScript, plus export/check.mjs
    ```
-   These three heads were recorded on 2026-09-22 and re-verified after the credential rotation.
-   **They are database facts and the rewrite does not touch the database**, so they must be
-   byte-identical afterwards. If any head moves, something other than the rewrite has happened.
+
+   These three heads were recorded on 2026-09-22 and **re-verified unchanged after every commit in
+   sections A, B and C** — after 68 modules were deleted, after the Ledger was split, after the
+   migration baseline was introduced. They are database facts and the rewrite does not touch the
+   database, so they must be byte-identical afterwards. If any head moves, something other than
+   the rewrite has happened.
+
+5. **New in this task: the export is a second, offline proof.** `export/` holds both house chains
+   and `check.mjs`, which recomputes them with no server and no database. It is committed, so a
+   rewritten repository carries it, and `node export/check.mjs` on a fresh clone of the rewritten
+   repo must print the same two heads as line 4. That check depends on no git object and no
+   running instance, which makes it the strongest available evidence that the rewrite changed
+   nothing about the record.
 
 ### K.5 Verification on the rewritten repository, before anything is pushed
 
-Both must return zero:
+All three must pass.
 
 ```bash
 # 1. secret scan over the full rewritten history, all refs
@@ -494,17 +550,29 @@ docker run --rm -v "$PWD:/repo" -w /repo zricethezav/gitleaks:latest \
   git --log-opts="--all --full-history" --redact --no-banner
 #    -> "no leaks found", and the commit count must equal (commits - merges)
 
-# 2. the sensitive-string sweep, over every blob in every commit
+# 2. the sensitive-string sweep, over every blob in every commit, reading the patterns from the
+#    file rather than from this document
 git log --all --full-history -p --format="COMMIT %H" > /tmp/hist.txt
-grep -c -E '<owner-email>|<gdelt-email>|~|<generated at seed time>|tradeos:tradeos@' /tmp/hist.txt
-#    -> must be 0
+cut -d'=' -f1 ~/receipts_release/expressions.txt | grep -v '^#' | grep . \
+  | while read -r s; do printf '%s: ' "$s"; grep -c -F -- "$s" /tmp/hist.txt; done
+#    -> every count 0, EXCEPT the development database password, which survives as the negative
+#       assertion described in K.0 — and only in its replaced form
+
+# 3. the paths removed by K.1 appear in no commit
 git log --all --full-history --pretty=format: --name-only \
   | sort -u | grep -E 'TRADEOS_HANDOVER|docs/research/2026-09-14|TRADEOS_INVENTORY'
 #    -> must be empty
 ```
 
-Then a functional check, because a rewrite that passes both scans and does not run is still a
-failure: `./scripts/setup.sh && docker compose up -d --build && make test && make test-js`.
+Then a functional check, because a rewrite that passes every scan and does not run is still a
+failure. This is the ten-minute test again, on the rewritten clone:
+
+```bash
+./scripts/setup.sh                 # then paste an Alpaca key pair into .env
+make quickstart                    # measured 84s on a clean clone
+make test && make test-js && make lint
+node export/check.mjs
+```
 
 ### K.6 Pushing into the new repository
 
@@ -518,22 +586,21 @@ git remote remove origin                                     # so nothing can pu
 # ... run filter-repo per K.1 and K.2, then K.5 ...
 git remote add origin git@github.com:<owner>/receipts.git
 git push -u origin main
-git push origin research_platform        # ONLY if the tag is also wanted publicly — it contains
-                                         # the research plane, which is fine, but re-run K.5
-                                         # against the tag before pushing it
 ```
 
 `--no-local` forces a real object copy rather than hardlinks, so `filter-repo` in the clone can
 never touch the original's object store. Verify before pushing:
 `git -C /path/to/tradeos log --oneline -1` must still be the original HEAD.
 
-**The `research_platform` tag is the decision point.** It preserves the whole original system, which
-is what makes section E reproducible — but it also contains every file K.1 removes. Either rewrite
-it too (losing nothing but the removed paths) or keep it private and reproduce section E from the
-owner's copy. **Recommendation: rewrite the tag with the same rules and publish it.** A research
-finding nobody can reproduce is a claim, and this project's whole argument is against those.
+**The `research_platform` tag is the decision point, and it now matters more than it did.**
+`docs/research/insider_buying.md` tells a reader to `git checkout research_platform` and reproduce
+the result from there. If the tag is not published, that document describes a reproduction nobody
+can perform, which is the exact failure this project argues against.
 
----
+The tag contains the whole research plane, which is fine, and every file K.1 removes, which is not.
+**Recommendation: rewrite the tag with the same expressions and publish it**, then re-run K.5
+against the tag before pushing it. If it is kept private instead, `insider_buying.md`'s
+reproduction section has to say so plainly rather than give commands that cannot be run.
 
 ## What is decided, and what is not
 

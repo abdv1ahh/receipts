@@ -16,3 +16,29 @@ in this directory disagrees with one of those three, those three win.
 
 Moved here from the repository root on 2026-09-13. Together they were 4,321 lines — 41% of the
 `receipts` branch diff, none of it code — and they made the root listing hard to read.
+
+---
+
+## Superseded by the Receipts extraction (2026-09-23)
+
+Six more documents moved here when sections A, B and C of `docs/release_plan.md` were executed and
+68 modules, 113 routes and the whole research plane were deleted. **They are accurate about the
+system they describe. That system is at the tag `research_platform`, not on `main`.**
+
+| file | what it was |
+|---|---|
+| `state.md` | "where the work stands" across ten phases of the research platform |
+| `plan.md` | "where it is going" — the ten-phase plan, all of it delivered |
+| `demo-script.md` | a walkthrough of surfaces that no longer exist |
+| `review-queue.md` | the review queue for those phases |
+| `TRADEOS_INVENTORY.md` | a full inventory of the pre-extraction system |
+| `tradeoss_veryimportant_prompt.md` | the original product brief the ten phases were built against |
+
+They were archived rather than deleted because they are the reasoning behind decisions the current
+code still depends on, and because a deleted document cannot be checked against the tag that still
+runs it. `docs/release_readiness.md` is where the work stands now; `CLAUDE.md` is the operating
+manual.
+
+Note that `TRADEOS_INVENTORY.md` is on `release_plan.md` §K.1's list of paths to remove from every
+commit, so it will not survive the history rewrite. Archiving it is about what `main` claims today,
+not about keeping it forever.
