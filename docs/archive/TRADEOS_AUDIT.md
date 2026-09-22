@@ -1,4 +1,4 @@
-# TRADEOS_AUDIT.md — a read-only forensic audit of the repository at `/path/to/receipts`
+# TRADEOS_AUDIT.md — a read-only forensic audit of the repository at `/path/to/tradeos`
 
 Compiled 2026-08-21 by walking the entire directory tree, reading every configuration file, every
 migration, every Python module, every React component, every stylesheet, every test and every
@@ -1242,7 +1242,7 @@ That is a real scalability limitation and it is not documented anywhere in the r
 
 **How the connection is configured.** Entirely from `DATABASE_URL`. `config.database_url()` raises
 `ConfigError` if it is unset. In `docker-compose.yml` it is
-`postgresql://tradeos:${POSTGRES_PASSWORD}@db:5432/tradeos` for both api and worker; in
+`postgresql://<user>:<password>@db:5432/<db>` for both api and worker; in
 `docker-compose.prod.yml` it is interpolated from `POSTGRES_USER`, `POSTGRES_PASSWORD` and
 `POSTGRES_DB`, with compose refusing to start if `POSTGRES_PASSWORD` is unset.
 

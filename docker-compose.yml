@@ -2,9 +2,16 @@ services:
   db:
     image: postgres:16
     environment:
-      POSTGRES_USER: tradeos
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}   # local dev only; production uses a managed secret
-      POSTGRES_DB: tradeos
+      POSTGRES_USER: ${POSTGRES_USER:-tradeos}
+      # NO DEFAULT, ON PURPOSE. This read `tradeos` for months in a file that is about to be
+      # public, so every self-hoster would have inherited the same password on a database whose
+      # port is published — and anyone who widened that port past loopback would have been
+      # trivially readable. `:?` makes compose refuse to start and print the message, rather than
+      # silently accepting an empty string, which is what `${VAR:-}` would do.
+      #
+      # `scripts/setup.sh` writes a generated value into .env, so the quickstart stays one command.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env — run ./scripts/setup.sh to generate one}
+      POSTGRES_DB: ${POSTGRES_DB:-tradeos}
     # Bound to the loopback interface ONLY. The nightly backup now connects to this port
     # from the host instead of going through `docker compose exec`, so the port has to be
     # published — but published on 0.0.0.0, as it was, this database was reachable from
@@ -12,14 +19,14 @@ services:
     ports: ["127.0.0.1:5432:5432"]
     volumes: [pgdata:/var/lib/postgresql/data]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tradeos"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tradeos}"]
       interval: 3s
       retries: 10
 
   api:
     build: .
     environment:
-      DATABASE_URL: postgresql://tradeos:${POSTGRES_PASSWORD}@db:5432/tradeos
+      DATABASE_URL: postgresql://${POSTGRES_USER:-tradeos}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-tradeos}
       UPLOADS_DIR: /app/uploads
       SEC_USER_AGENT: ${SEC_USER_AGENT}
       # The origin this instance is reachable at from outside. Every og:image and
@@ -65,7 +72,7 @@ services:
     build: .
     command: ["python", "-m", "tradeos.cli", "scheduler"]
     environment:
-      DATABASE_URL: postgresql://tradeos:${POSTGRES_PASSWORD}@db:5432/tradeos
+      DATABASE_URL: postgresql://${POSTGRES_USER:-tradeos}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-tradeos}
       SEC_USER_AGENT: ${SEC_USER_AGENT}
       # The origin this instance is reachable at from outside. Every og:image and
       # og:url is built from it, so unset means every shared record previews as a

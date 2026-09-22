@@ -136,6 +136,10 @@ def test_the_reason_for_not_rotating_is_written_down():
 # for 429, so the MOST COMMON refusal was invisible to it and the scheduler kept knocking.
 
 # Measured live on 2026-08-24: HTTP 429, no content-type header, 444 bytes of plain text.
+#
+# The contact address GDELT gives in that body is a real person's, and it is not ours to
+# republish, so it is a placeholder here. Nothing in the test depends on it: `_in_backoff` and the
+# non-JSON branch key on the STATUS and the missing content-type, never on the wording.
 REFUSAL_BODY = (
     "Please limit requests to one every 5 seconds or contact support@example.invalid for larger "
     "queries. All high-traffic users should switch to our ngrams dataset: "

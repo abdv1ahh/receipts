@@ -2,7 +2,7 @@
 
 **Written 2026-09-11.** Read this if a backup failed, or before trusting one.
 
-Backups live in **`/path/to/receipts/backups/`**. To open that in Finder: **⇧⌘G**, paste the
+Backups live in **`/path/to/tradeos/backups/`**. To open that in Finder: **⇧⌘G**, paste the
 path. The log is `backups/backup.log`.
 
 ---
@@ -105,7 +105,7 @@ Change this:
 ```xml
     <key>ProgramArguments</key>
     <array>
-        <string>/path/to/receipts/scripts/backup.sh</string>
+        <string>/path/to/tradeos/scripts/backup.sh</string>
     </array>
 ```
 
@@ -114,7 +114,7 @@ to this:
 ```xml
     <key>ProgramArguments</key>
     <array>
-        <string>/path/to/receipts/scripts/backup-scheduled.sh</string>
+        <string>/path/to/tradeos/scripts/backup-scheduled.sh</string>
     </array>
 ```
 
@@ -137,7 +137,7 @@ Force one run now, without waiting for 03:15:
 
 ```bash
 launchctl start app.rhumb.backup
-tail -f /path/to/receipts/backups/backup.log
+tail -f /path/to/tradeos/backups/backup.log
 ```
 
 ### C. The permanent fix — install a host `pg_dump`
@@ -211,7 +211,7 @@ Restoring one table out of a dump:
 ```bash
 docker compose exec -T db createdb -U tradeos scratch
 docker run --rm -i --network container:tradeos-db-1 \
-  -v /path/to/receipts/backups:/b:ro postgres:16 \
+  -v /path/to/tradeos/backups:/b:ro postgres:16 \
   pg_restore -h 127.0.0.1 -U tradeos -d scratch --no-owner -t calls /b/<dumpfile>
 docker compose exec -T db psql -U tradeos -d scratch -c 'SELECT count(*) FROM calls'
 docker compose exec -T db dropdb -U tradeos scratch

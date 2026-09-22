@@ -18,6 +18,7 @@ import argparse
 import json
 import logging
 import os
+import secrets
 from datetime import UTC, date, datetime, time, timedelta
 
 from psycopg import sql
@@ -921,13 +922,29 @@ def cmd_verify_chain(args) -> None:
     raise SystemExit(0 if result["intact"] else 1)
 
 
-def cmd_seed_demo(_args) -> None:
+def cmd_seed_demo(args) -> None:
     """A ready-to-use demo account: tier=pro (full features, no charge), NO TOTP (so it logs in with
     just email + password), pre-populated with a handle, journal trades, a portfolio, and a watchlist
-    so the product looks alive on first login. Idempotent. Override creds via TRADEOS_DEMO_EMAIL /
-    TRADEOS_DEMO_PASSWORD."""
+    so the product looks alive on first login. Idempotent.
+
+    THE PASSWORD IS GENERATED, NOT FIXED. It used to default to a constant that also appeared in
+    CLAUDE.md, GO-LIVE.md, two runbooks and this docstring — so every reader of the repository knew
+    the credentials of a tier=pro account with no second factor, on every instance that had ever run
+    this command. It is now 24 hex characters from the OS CSPRNG, printed once and stored nowhere
+    but the password hash. Set TRADEOS_DEMO_PASSWORD to choose your own.
+
+    AND IT REFUSES TO RUN ON AN INSTANCE THAT LOOKS LIKE PRODUCTION. `COOKIE_SECURE=true` means
+    session cookies are being issued over TLS, which means real users. A demo account is a
+    permanent, fully-privileged, MFA-less login, so seeding one there should be a decision rather
+    than a habit: `--i-know` is how you say it was one.
+    """
     email = os.environ.get("TRADEOS_DEMO_EMAIL", "demo@tradeos.app").strip().lower()
-    pw = os.environ.get("TRADEOS_DEMO_PASSWORD", "<generated at seed time>")
+    if os.environ.get("COOKIE_SECURE", "false").lower() == "true" and not getattr(args, "i_know", False):
+        raise SystemExit(
+            "refusing: COOKIE_SECURE=true, so this instance is serving real users over TLS.\n"
+            "A demo account is a permanent tier=pro login with no second factor. If you genuinely\n"
+            "want one here, re-run with --i-know.")
+    pw = os.environ.get("TRADEOS_DEMO_PASSWORD") or secrets.token_hex(12)
     with db.connect() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -975,6 +992,7 @@ def cmd_seed_demo(_args) -> None:
         authn.audit(conn, "system", "seed_demo", email)
     print(f"demo account created: {email}  (tier=pro, no MFA)")
     print(f"  password: {pw}")
+    print("  This is shown ONCE and is not stored anywhere but the password hash.")
     print("  Log in with that email + password — full Pro features, no charge.")
 
 
@@ -1185,7 +1203,10 @@ def main() -> None:
     sa = sub.add_parser("seed-admin")
     sa.add_argument("--email", required=True)
     sa.set_defaults(fn=cmd_seed_admin)
-    sub.add_parser("seed-demo").set_defaults(fn=cmd_seed_demo)
+    p_demo = sub.add_parser("seed-demo")
+    p_demo.add_argument("--i-know", action="store_true",
+                        help="seed a demo account even when COOKIE_SECURE=true (real users)")
+    p_demo.set_defaults(fn=cmd_seed_demo)
     sub.add_parser("seed-house-records").set_defaults(fn=cmd_seed_house_records)
     rc = sub.add_parser("resolve-calls", help="score published calls whose horizon has closed")
     rc.add_argument("--limit", type=int, default=100)

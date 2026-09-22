@@ -16,6 +16,8 @@ from urllib.parse import urlparse
 import httpx
 import psycopg
 
+from .. import config
+
 log = logging.getLogger("tradeos.ingest.finra")
 SOURCE = "finra:consolidated"
 FINRA_HOST = "api.finra.org"
@@ -33,9 +35,14 @@ def _add_business_days(d: date, n: int) -> date:
 
 class FinraClient:
     def __init__(self, min_interval: float = 0.3):
+        # The contact address comes from SEC_USER_AGENT, never from source. FINRA asks for the same
+        # thing the SEC fair-access policy does — a declared requester with a way to reach them —
+        # so there is one setting for both rather than two that can disagree. It was hardcoded
+        # here, which published the operator's personal email address to everyone who cloned the
+        # repository and put a stranger's address on our outbound requests after a fork.
         self._client = httpx.Client(
             headers={"Content-Type": "application/json", "Accept": "application/json",
-                     "User-Agent": "TradeOSS contact@example.com"},
+                     "User-Agent": config.sec_user_agent()},
             timeout=60.0, follow_redirects=False)
         self._min_interval = min_interval
         self._last = 0.0

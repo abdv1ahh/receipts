@@ -101,8 +101,15 @@ docker compose logs -f worker         # follow scheduler logs
 docker compose down                   # stop
 ```
 
-The app is at <http://localhost:8000>. Demo login: `demo@tradeos.app` / `<generated at seed time>`
-(tier `pro`, no MFA, populated with trades and portfolios).
+The app is at <http://localhost:8000>. First run: **`./scripts/setup.sh`** writes `.env` with a
+generated database password — `docker-compose.yml` has no default and the stack refuses to start
+without one.
+
+Demo account: `demo@tradeos.app` (tier `pro`, no MFA, populated with trades and portfolios).
+**`cli seed-demo` GENERATES its password and prints it once.** It used to default to a constant
+that was also written in CLAUDE.md, GO-LIVE.md and two runbooks, so every reader of this repository
+knew the credentials of a no-second-factor pro account on every instance that had run it. The
+command also refuses to run when `COOKIE_SECURE=true` unless given `--i-know`.
 
 ### Tests
 

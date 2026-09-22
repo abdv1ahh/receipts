@@ -4,6 +4,9 @@ Includes the fix for the finding this phase's own security review raised: /api/i
 unauthenticated and returned `str(exc)` from arbitrary ingestion failures, and httpx puts the full
 request URL — query string included — into its exception messages. A keyed API's credential could
 therefore reach the database and then the public internet."""
+import argparse
+import pathlib
+
 import pytest
 
 from tradeos import scheduler, sources
@@ -403,3 +406,59 @@ def test_a_model_failure_names_the_status_code_and_nothing_else():
     assert out is None
     assert "HTTP 410" in why
     assert "SECRET" not in why and "models.github.ai" not in why
+
+
+# ------------------------------------------------------------------ the demo account's credentials
+
+def test_seed_demo_generates_its_password_rather_than_shipping_one():
+    """The default used to be a constant that also appeared in CLAUDE.md, GO-LIVE.md and two
+    runbooks — so every reader of the repository knew the login for a tier=pro account with no
+    second factor, on every instance that had ever run the command. This is about to be a public
+    repository, which turns that from untidy into a standing invitation."""
+    import inspect
+
+    from tradeos import cli
+
+    src = inspect.getsource(cli.cmd_seed_demo)
+    assert "secrets.token_hex" in src, "the demo password must be generated"
+    assert "TradeOSDemo" not in src
+
+    # And nowhere else in the tree either. The needle is assembled rather than written out, or
+    # this file matches itself — which it did on the first run.
+    needle = "TradeOS" + "Demo" + "2026"
+    root = pathlib.Path(__file__).resolve().parents[1]
+    hits = sorted(str(f.relative_to(root)) for f in root.rglob("*")
+                  if f.is_file() and f.suffix in {".py", ".md", ".sh", ".yml", ".yaml"}
+                  and ".git" not in f.parts and "node_modules" not in f.parts
+                  and f.name != pathlib.Path(__file__).name
+                  and needle in f.read_text(errors="ignore"))
+    assert not hits, f"the old fixed demo password is still written down in {hits}"
+
+
+def test_seed_demo_refuses_on_an_instance_serving_real_users(monkeypatch):
+    """COOKIE_SECURE=true means session cookies go out over TLS, which means real users. A demo
+    account is a permanent, fully privileged, MFA-less login; seeding one there has to be a
+    decision rather than a habit."""
+    from tradeos import cli
+
+    monkeypatch.setenv("COOKIE_SECURE", "true")
+    with pytest.raises(SystemExit) as exc:
+        cli.cmd_seed_demo(argparse.Namespace(i_know=False))
+    assert "--i-know" in str(exc.value)
+
+
+def test_the_compose_file_ships_no_default_database_password():
+    """A public repository that carries a literal `POSTGRES_PASSWORD` hands every self-hoster the
+    same credential on a database whose port is published.
+
+    Skips inside the API image, which mounts only `tests/`, `tradeos/` and `frontend/src` — the
+    same reason `test_navigation.py` skips when the front end source is absent.
+    """
+    root = pathlib.Path(__file__).resolve().parents[1]
+    if not (root / "docker-compose.yml").exists():
+        pytest.skip("docker-compose.yml is not mounted here; this reads it from a checkout")
+    compose = (root / "docker-compose.yml").read_text()
+    assert "POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?" in compose, (
+        "the password must be required, and `:?` rather than `:-` so an empty value is refused")
+    assert "postgresql://tradeos:${POSTGRES_PASSWORD}@" not in compose
+    assert (root / "scripts" / "setup.sh").exists(), "the quickstart needs a generator"

@@ -1,6 +1,6 @@
 # BUILD BRIEF: RECEIPTS
 
-Paste this whole file into Claude Code as the opening message, from the repository root at `/path/to/receipts` on branch `main`.
+Paste this whole file into Claude Code as the opening message, from the repository root at `/path/to/tradeos` on branch `main`.
 
 ---
 

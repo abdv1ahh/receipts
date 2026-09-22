@@ -8,12 +8,13 @@ session. If one of them does not work, fix it here in the same change that disco
 ## The short version
 
 ```bash
-cd /path/to/receipts
+cd /path/to/tradeos
 docker compose up -d db api worker          # or `make dev` while iterating on the UI
 open http://localhost:8000/board
 ```
 
-Sign in as `demo@tradeos.app` / `<generated at seed time>`.
+Sign in as `demo@tradeos.app`, with the password `cli seed-demo` printed when you ran it.
+It is generated per instance and shown once; re-run against an empty database to get a new one.
 
 **How long before the demo to start the worker: fifteen minutes.** Not because Receipts needs it —
 the Board, the records, the chain verification and the share pages are pure reads of data that is
