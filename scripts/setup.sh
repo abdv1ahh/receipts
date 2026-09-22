@@ -65,8 +65,9 @@ echo "         ALPACA_API_KEY_ID=..."
 echo "         ALPACA_API_SECRET_KEY=..."
 echo "  3. make quickstart"
 echo
-echo "That brings the stack up, migrates, and loads a year of daily closes for 400 symbols"
-echo "(about 20 seconds) so you can publish a call straight away."
+echo "That brings the stack up, migrates, and loads a month of daily closes for every US-listed"
+echo "symbol Alpaca quotes — about 13,000 of them, in roughly a minute — so you can publish a"
+echo "call on anything straight away."
 echo
 echo "If prices do not appear, 'docker compose exec -T api python -m tradeos.cli check-source alpaca'"
 echo "makes a real request and says which half of the credential is wrong."

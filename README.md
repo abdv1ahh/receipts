@@ -36,7 +36,7 @@ ALPACA_API_SECRET_KEY=...
 ```
 
 ```bash
-make quickstart                 # builds, migrates, loads a year of closes for 400 symbols (~20s)
+make quickstart                 # builds, migrates, loads a month of closes for every symbol
 ```
 
 Open <http://localhost:8000>, register, claim a handle, publish a call.
@@ -44,12 +44,24 @@ Open <http://localhost:8000>, register, claim a handle, publish a call.
 If prices do not appear, `docker compose exec -T api python -m tradeos.cli check-source alpaca`
 makes a real request and tells you which half of the credential is wrong.
 
-The quickstart loads 400 symbols because that is enough to publish on and takes twenty seconds.
-The full universe is 13,170 symbols and about 3.5 hours — run it overnight when you want it:
+**The quickstart loads a short window over every symbol rather than a long window over a few**, and
+that is not an arbitrary trade. A call is scored on the sessions *after* it is published — entry is
+the close of the first session following publication — so a fresh install needs the symbol to
+exist with a recent session, not a year of history behind it. Measured on a clean clone:
+**13,170 symbols, 12,930 with data, 176,000 rows, 65 seconds.**
+
+The first version of this loaded 400 symbols over a year instead, and it is worth saying why it was
+wrong: the work list sorts by staleness, everything on a fresh database is equally stale, so it
+falls back to sorting by symbol and you get `A, AA, AAA, AAAA, AAAC…`. Of twelve names a person
+actually reaches for, ten were missing. A stranger's first call is on a company they have heard of.
+
+Deeper history is optional and nothing needs it to work:
 
 ```bash
 docker compose exec -T api python -m tradeos.cli ingest-prices --universe --start 2024-01-01
 ```
+
+That is about 3.5 hours for a full year. Run it overnight if you want it.
 
 ---
 

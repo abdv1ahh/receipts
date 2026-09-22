@@ -6,19 +6,35 @@ X = docker compose exec -T api python -m tradeos.cli
 
 .PHONY: quickstart test test-js dev web lint fix up down logs
 
-# Everything a stranger needs on a fresh clone: migrate, then load enough recent price history to
-# publish a call on. 400 symbols over one year is ~19 seconds measured, which is the right size for
-# a first run — the full 13,170-symbol universe takes about 3.5 hours and is documented in the
-# README as an overnight job rather than put in anybody's way here.
+# Everything a stranger needs on a fresh clone: migrate, then load enough recent price data to
+# publish a call on.
 #
-# `--universe` reads Alpaca's own asset endpoint and no research table, which is why this works on
-# a database that has only ever run `migrate`.
+# EVERY SYMBOL, A SHORT WINDOW — not a few symbols and a long one, and the difference is the whole
+# point. The obvious first version was `--limit 400` over a year, which is quick and useless: the
+# work list sorts by staleness and every symbol on a fresh database is equally stale, so it falls
+# back to sorting by SYMBOL and the 400 are the alphabetical first 400 of 13,170. Measured on a
+# clean clone: A, AA, AAA, AAAA, AAAC, AAAP, AAAU … and of the twelve names a person actually
+# reaches for, TEN WERE ABSENT — MSFT, NVDA, TSLA, GOOGL, AMZN, META, QQQ, AMD, NFLX, JPM. A
+# stranger's first call is on a company they have heard of, and it could not be published. That is
+# the same defect as the old insider-signal universe wearing a different hat.
+#
+# A CALL DOES NOT NEED HISTORY. It is scored on the sessions AFTER it is published: entry is the
+# close of the first session following publication, exit the close on or after the horizon. What a
+# fresh install needs is that the symbol EXISTS in `prices_eod` with a recent session, and that SPY
+# is current — so a month of closes over everything beats a year of closes over the alphabet.
+#
+# Measured on a clean clone: 13,170 symbols, 12,930 with data, ~176,000 rows, 132 batches, 65
+# seconds for a 21-day window. `--universe` reads Alpaca's own asset endpoint and no research
+# table, which is why it works on a database that has only ever run `migrate`.
 quickstart:
 	docker compose up -d --build
 	$(X) migrate
-	$(X) ingest-prices --universe --limit 400 --start $$(python3 -c "import datetime;print(datetime.date.today()-datetime.timedelta(days=365))")
+	$(X) ingest-prices --universe --start $$(python3 -c "import datetime;print(datetime.date.today()-datetime.timedelta(days=30))")
 	@echo ""
 	@echo "Ready at http://localhost:8000 — register, claim a handle, publish a call."
+	@echo "Every US-listed symbol Alpaca quotes is publishable; run the line below whenever you"
+	@echo "want deeper history (about 3.5 hours for a full year, and nothing needs it to work):"
+	@echo "  docker compose exec -T api python -m tradeos.cli ingest-prices --universe --start 2024-01-01"
 	@echo "Optional, to put our own 473-call record on your board:"
 	@echo "  docker compose exec api python -m tradeos.cli seed-house-records"
 
