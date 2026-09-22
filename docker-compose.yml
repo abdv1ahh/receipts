@@ -27,8 +27,6 @@ services:
     build: .
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-tradeos}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-tradeos}
-      UPLOADS_DIR: /app/uploads
-      SEC_USER_AGENT: ${SEC_USER_AGENT}
       # The origin this instance is reachable at from outside. Every og:image and
       # og:url is built from it, so unset means every shared record previews as a
       # bare text link. Enumerated in BOTH services (CLAUDE.md 0i).
@@ -38,41 +36,18 @@ services:
       # that 403s on every bar. Free key: https://app.alpaca.markets/signup
       ALPACA_API_KEY_ID: ${ALPACA_API_KEY_ID:-}
       ALPACA_API_SECRET_KEY: ${ALPACA_API_SECRET_KEY:-}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-flash-latest}
-      GEMINI_MODEL_FAST: ${GEMINI_MODEL_FAST:-gemini-flash-lite-latest}
-      EXPLAIN_PROVIDER: ${EXPLAIN_PROVIDER:-template}
-      # Free live AI via any OpenAI-compatible endpoint (GitHub Models / Groq / OpenRouter). See FREE-AI.md.
-      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      OPENAI_MODEL: ${OPENAI_MODEL:-}
-      OPENAI_MODEL_FAST: ${OPENAI_MODEL_FAST:-}
-      # Sentiment sources (Slice H). HN needs no key; add these free keys to connect Reddit/YouTube.
-      REDDIT_CLIENT_ID: ${REDDIT_CLIENT_ID:-}
-      REDDIT_CLIENT_SECRET: ${REDDIT_CLIENT_SECRET:-}
-      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
-      # CUSIP -> ticker mapping for 13F holdings (resolve-cusips). Optional: the client works
-      # keyless at 10 jobs/request, and a key raises that to 100.
-      OPENFIGI_API_KEY: ${OPENFIGI_API_KEY:-}
-      # Billing (Slice D). Empty = test mode (no charge). Set these + add `stripe` to requirements to go live.
-      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
-      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
-      STRIPE_PRICE_RETAIL: ${STRIPE_PRICE_RETAIL:-}
-      STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO:-}
     ports: ["8000:8000"]
-    volumes: [uploads:/app/uploads]   # user trade screenshots (re-encoded); survives image rebuilds
     depends_on:
       db:
         condition: service_healthy
 
-  # Continuous updates (Milestone 3): the same image, running the scheduler loop so news, signals and
-  # attention refresh on their own. Keeps the API process stateless. Shares the DB and .env config.
+  # The background worker: the same image running the scheduler loop, so prices come in and calls
+  # get scored with nobody watching. Keeps the API process stateless. Shares the DB and .env config.
   worker:
     build: .
     command: ["python", "-m", "tradeos.cli", "scheduler"]
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-tradeos}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-tradeos}
-      SEC_USER_AGENT: ${SEC_USER_AGENT}
       # The origin this instance is reachable at from outside. Every og:image and
       # og:url is built from it, so unset means every shared record previews as a
       # bare text link. Enumerated in BOTH services (CLAUDE.md 0i).
@@ -82,21 +57,9 @@ services:
       # that 403s on every bar. Free key: https://app.alpaca.markets/signup
       ALPACA_API_KEY_ID: ${ALPACA_API_KEY_ID:-}
       ALPACA_API_SECRET_KEY: ${ALPACA_API_SECRET_KEY:-}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-flash-latest}
-      GEMINI_MODEL_FAST: ${GEMINI_MODEL_FAST:-gemini-flash-lite-latest}
-      EXPLAIN_PROVIDER: ${EXPLAIN_PROVIDER:-template}
-      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      OPENAI_MODEL: ${OPENAI_MODEL:-}
-      OPENAI_MODEL_FAST: ${OPENAI_MODEL_FAST:-}
-      REDDIT_CLIENT_ID: ${REDDIT_CLIENT_ID:-}
-      REDDIT_CLIENT_SECRET: ${REDDIT_CLIENT_SECRET:-}
-      OPENFIGI_API_KEY: ${OPENFIGI_API_KEY:-}
     depends_on:
       db:
         condition: service_healthy
 
 volumes:
   pgdata:
-  uploads:

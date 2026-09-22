@@ -1,15 +1,20 @@
-"""Rate limiting for the surfaces a stranger can reach, and the ones that cost money (Phase 9).
+"""Rate limiting for the surfaces a stranger can reach, and for the writes nobody can take back.
 
 Two different problems wear the same name here, and conflating them produces a limiter that is
 wrong for both:
 
-  **Abuse of the public surface.** `/api/public/*` and `/api/ledger` answer anyone, take no
-  session, and run real queries. Nothing stopped one client from calling them in a loop.
+  **Abuse of the public surface.** The board, every record, every chain and every card answer
+  anyone, take no session, and run real queries. Nothing stopped one client calling them in a loop,
+  and requiring a session instead would break the argument the product is making.
 
-  **Cost.** The model paths spend a metered quota. Gemini's free daily allowance ran out twice in
-  one session of ordinary development, so a handful of enthusiastic users — or one script — can
-  silence every AI surface for everybody until midnight UTC. That is not a denial-of-service
-  concern, it is a bill and a shared resource.
+  **Permanence.** Publishing seals a row into an append-only table that nothing can delete, and
+  registering is upstream of a handle and of that table. A runaway script on those two paths does
+  not leave a recoverable mess, it leaves permanent entries on a public record. Those buckets are
+  tight for that reason and not for load.
+
+The "model" bucket is gone with the model paths. It existed because Gemini's free daily allowance
+is shared by every user, so one script could silence every AI surface until midnight UTC — a
+concern that retired with the AI surfaces.
 
 **This is an in-process limiter, and that is a real limitation, stated rather than buried.** It is
 a dict in one worker. It resets on restart, and with more than one API replica each replica gets
@@ -31,12 +36,10 @@ import time
 log = logging.getLogger("tradeos.ratelimit")
 
 # (requests, per_seconds). Deliberately generous: the aim is to stop a loop, not to make a
-# legitimate reader feel watched. A visitor clicking every country on the marketing site's map
-# fires a handful of requests in a few seconds and must never see one of these.
+# legitimate reader feel watched. A visitor opening a record and pressing Verify fires a handful of
+# requests in a few seconds and must never see one of these.
 LIMITS: dict[str, tuple[int, int]] = {
     "public": (120, 60),      # the whole unauthenticated surface, per client, per minute
-    "model": (20, 300),       # any route that may spend model quota, per client, per 5 minutes
-    "upload": (30, 3600),     # image uploads, per client, per hour
     # Verification and reset. Tight, because these send mail to a third party and because a token
     # guess is cheap: 32 bytes of entropy makes brute force hopeless anyway, but there is no reason
     # to host the attempt. Per-address limiting also lives in `authn`, which this does not replace

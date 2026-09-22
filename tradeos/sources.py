@@ -90,14 +90,13 @@ def _google_oauth_configured() -> bool:
     return oauth.configured()
 
 
+# One entry per catalog source with `state: None`, and `test_every_dynamic_source_has_a_config_check`
+# asserts the two tables cannot drift apart. A catalog entry asking for its state to be computed
+# with nothing here to compute it falls through to NEEDS_KEY forever: the source can never report
+# connected however valid the credential, `check-source` refuses to run its probe, and the operator
+# is told to add a key they already added. Alpaca shipped that way once.
 _DYNAMIC = {
     "alpaca": config.alpaca_configured,
-    "reddit": config.reddit_configured,
-    "youtube": config.youtube_configured,
-    "openfigi": lambda: bool(config.openfigi_configured()),
-    "llm_gemini": config.gemini_configured,
-    "llm_openai": config.openai_compat_configured,
-    "stripe": config.stripe_configured,
     "sentry": config.sentry_configured,
     "smtp": _smtp_configured,
     "google_oauth": _google_oauth_configured,

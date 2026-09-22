@@ -20,8 +20,6 @@ import os
 import secrets
 from datetime import date
 
-from psycopg import sql
-
 from . import authn, config, db
 from .ingestion import prices_alpaca
 from .ingestion.prices_alpaca import AlpacaClient, ingest_prices_alpaca
@@ -350,9 +348,18 @@ def cmd_verify_chain(args) -> None:
 
 
 def cmd_seed_demo(args) -> None:
-    """A ready-to-use demo account: tier=pro (full features, no charge), NO TOTP (so it logs in with
-    just email + password), pre-populated with a handle, journal trades, a portfolio, and a watchlist
-    so the product looks alive on first login. Idempotent.
+    """A ready-to-use account with a handle and nothing published: tier=pro, no TOTP, so it logs in
+    with email and password alone. Idempotent.
+
+    IT SEEDS NO CALLS, and that is the point rather than an omission. This used to pre-populate
+    journal trades, a portfolio and a watchlist "so the product looks alive on first login" — and
+    those surfaces are gone. Inventing calls to fill the gap would put fabricated entries into a
+    permanent, sealed, public record whose entire argument is that nothing in it was made up. There
+    is no `--i-know` for that one. What a fresh instance shows instead is the truth: an empty
+    record, and a publish form.
+
+    (`seed-house-records` is the other half of this and it is not a substitute: it imports 473
+    calls the signal engine actually made, from tables only the author's database has.)
 
     THE PASSWORD IS GENERATED, NOT FIXED. It used to default to a constant that also appeared in
     CLAUDE.md, GO-LIVE.md, two runbooks and this docstring — so every reader of the repository knew
@@ -365,7 +372,8 @@ def cmd_seed_demo(args) -> None:
     permanent, fully-privileged, MFA-less login, so seeding one there should be a decision rather
     than a habit: `--i-know` is how you say it was one.
     """
-    email = os.environ.get("TRADEOS_DEMO_EMAIL", "demo@tradeos.app").strip().lower()
+    email = os.environ.get("TRADEOS_DEMO_EMAIL", "demo@example.invalid").strip().lower()
+    handle = os.environ.get("TRADEOS_DEMO_HANDLE", "demo-caller").strip().lower()
     if os.environ.get("COOKIE_SECURE", "false").lower() == "true" and not getattr(args, "i_know", False):
         raise SystemExit(
             "refusing: COOKIE_SECURE=true, so this instance is serving real users over TLS.\n"
@@ -375,52 +383,22 @@ def cmd_seed_demo(args) -> None:
     with db.connect() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "INSERT INTO users (email, password_hash, tier, handle, bio) VALUES (%s,%s,'pro',%s,%s) "
-                "ON CONFLICT (email) DO NOTHING RETURNING id",
-                (email, authn.hash_password(pw), "demo_trader",
-                 "Demo account — exploring smart-money convergence, journaling trades, and the AI tools."),
-            )
+                "INSERT INTO users (email, password_hash, tier) VALUES (%s,%s,'pro') "
+                "ON CONFLICT (email) DO NOTHING RETURNING id", (email, authn.hash_password(pw)))
             row = cur.fetchone()
             if not row:
                 print(f"demo account {email} already exists; not modified")
                 return
             uid = row[0]
-            eid = sql.SQL("(SELECT entity_id FROM security_map WHERE symbol=%s "
-                          "AND source='sec_company_tickers' ORDER BY confidence DESC LIMIT 1)")
-            trades = [
-                ("NVDA", "long", "closed", 120, 138, 110, 145, 80, "breakout", True, "2026-06-02", "2026-06-20"),
-                ("MSFT", "long", "open", 410, None, 395, 465, 40, "pullback", True, "2026-06-25", None),
-                ("AAPL", "long", "closed", 195, 186, 188, 215, 60, "earnings", False, "2026-05-15", "2026-05-30"),
-                ("AMD", "long", "planned", 150, None, 138, 190, 50, "breakout", False, None, None),
-                ("TSLA", "short", "closed", 250, 232, 265, 220, 30, "reversal", True, "2026-06-10", "2026-06-24"),
-            ]
-            for (sym, d, st, e, ex, stp, tg, sz, strat, pub, op, cl) in trades:
-                cur.execute(
-                    sql.SQL("""INSERT INTO trades (user_id, symbol, entity_id, asset_class, direction,
-                                 status, entry_price, exit_price, stop_price, target_price, size,
-                                 size_unit, strategy, is_public, opened_on, closed_on)
-                               VALUES (%s,%s,{eid},'equity',%s,%s,%s,%s,%s,%s,%s,'shares',%s,%s,%s,%s)"""
-                            ).format(eid=eid),
-                    (uid, sym, sym, d, st, e, ex, stp, tg, sz, strat, pub, op, cl),
-                )
-            cur.execute("INSERT INTO portfolios (user_id, name, kind) VALUES (%s,'My shadows','manual') RETURNING id", (uid,))
-            pid = cur.fetchone()[0]
-            for sym, op in (("NVDA", "2026-06-02"), ("MSFT", "2026-06-25")):
-                cur.execute(sql.SQL("INSERT INTO portfolio_positions (portfolio_id, symbol, "
-                                    "entity_id, opened_on) VALUES (%s,%s,{eid},%s)").format(eid=eid),
-                            (pid, sym, sym, op))
-            for sym in ("NVDA", "MSFT", "AMD", "TSLA"):
-                cur.execute("INSERT INTO watchlists (user_key, symbol) VALUES ('demo',%s) ON CONFLICT DO NOTHING", (sym,))
-            # follow a few names so the Morning Brief's "Your names" section is alive on first login
-            for sym in ("NVDA", "MSFT", "TSLA", "AMD"):
-                cur.execute("INSERT INTO follows (user_id, kind, ref, label) VALUES (%s,'symbol',%s,%s) "
-                            "ON CONFLICT DO NOTHING", (uid, sym, sym))
+            cur.execute(
+                """INSERT INTO callers (handle, display_name, kind, user_id, jurisdiction_attested)
+                   VALUES (%s, 'Demo Caller', 'human', %s, true)
+                   ON CONFLICT (handle) DO NOTHING""", (handle, uid))
         conn.commit()
-        authn.audit(conn, "system", "seed_demo", email)
-    print(f"demo account created: {email}  (tier=pro, no MFA)")
+    print(f"demo account ready: {email}")
     print(f"  password: {pw}")
-    print("  This is shown ONCE and is not stored anywhere but the password hash.")
-    print("  Log in with that email + password — full Pro features, no charge.")
+    print("  (printed once; it is stored only as an argon2 hash)")
+    print(f"  handle:   @{handle} — an empty record, which is what an honest one looks like on day one")
 
 
 def cmd_create_invites(args) -> None:
@@ -432,17 +410,38 @@ def cmd_create_invites(args) -> None:
 
 
 def cmd_status(_args) -> None:
+    """What the instance actually holds, in the order an operator asks.
+
+    The price feed FIRST, because it is the only thing that can silently stop the product working:
+    a stale benchmark makes every open call unscoreable, and `resolve_due` refuses the whole batch
+    rather than half-scoring against it. The three counts after it answer "is anything here".
+    """
     with db.connect() as conn, conn.cursor() as cur:
-        cur.execute("SELECT source, last_success_at, last_record_knowable, records_total, rejects_total FROM feed_health ORDER BY source")
+        cur.execute("SELECT source, last_success_at, last_record_knowable, records_total, "
+                    "rejects_total FROM feed_health ORDER BY source")
         rows = cur.fetchall()
         if not rows:
             print("no feeds have run yet")
         for source, ok_at, knowable, total, rejects in rows:
-            print(f"{source}: last run {ok_at}, freshest record {knowable}, {total} records, {rejects} rejects")
-        cur.execute("SELECT count(*) FROM fund_holdings WHERE issuer_entity IS NULL")
-        unresolved = cur.fetchone()[0]
-        if unresolved:
-            print(f"unresolved 13F holdings (CUSIP not yet mapped): {unresolved}")
+            print(f"{source}: last run {ok_at}, freshest record {knowable}, "
+                  f"{total} records, {rejects} rejects")
+
+        cur.execute("SELECT count(DISTINCT symbol), max(day) FROM prices_eod")
+        symbols, newest = cur.fetchone()
+        cur.execute("SELECT max(day) FROM prices_eod WHERE symbol = 'SPY'")
+        spy = cur.fetchone()[0]
+        print(f"prices: {symbols or 0} symbols, newest close {newest or 'none'}")
+        if spy != newest:
+            # Named separately rather than folded into the line above. SPY being behind the rest of
+            # the table is not one stale symbol among many: it is the benchmark, so it blocks every
+            # publish and defers every resolution at once.
+            print(f"  SPY runs to {spy or 'none'} — BEHIND the rest of the table, so nothing "
+                  f"can be scored and publishing is blocked until it catches up")
+
+        cur.execute("SELECT count(*), count(*) FILTER (WHERE verdict IS NULL) FROM calls")
+        total, still_open = cur.fetchone()
+        cur.execute("SELECT count(*) FROM callers")
+        print(f"record: {cur.fetchone()[0]} caller(s), {total} sealed call(s), {still_open} open")
 def main() -> None:
     """Every command this product has.
 

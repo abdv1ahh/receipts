@@ -56,12 +56,17 @@ chmod 600 "$ENV_FILE"
 
 echo "Wrote $ENV_FILE with a generated database password (not shown)."
 echo
-echo "One more thing before the stack will run — SEC fair access requires a contact address:"
-echo "    edit $ENV_FILE and set SEC_USER_AGENT to  'Your Name you@example.com'"
+echo "ONE thing left, and it is the only external key this product needs:"
 echo
-echo "Then:"
-echo "    docker compose up -d --build"
-echo "    docker compose exec -T api python -m tradeos.cli migrate"
+echo "  1. Get a free Alpaca key — no card — at https://app.alpaca.markets/signup"
+echo "     Then: the paper-trading dashboard, 'API Keys', 'Generate'."
+echo "  2. Put BOTH halves in $ENV_FILE:"
+echo "         ALPACA_API_KEY_ID=..."
+echo "         ALPACA_API_SECRET_KEY=..."
+echo "  3. make quickstart"
 echo
-echo "For prices, add a free Alpaca key (https://app.alpaca.markets/signup) as"
-echo "ALPACA_API_KEY_ID and ALPACA_API_SECRET_KEY, then re-run 'docker compose up -d'."
+echo "That brings the stack up, migrates, and loads a year of daily closes for 400 symbols"
+echo "(about 20 seconds) so you can publish a call straight away."
+echo
+echo "If prices do not appear, 'docker compose exec -T api python -m tradeos.cli check-source alpaca'"
+echo "makes a real request and says which half of the credential is wrong."

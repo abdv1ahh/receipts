@@ -12,7 +12,7 @@
 # with retention, it has to work on whatever free tier this ends up on, and anything cleverer is
 # something else to operate.
 #
-#   ./scripts/backup.sh                      # dump to ./backups
+#   ./scripts/backup.sh                      # dump to ~/.local/share/receipts/backups
 #   BACKUP_DIR=/mnt/vol ./scripts/backup.sh  # somewhere that survives a redeploy
 #   ./scripts/backup.sh --verify             # dump, then prove it restores
 #
@@ -64,7 +64,23 @@
 
 set -uo pipefail        # deliberately NOT -e; see THE GUARD below
 
-BACKUP_DIR="${BACKUP_DIR:-./backups}"
+# DEFAULTS OUTSIDE THE CLONE, and that is a correctness change rather than tidiness.
+#
+# It used to default to `./backups`, i.e. inside the working tree. Measured on the author's machine
+# on 2026-09-23: 18 dumps, 81 GB, sitting in the repository directory. Nothing was ever committed —
+# `.gitignore` has carried `backups/` from the start — but "the dump is safe because git ignores
+# it" is not the property anybody wanted. A dump inside the clone is deleted by a fresh clone, is
+# copied by a `cp -r` of the project, is scanned by every tool pointed at the repo, and on a laptop
+# it is the thing that fills the disk while looking like source code.
+#
+# `$XDG_DATA_HOME` (or ~/.local/share) is where a per-user data store belongs on Linux and is
+# harmless on macOS. A production host should set BACKUP_DIR to a volume that survives a redeploy,
+# which is what the usage line above says.
+#
+# NOTHING IS MIGRATED. An existing ./backups keeps every dump in it; this only changes where the
+# NEXT one is written. Moving somebody's 81 GB as a side effect of a default change would be the
+# worse mistake.
+BACKUP_DIR="${BACKUP_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/receipts/backups}"
 KEEP_DAYS="${KEEP_DAYS:-14}"
 DB_SERVICE="${DB_SERVICE:-db}"
 DB_HOST="${PGHOST:-127.0.0.1}"

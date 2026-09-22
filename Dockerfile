@@ -15,7 +15,8 @@ RUN npm run build
 # --- stage 2: the API image, serving the built bundle from tradeos/static ---
 FROM python:3.12-slim
 WORKDIR /app
-# ONE OS PACKAGE, AND IT IS FOR THE SHARE CARD.
+# TWO OS PACKAGES. The first is for the share card; the second is so the suite can check its own
+# schema.
 #
 # `receipts/card.py` renders the Open Graph image with Pillow. Pillow 12 ships a scalable embedded
 # face (Aileron), which is enough to draw a card -- but measured against a private-use codepoint to
@@ -29,8 +30,15 @@ WORKDIR /app
 # `--no-install-recommends` and the cache cleanup keep the layer to what was asked for. This is an
 # OS package, not a Python dependency: `requirements.txt` is untouched and its ten-line rule is not
 # in play.
+#
+# `postgresql-client` is here for `pg_dump`, and it is not a convenience. A fresh install takes
+# `migrations/baseline/001_baseline.sql` and an existing one takes the 37 ordered files, and
+# `tests/test_migrations.py` proves those two paths produce the same 19 tables by migrating two
+# scratch databases and diffing their schemas. Without pg_dump in this image that test SKIPS, and
+# a skipped equivalence check is how a fresh install and an upgraded one quietly stop being the
+# same product. `scripts/backup.sh` also falls back to a container pg_dump when the host has none.
 RUN apt-get update \
- && apt-get install --no-install-recommends -y fonts-dejavu-core \
+ && apt-get install --no-install-recommends -y fonts-dejavu-core postgresql-client \
  && apt-get clean \
  && find /var/lib/apt/lists -type f -delete
 COPY requirements.txt .
@@ -40,10 +48,9 @@ COPY requirements.txt .
 # enough to stop being read.
 RUN pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir -r requirements.txt
 COPY tradeos ./tradeos
-COPY content ./content
 COPY --from=web /src/frontend/dist ./tradeos/static
 # run as a non-root user (production additionally pins the base image by digest)
-RUN useradd --create-home --uid 10001 appuser && mkdir -p /app/uploads && chown -R appuser:appuser /app
+RUN useradd --create-home --uid 10001 appuser && chown -R appuser:appuser /app
 USER appuser
 EXPOSE 8000
 CMD ["uvicorn", "tradeos.app:app", "--host", "0.0.0.0", "--port", "8000"]

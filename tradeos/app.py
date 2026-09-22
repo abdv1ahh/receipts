@@ -102,21 +102,6 @@ app = FastAPI(title="TradeOSS", docs_url=None, redoc_url=None, openapi_url=None)
 
 CALIBRATION_PENDING = "Backtested calibration pending"  # until Slice 4 (rule: no premature certainty)
 _BUCKET_RANK = {"low": 0, "medium": 1, "high": 2}
-MAX_IMAGE_BYTES = 8 * 1024 * 1024
-_ALLOWED_IMAGE = {"image/png", "image/jpeg", "image/webp"}
-_extract_calls: list[float] = []
-# ---- user-uploaded trade screenshots: re-encoded, opaque-named, served through an authed route
-UPLOADS_DIR = Path(os.environ.get("UPLOADS_DIR", str(Path(__file__).parent.parent / "uploads")))
-_IMG_KEY = re.compile(r"[0-9a-f]{32}\.png")
-# A chart screenshot is a PNG, a JPEG, a WebP or a GIF. Nothing else needs to be decodable.
-#
-# Pillow ships decoders for PSD, FITS, PCF, BDF and a long tail of others, and several of those
-# have a history of memory-safety bugs — the version this repo pinned until Phase 9 had a
-# known out-of-bounds write and a memory-corruption issue, both reachable by uploading a crafted
-# PSD, because `Image.open` sniffs the format from the bytes and the caller never said which
-# formats it wanted. Upgrading fixes the known ones; refusing to decode formats the product has no
-# use for is what keeps the next one out of reach.
-_ALLOWED_IMAGE_FORMATS = {"PNG", "JPEG", "WEBP", "GIF"}
 _CSP = ("default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; "
         "script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; "
         "form-action 'self'")
@@ -134,11 +119,7 @@ def _origin_ok(origin: str, host: str | None) -> bool:
 
 # Paths a stranger can reach without a session. Everything else is behind authentication, which
 # is its own limit — an attacker without an account cannot spend an account's allowance.
-_PUBLIC_PREFIXES = ("/api/public/", "/api/ledger", "/api/receipts", "/api/board", "/r/",
-                    "/api/card/receipt/", "/api/calls/")
-# Routes that may spend model quota. Gemini's free daily allowance is shared by every user, so one
-# script exhausting it silences the AI surfaces for everybody until midnight UTC.
-_MODEL_PATHS = ("/api/assistant", "/api/analyze-chart", "/api/extract-tickers")
+_PUBLIC_PREFIXES = ("/api/receipts", "/api/board", "/r/", "/api/card/receipt/", "/api/calls/")
 # Anything that can cause an email to be sent, or that guesses at a token.
 _AUTH_TOKEN_PATHS = ("/api/auth/verify/", "/api/auth/reset/")
 # Creating an account. Registration is open now, and an account is upstream of a caller handle and
@@ -159,12 +140,8 @@ def _limit_bucket(path: str, method: str = "GET") -> str | None:
         return "register"
     if path.startswith(_PUBLIC_PREFIXES):
         return "public"
-    if path.startswith(_MODEL_PATHS):
-        return "model"
     if path.startswith(_AUTH_TOKEN_PATHS):
         return "auth_token"
-    if path.endswith("/image") or path.endswith("/chart-analysis"):
-        return "upload"
     return None
 
 
