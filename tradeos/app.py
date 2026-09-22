@@ -883,8 +883,7 @@ def receipts_chain_data(handle: str, response: Response) -> dict:
         # How the client must frame those values before hashing, stated on the wire rather than
         # only in two codebases. A third implementation — someone checking this record in a
         # language we never wrote — should not have to read our source to get the bytes right.
-        "framing": ("each field as name:byte-length-of-value:value, joined with newline; "
-                    "sha256 of (prev_hash + payload), hex"),
+        "framing": receipts_chain.FRAMING,
         "does_not_prove": receipts_record.methodology()["chain"]["does_not_prove"],
     }
 

@@ -1,0 +1,40 @@
+{
+  "exported_at": "2026-09-22T21:18:19.647502+00:00",
+  "framing": "each field as name:byte-length-of-value:value, joined with newline; sha256 of (prev_hash + payload), hex",
+  "sealed_fields": [
+    "caller_id",
+    "seq",
+    "symbol",
+    "direction",
+    "horizon_days",
+    "confidence",
+    "thesis",
+    "benchmark_symbol",
+    "published_at",
+    "knowable_time"
+  ],
+  "files": {
+    "convergence-v3.json": {
+      "sha256": "eda5ee2a7e06ce34f14b399ba13ba0a8cf6a0cfa3b54a37dedfbfd9025d1f01a",
+      "links": 323,
+      "head": "c9f480e0a79a28c73f149eec3c083a0d436169812471c7b5c4d94f613b6ef5f1",
+      "sealed_after_the_outcome_was_known": true
+    },
+    "convergence-v4.json": {
+      "sha256": "ee74a740674f7ae7e0f600a6ccd5f9fe3edf87da65ab29f2d044ab114695eb7b",
+      "links": 150,
+      "head": "24df0daed4f23ccde198744a376cbae5f43f35fd611dc4288265e75679fee2d5",
+      "sealed_after_the_outcome_was_known": true
+    },
+    "verify.js": {
+      "sha256": "f2d591d113d442cf9c801e7606e8a575830f2becab6b2d3dc20fb3cf9f0c366f",
+      "copied_verbatim_from": "tradeos/receipts/verify.js"
+    },
+    "check.mjs": {
+      "sha256": "801d17504d3d2e1806b5f5f8f42ec73b8973fbb56c6f4bd7e81fa2d4055fbd57"
+    },
+    "README.md": {
+      "sha256": "92e959276590947525ee257aa3a5921a3e668c76f4baf21414355e797b5f6f30"
+    }
+  }
+}

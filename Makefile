@@ -40,6 +40,9 @@ test:
 # instead (tests/fixtures/receipt_chain.json). Node is already a prerequisite for `make web`.
 test-js:
 	node tests/verify_js_check.mjs
+	@# And the EXPORT, which is the same wire format checked with no server at all. A broken
+	@# export is worse than no export: it is a file that claims to prove a record and does not.
+	@test -f export/check.mjs && node export/check.mjs || echo "no export/ in this checkout; skipping"
 
 # Development stack: Python reloads in place, tests/ is mounted, and the locally built frontend is
 # served, so a UI change needs only `make web` instead of a full image rebuild.

@@ -15,10 +15,13 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import logging
 import os
+import pathlib
 import secrets
-from datetime import date
+from datetime import UTC, date, datetime
 
 from . import authn, config, db
 from .ingestion import prices_alpaca
@@ -401,6 +404,208 @@ def cmd_seed_demo(args) -> None:
     print(f"  handle:   @{handle} — an empty record, which is what an honest one looks like on day one")
 
 
+def cmd_export_records(args) -> None:
+    """Write one caller's whole sealed chain to a directory that verifies with no server at all.
+
+    WHY THIS EXISTS. Every other way of checking this record needs the instance to be up: the
+    browser verifier fetches `/api/receipts/{handle}/chain`, and `verify-chain` needs the database.
+    A record that can only be checked while its author keeps a server running is a record with an
+    expiry date, and the argument this product makes does not survive that.
+
+    So the export is the sealed fields plus the two hashes, the same bytes the API hands a browser,
+    and the checker is `receipts/verify.js` ITSELF — not a copy of it. A second implementation of a
+    frozen wire format is the one thing this project has been most careful to avoid, and an export
+    carrying its own private reimplementation would be the third.
+
+    A MANIFEST WITH THE SHA256 OF EACH FILE. Not integrity theatre: the chain already proves the
+    calls are unedited, and the manifest proves the FILES are the ones that were exported — which
+    is the different question somebody downloading a zip actually has.
+    """
+    from .receipts import chain, record
+    out = pathlib.Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    written, manifest = [], {}
+    with db.connect() as conn:
+        handles = args.handles or [r[0] for r in _house_handles(conn)]
+        for handle in handles:
+            caller = record.caller(handle, conn)
+            if not caller:
+                raise SystemExit(f"no caller @{handle}")
+            payload = chain.export_payload(caller, conn)
+            path = out / f"{handle}.json"
+            path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n")
+            written.append((handle, len(payload["links"]), payload["head"]))
+            manifest[path.name] = {"sha256": _sha256_file(path),
+                                   "links": len(payload["links"]),
+                                   "head": payload["head"],
+                                   "sealed_after_the_outcome_was_known": payload["is_house"]}
+
+    # verify.js, copied rather than imported, because the export has to run where this repository
+    # is not. It is copied VERBATIM and the manifest carries its hash, so a reader can prove the
+    # checker in the export is the checker the product uses.
+    verifier = pathlib.Path(__file__).parent / "receipts" / "verify.js"
+    (out / "verify.js").write_text(verifier.read_text())
+    manifest["verify.js"] = {"sha256": _sha256_file(out / "verify.js"),
+                             "copied_verbatim_from": "tradeos/receipts/verify.js"}
+
+    (out / "check.mjs").write_text(_CHECK_MJS)
+    manifest["check.mjs"] = {"sha256": _sha256_file(out / "check.mjs")}
+
+    (out / "README.md").write_text(_export_readme(written))
+    manifest["README.md"] = {"sha256": _sha256_file(out / "README.md")}
+
+    (out / "MANIFEST.json").write_text(json.dumps(
+        {"exported_at": datetime.now(UTC).isoformat(), "framing": chain.FRAMING,
+         "sealed_fields": list(chain.SEALED_FIELDS), "files": manifest},
+        indent=2) + "\n")
+
+    for handle, links, head in written:
+        print(f"  {handle}: {links} links, head {head[:16]}")
+    print(f"exported to {out}/  — check it with:  node {out}/check.mjs")
+
+
+# The runner. Deliberately thin: everything that decides whether the record is intact lives in
+# `verify.js`, which is copied beside it unmodified. This file only reads the JSON, calls it, and
+# prints. Node 18+, no dependencies, no network.
+_CHECK_MJS = """// Check every exported record, offline, with no server and no dependencies.
+//
+//     node check.mjs
+//
+// It reads each <handle>.json beside it and recomputes every SHA-256 with `verify.js` — the SAME
+// file this product serves to a browser, copied here verbatim, not a second implementation. A
+// frozen wire format with two implementations already needs a cross-language test to keep them
+// honest; a third would be a liability, not a reassurance.
+//
+// Exit status is 0 only if every record verifies.
+import { readFileSync, readdirSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+// verify.js reaches for WebCrypto, which node exposes on `globalThis.crypto` from 19 and behind a
+// flag before that. Providing the one primitive it uses keeps the browser file unmodified, which
+// is the whole point of copying rather than porting it.
+if (!globalThis.crypto?.subtle) {
+  globalThis.crypto = {
+    subtle: {
+      digest: async (_alg, data) =>
+        createHash("sha256").update(Buffer.from(data)).digest().buffer,
+    },
+  };
+}
+
+const here = dirname(fileURLToPath(import.meta.url));
+const { verifyChain } = await import(join(here, "verify.js"));
+
+const manifest = JSON.parse(readFileSync(join(here, "MANIFEST.json"), "utf8"));
+const records = readdirSync(here).filter(
+  (f) => f.endsWith(".json") && f !== "MANIFEST.json");
+
+let failed = 0;
+for (const file of records.sort()) {
+  const body = JSON.parse(readFileSync(join(here, file), "utf8"));
+  const started = Date.now();
+  const out = await verifyChain(body);
+  const ms = Date.now() - started;
+  const sealed = manifest.files?.[file]?.sealed_after_the_outcome_was_known;
+  const note = sealed ? "  [SEALED BACKTEST - see README]" : "";
+  if (out.intact) {
+    console.log(`ok    ${body.handle}: ${out.links} links in ${ms} ms, head ${out.head.slice(0, 16)}${note}`);
+  } else {
+    failed += 1;
+    console.log(`BROKEN ${body.handle}: ${out.reason} at call #${out.broken_at_seq}`);
+  }
+}
+
+// Tamper with one byte and confirm the check says no. A checker that can only ever print "ok" is
+// indistinguishable from a checker that does nothing, and a reader has no way to tell them apart
+// unless they watch it fail.
+if (records.length) {
+  const body = JSON.parse(readFileSync(join(here, records[0]), "utf8"));
+  const field = body.fields[body.fields.length - 1];
+  body.links[0].values[field] = body.links[0].values[field] + "x";
+  const out = await verifyChain(body);
+  if (out.intact) {
+    console.log("BROKEN the checker did not notice a tampered record; it is not checking anything");
+    failed += 1;
+  } else {
+    console.log(`ok    and it says no when it should: ${out.reason} at call #${out.broken_at_seq}`);
+  }
+}
+
+console.log(failed ? `\\n${failed} problem(s)` : `\\nall ${records.length} record(s) verified`);
+process.exit(failed ? 1 : 0);
+"""
+
+
+def _export_readme(written: list) -> str:
+    rows = "\\n".join(f"| `@{h}` | {n} | `{head[:16]}` |" for h, n, head in written)
+    return f"""# Exported records
+
+Every sealed call by these callers, with the two hashes that chain them, in the exact bytes they
+were hashed from. No server is involved in checking them:
+
+```
+node check.mjs
+```
+
+| caller | calls | chain head |
+|---|---:|---|
+{rows}
+
+## These are a SEALED BACKTEST, not foresight
+
+**Every call in this export was imported from an already-scored ledger and sealed after its
+outcome was known.** They are not predictions that were published in advance and then resolved.
+They exist to demonstrate the machinery — the chaining, the scoring, the append-only trigger, the
+browser check — over a real sample rather than a toy one, and `MANIFEST.json` marks each of them
+`sealed_after_the_outcome_was_known: true`.
+
+A call published through the product is sealed at PUBLICATION, before the outcome exists. That is
+the whole claim, and it is not the claim these records support.
+
+## The numbers, which are bad
+
+Pooled across both: **43.2% right on 412 resolved calls**, which is 2.76 standard errors below a
+coin flip. Average excess return per call against SPY: **−1.18%**, with a 95% interval of
+**[−2.93%, +0.57%]** that spans zero — so on this sample no edge is shown in either direction, and
+the frequency and the return genuinely disagree. At the measured dispersion it would take **1,268**
+resolved calls to detect a 1% per-call edge.
+
+This is not presented as a positive result and never should be.
+
+## What `check.mjs` proves, and what it does not
+
+It proves the CALLER has not edited, deleted, reordered or backdated anything: every hash is
+recomputed from the fields in these files, and one changed character breaks every link after it.
+It runs the tamper test on itself so you can watch it say no.
+
+It does NOT prove the operator did not rewrite the whole chain and recompute it. They held every
+field. Closing that needs an anchor outside their control — publishing the chain head somewhere
+they cannot revise — and that is not built. This is not a blockchain.
+
+## What is in each file
+
+`fields` is the sealed field list, in the frozen order. `framing` states how to turn a link's
+values into the bytes that were hashed, so a checker written in any language needs nothing from
+this repository. `links[].values` are already rendered to text, because two of the fields are
+timestamps whose sealed spelling carries microseconds and a trailing `Z` that a JavaScript `Date`
+round trip would drop.
+
+Nothing here is investment advice.
+"""
+
+
+def _house_handles(conn):
+    with conn.cursor() as cur:
+        cur.execute("SELECT handle FROM callers WHERE is_house ORDER BY id")
+        return cur.fetchall()
+
+
+def _sha256_file(path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 def cmd_create_invites(args) -> None:
     with db.connect() as conn:
         codes = [authn.create_invite(conn, None) for _ in range(args.n)]
@@ -515,6 +720,12 @@ def main() -> None:
     ci = sub.add_parser("create-invites")
     ci.add_argument("--n", type=int, default=5)
     ci.set_defaults(fn=cmd_create_invites)
+
+    ex = sub.add_parser("export-records",
+                        help="write sealed chains to a directory that verifies with no server")
+    ex.add_argument("handles", nargs="*", help="caller handles; default every house record")
+    ex.add_argument("--out", default="export", help="directory to write into")
+    ex.set_defaults(fn=cmd_export_records)
 
     sub.add_parser("status").set_defaults(fn=cmd_status)
     sub.add_parser("preflight").set_defaults(fn=cmd_preflight)

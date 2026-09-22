@@ -42,6 +42,9 @@ EXPECTED = {
     "scheduler",
     "seed-admin", "seed-demo", "seed-house-records", "create-invites",
     "resolve-calls", "verify-chain",
+    # Writes every sealed chain to a directory that verifies with no server and no database. The
+    # record has to outlive the instance, or it is a record with an expiry date.
+    "export-records",
     "status", "preflight",
 }
 

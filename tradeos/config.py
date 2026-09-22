@@ -83,4 +83,4 @@ def sentry_configured() -> bool:
 def brand_name() -> str:
     """The public product name. A single config value so the display name can change without a
     refactor — nothing renames modules, tables or the package for branding."""
-    return os.environ.get("BRAND_NAME", "Rhumb").strip() or "Rhumb"
+    return os.environ.get("BRAND_NAME", "Receipts").strip() or "Receipts"

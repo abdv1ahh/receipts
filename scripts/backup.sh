@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Database backup for Rhumb.
+# Database backup for Receipts.
 #
 # WHY THIS EXISTS: the dataset is 759,698 insider transactions, 135,925 stake events and 24,982
 # institutional holdings, built over hours of rate-limited SEC backfill that cannot be rerun
@@ -43,7 +43,7 @@
 #
 # ---------------------------------------------------------------------------------------------
 # SCHEDULING. On Linux, cron (daily, 03:15), with output kept so a silent failure is not silent:
-#   15 3 * * * cd /srv/rhumb && ./scripts/backup.sh >> /var/log/rhumb-backup.log 2>&1
+#   15 3 * * * cd /srv/receipts && ./scripts/backup.sh >> /var/log/receipts-backup.log 2>&1
 #
 # On macOS use launchd, NOT cron: cron skips a scheduled run entirely if the machine is asleep at
 # the time, so on a laptop the line above silently never fires. launchd's StartCalendarInterval
@@ -91,7 +91,11 @@ DB_NAME="${POSTGRES_DB:-tradeos}"
 # supplies its own, and this default is then never used.
 export PGPASSWORD="${POSTGRES_PASSWORD:-tradeos}"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
-OUT="${BACKUP_DIR}/rhumb-${STAMP}.dump"
+# THE PREFIX CHANGED AND THE MATCH DID NOT. New dumps are written as `receipts-*`; every read
+# below globs BOTH, because 18 dumps on this machine are named `rhumb-*` and a retention sweep
+# that stops seeing them would keep them forever while reporting success, and a restore that
+# stops seeing them would report "no backup found" next to 81 GB of backups.
+OUT="${BACKUP_DIR}/receipts-${STAMP}.dump"
 # THE DUMP IS WRITTEN UNDER A NAME THAT IS NOT A BACKUP, and only renamed once every check has
 # passed. This is the one guard a trap cannot provide: a trap handles SIGTERM, SIGINT and SIGHUP,
 # but SIGKILL and a power cut cannot be caught by anything, and bash defers even a catchable
@@ -167,7 +171,7 @@ trap 'loud "interrupted by a signal"; exit 130' INT TERM HUP
 
 # Anything left by a run that was SIGKILLed or lost power. Matched on the suffix this
 # script alone writes, so it can never remove a real backup.
-for stale in "${BACKUP_DIR}"/rhumb-*.dump.partial; do
+for stale in "${BACKUP_DIR}"/receipts-*.dump.partial "${BACKUP_DIR}"/rhumb-*.dump.partial; do
   [ -e "$stale" ] || continue
   log "sweeping abandoned partial from an earlier run: ${stale} ($(wc -c < "$stale" | tr -d " ") bytes)"
   rm -f "$stale"
@@ -241,7 +245,7 @@ prior_size() {
     [ "$f" = "$STAGE" ] && continue
     n="$(wc -c < "$f" 2>/dev/null | tr -d ' ')"
     if [ -n "$n" ] && [ "$n" -ge "$ABS_FLOOR" ]; then echo "$n"; return 0; fi
-  done < <(find "$BACKUP_DIR" -name 'rhumb-*.dump' -type f -exec ls -t {} + 2>/dev/null)
+  done < <(find "$BACKUP_DIR" \( -name 'receipts-*.dump' -o -name 'rhumb-*.dump' \) -type f -exec ls -t {} + 2>/dev/null)
   return 1
 }
 
@@ -349,5 +353,5 @@ log "promoted to ${OUT}"
 
 # Retention. `-mtime +N` only ever matches this script's own naming pattern, so it cannot delete
 # anything it did not write.
-find "$BACKUP_DIR" -name 'rhumb-*.dump' -type f -mtime "+${KEEP_DAYS}" -print -delete
+find "$BACKUP_DIR" \( -name 'receipts-*.dump' -o -name 'rhumb-*.dump' \) -type f -mtime "+${KEEP_DAYS}" -print -delete
 log "done; keeping ${KEEP_DAYS} days in ${BACKUP_DIR}"

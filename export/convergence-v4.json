@@ -1,0 +1,2572 @@
+{
+  "handle": "convergence-v4",
+  "display_name": "Convergence v4",
+  "is_house": true,
+  "fields": [
+    "caller_id",
+    "seq",
+    "symbol",
+    "direction",
+    "horizon_days",
+    "confidence",
+    "thesis",
+    "benchmark_symbol",
+    "published_at",
+    "knowable_time"
+  ],
+  "genesis": "0000000000000000000000000000000000000000000000000000000000000000",
+  "framing": "each field as name:byte-length-of-value:value, joined with newline; sha256 of (prev_hash + payload), hex",
+  "head": "24df0daed4f23ccde198744a376cbae5f43f35fd611dc4288265e75679fee2d5",
+  "links": [
+    {
+      "seq": 1,
+      "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "content_hash": "77f88f5f3ea84a47e4621446cd969a51d7f7c061c69b290e0c28b8d67c7e621e",
+      "values": {
+        "caller_id": "108",
+        "seq": "1",
+        "symbol": "NSIT",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "5 separate filers acted on NSIT inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2022-03-01T23:59:59.000000Z",
+        "knowable_time": "2022-03-01T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 2,
+      "prev_hash": "77f88f5f3ea84a47e4621446cd969a51d7f7c061c69b290e0c28b8d67c7e621e",
+      "content_hash": "60b552c07de6587bfecc22f159e28c0ff0f38808cc784d1d97f4a902e35cd99f",
+      "values": {
+        "caller_id": "108",
+        "seq": "2",
+        "symbol": "PRTA",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "5 separate filers acted on PRTA inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2022-03-01T23:59:59.000000Z",
+        "knowable_time": "2022-03-01T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 3,
+      "prev_hash": "60b552c07de6587bfecc22f159e28c0ff0f38808cc784d1d97f4a902e35cd99f",
+      "content_hash": "b21ae49dfcc220de7d5dfc10db5ad3e1c282acdaadc7ce9937f3e9ad488c47c1",
+      "values": {
+        "caller_id": "108",
+        "seq": "3",
+        "symbol": "ABG",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "5 separate filers acted on ABG inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2022-03-01T23:59:59.000000Z",
+        "knowable_time": "2022-03-01T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 4,
+      "prev_hash": "b21ae49dfcc220de7d5dfc10db5ad3e1c282acdaadc7ce9937f3e9ad488c47c1",
+      "content_hash": "96b7e0316451ae11cdc535793aaaf175499a231e7fc9d2ff4003024af9f47df0",
+      "values": {
+        "caller_id": "108",
+        "seq": "4",
+        "symbol": "ADMA",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "5 separate filers acted on ADMA inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2022-03-01T23:59:59.000000Z",
+        "knowable_time": "2022-03-01T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 5,
+      "prev_hash": "96b7e0316451ae11cdc535793aaaf175499a231e7fc9d2ff4003024af9f47df0",
+      "content_hash": "da283edc96866d70711be13207960027222230b3ab17dd633bc8eadc7228dc4e",
+      "values": {
+        "caller_id": "108",
+        "seq": "5",
+        "symbol": "RPAY",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "7 separate filers acted on RPAY inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2022-03-01T23:59:59.000000Z",
+        "knowable_time": "2022-03-01T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 6,
+      "prev_hash": "da283edc96866d70711be13207960027222230b3ab17dd633bc8eadc7228dc4e",
+      "content_hash": "a9ccc5c695657f69003f6132eecd1076c0b48117bfca0f4c438fe935a3d27cf8",
+      "values": {
+        "caller_id": "108",
+        "seq": "6",
+        "symbol": "IRDM",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "6 separate filers acted on IRDM inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2022-03-11T23:59:59.000000Z",
+        "knowable_time": "2022-03-11T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 7,
+      "prev_hash": "a9ccc5c695657f69003f6132eecd1076c0b48117bfca0f4c438fe935a3d27cf8",
+      "content_hash": "da8a43fa3eb3c114650136d9fe437d834a95c31e980989015f0ab894a70e1c88",
+      "values": {
+        "caller_id": "108",
+        "seq": "7",
+        "symbol": "BFLY",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "4 separate filers acted on BFLY inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2022-03-11T23:59:59.000000Z",
+        "knowable_time": "2022-03-11T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 8,
+      "prev_hash": "da8a43fa3eb3c114650136d9fe437d834a95c31e980989015f0ab894a70e1c88",
+      "content_hash": "35a399be6f8ab94f973ac4224914489f092fe8bc753be80fca106a5ca92e3acb",
+      "values": {
+        "caller_id": "108",
+        "seq": "8",
+        "symbol": "ACIW",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "5 separate filers acted on ACIW inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2022-04-01T23:59:59.000000Z",
+        "knowable_time": "2022-04-01T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 9,
+      "prev_hash": "35a399be6f8ab94f973ac4224914489f092fe8bc753be80fca106a5ca92e3acb",
+      "content_hash": "3e5cfc1ab83163c0ba98bb25e59671a35c01ccc3666b570977857499edd99a27",
+      "values": {
+        "caller_id": "108",
+        "seq": "9",
+        "symbol": "LAB",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "medium",
+        "thesis": "11 separate filers acted on LAB inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2022-04-21T23:59:59.000000Z",
+        "knowable_time": "2022-04-21T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 10,
+      "prev_hash": "3e5cfc1ab83163c0ba98bb25e59671a35c01ccc3666b570977857499edd99a27",
+      "content_hash": "7a531db4f16ec001132c2fff03afe3e0139f3d38fc69bc4ab429fca15d52c9af",
+      "values": {
+        "caller_id": "108",
+        "seq": "10",
+        "symbol": "CACC",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "6 separate filers acted on CACC inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2022-05-09T23:59:59.000000Z",
+        "knowable_time": "2022-05-09T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 11,
+      "prev_hash": "7a531db4f16ec001132c2fff03afe3e0139f3d38fc69bc4ab429fca15d52c9af",
+      "content_hash": "9d974bbd4beba691063c8bb043c2fa97bffbeba4cc320c2348aad0160a104143",
+      "values": {
+        "caller_id": "108",
+        "seq": "11",
+        "symbol": "LAB",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "5 separate filers acted on LAB inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2022-05-27T23:59:59.000000Z",
+        "knowable_time": "2022-05-27T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 12,
+      "prev_hash": "9d974bbd4beba691063c8bb043c2fa97bffbeba4cc320c2348aad0160a104143",
+      "content_hash": "9831bb1c883aae3cff467db5dbda4477db1d46005a393cd1a71ecb0766eab027",
+      "values": {
+        "caller_id": "108",
+        "seq": "12",
+        "symbol": "NN",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "4 separate filers acted on NN inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2022-08-19T23:59:59.000000Z",
+        "knowable_time": "2022-08-19T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 13,
+      "prev_hash": "9831bb1c883aae3cff467db5dbda4477db1d46005a393cd1a71ecb0766eab027",
+      "content_hash": "ebb0696cc06b9be5f845cf4fae867680b5959adfce6078e3019ab058a2e4a0e0",
+      "values": {
+        "caller_id": "108",
+        "seq": "13",
+        "symbol": "GABC",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "8 separate filers acted on GABC inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2024-10-31T23:59:59.000000Z",
+        "knowable_time": "2024-10-31T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 14,
+      "prev_hash": "ebb0696cc06b9be5f845cf4fae867680b5959adfce6078e3019ab058a2e4a0e0",
+      "content_hash": "2d7db76faccfa4cbd87635c9199db3d5a3d820534bcbf37d46f02284c593ebe1",
+      "values": {
+        "caller_id": "108",
+        "seq": "14",
+        "symbol": "CMCO",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on CMCO inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2024-11-04T23:59:59.000000Z",
+        "knowable_time": "2024-11-04T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 15,
+      "prev_hash": "2d7db76faccfa4cbd87635c9199db3d5a3d820534bcbf37d46f02284c593ebe1",
+      "content_hash": "966922c470d34f87f3740e33c1515c4054ca6a8cfa534db9cb8e811611044ef0",
+      "values": {
+        "caller_id": "108",
+        "seq": "15",
+        "symbol": "DMLP",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "medium",
+        "thesis": "4 separate filers acted on DMLP inside a short window — company insiders buying on the open market, and investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2024-12-30T23:59:59.000000Z",
+        "knowable_time": "2024-12-30T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 16,
+      "prev_hash": "966922c470d34f87f3740e33c1515c4054ca6a8cfa534db9cb8e811611044ef0",
+      "content_hash": "439ab2ed3e8474581df7fa8d7c657e477fe3c1afb158b6c9abf5d9123f7de16b",
+      "values": {
+        "caller_id": "108",
+        "seq": "16",
+        "symbol": "FIGS",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "medium",
+        "thesis": "4 separate filers acted on FIGS inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-01-20T23:59:59.000000Z",
+        "knowable_time": "2025-01-20T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 17,
+      "prev_hash": "439ab2ed3e8474581df7fa8d7c657e477fe3c1afb158b6c9abf5d9123f7de16b",
+      "content_hash": "219e8383a9a0a5e5c1ce290773bb7edf79ab1c5c40068123fc1e76430ac7a058",
+      "values": {
+        "caller_id": "108",
+        "seq": "17",
+        "symbol": "ABR",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on ABR inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-01-28T23:59:59.000000Z",
+        "knowable_time": "2025-01-28T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 18,
+      "prev_hash": "219e8383a9a0a5e5c1ce290773bb7edf79ab1c5c40068123fc1e76430ac7a058",
+      "content_hash": "338e3333d9373102e6225662653de2accb072f306f63ef1cd0eaa93e12f7fdcb",
+      "values": {
+        "caller_id": "108",
+        "seq": "18",
+        "symbol": "ANNX",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on ANNX inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-01-31T23:59:59.000000Z",
+        "knowable_time": "2025-01-31T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 19,
+      "prev_hash": "338e3333d9373102e6225662653de2accb072f306f63ef1cd0eaa93e12f7fdcb",
+      "content_hash": "a3424cfff0caed70119b01c78b058da51c9f7dc3753b1855e5d61568e79c561d",
+      "values": {
+        "caller_id": "108",
+        "seq": "19",
+        "symbol": "IMNM",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "4 separate filers acted on IMNM inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-01-31T23:59:59.000000Z",
+        "knowable_time": "2025-01-31T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 20,
+      "prev_hash": "a3424cfff0caed70119b01c78b058da51c9f7dc3753b1855e5d61568e79c561d",
+      "content_hash": "5374152953c649beee1f8f0a40abb40aeccbf5ed556fc2268cd3041e7ad6d545",
+      "values": {
+        "caller_id": "108",
+        "seq": "20",
+        "symbol": "ASH",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on ASH inside a short window — company insiders buying on the open market, and investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-02-03T23:59:59.000000Z",
+        "knowable_time": "2025-02-03T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 21,
+      "prev_hash": "5374152953c649beee1f8f0a40abb40aeccbf5ed556fc2268cd3041e7ad6d545",
+      "content_hash": "286db78fe0ddb85f7007611f7b13de316179a7bf3a973230ecbf0beb5a7e1502",
+      "values": {
+        "caller_id": "108",
+        "seq": "21",
+        "symbol": "GDOT",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "4 separate filers acted on GDOT inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-02-05T23:59:59.000000Z",
+        "knowable_time": "2025-02-05T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 22,
+      "prev_hash": "286db78fe0ddb85f7007611f7b13de316179a7bf3a973230ecbf0beb5a7e1502",
+      "content_hash": "010251f0a74f275006d95b303645400a9aaa4f204e289e077612c9e849a682c5",
+      "values": {
+        "caller_id": "108",
+        "seq": "22",
+        "symbol": "AESI",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on AESI inside a short window — company insiders buying on the open market, and investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-02-06T23:59:59.000000Z",
+        "knowable_time": "2025-02-06T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 23,
+      "prev_hash": "010251f0a74f275006d95b303645400a9aaa4f204e289e077612c9e849a682c5",
+      "content_hash": "5a3f90b6483c241613b2c53ecb249952e7b8ccb1e28524b0e24a2d4cd01804a2",
+      "values": {
+        "caller_id": "108",
+        "seq": "23",
+        "symbol": "INDV",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on INDV inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-02-06T23:59:59.000000Z",
+        "knowable_time": "2025-02-06T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 24,
+      "prev_hash": "5a3f90b6483c241613b2c53ecb249952e7b8ccb1e28524b0e24a2d4cd01804a2",
+      "content_hash": "8b44ab8dc2d53c34bedfedea169274315c2531e15bf5ff9f9abba78dd3730674",
+      "values": {
+        "caller_id": "108",
+        "seq": "24",
+        "symbol": "COHR",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on COHR inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-02-07T23:59:59.000000Z",
+        "knowable_time": "2025-02-07T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 25,
+      "prev_hash": "8b44ab8dc2d53c34bedfedea169274315c2531e15bf5ff9f9abba78dd3730674",
+      "content_hash": "5743b2f8020181cc8908d2bfaf2807b8d615e64d580fc2fe89a8444ed0bd5114",
+      "values": {
+        "caller_id": "108",
+        "seq": "25",
+        "symbol": "COGT",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on COGT inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-02-12T23:59:59.000000Z",
+        "knowable_time": "2025-02-12T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 26,
+      "prev_hash": "5743b2f8020181cc8908d2bfaf2807b8d615e64d580fc2fe89a8444ed0bd5114",
+      "content_hash": "61642ee51c8fd328b581005d65d753323e55078e45648845e0a36345eec6528d",
+      "values": {
+        "caller_id": "108",
+        "seq": "26",
+        "symbol": "BBSI",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "4 separate filers acted on BBSI inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-02-12T23:59:59.000000Z",
+        "knowable_time": "2025-02-12T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 27,
+      "prev_hash": "61642ee51c8fd328b581005d65d753323e55078e45648845e0a36345eec6528d",
+      "content_hash": "262b85a2417a7cd1380d1509fe97317ec26afe03cfe69151afe6a22f249264a3",
+      "values": {
+        "caller_id": "108",
+        "seq": "27",
+        "symbol": "GTM",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on GTM inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-02-12T23:59:59.000000Z",
+        "knowable_time": "2025-02-12T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 28,
+      "prev_hash": "262b85a2417a7cd1380d1509fe97317ec26afe03cfe69151afe6a22f249264a3",
+      "content_hash": "03c2a2ec872f686cb6b61e3ece7b36e349480591c0f127285c659e8b16e86cd6",
+      "values": {
+        "caller_id": "108",
+        "seq": "28",
+        "symbol": "FIS",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on FIS inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-02-13T23:59:59.000000Z",
+        "knowable_time": "2025-02-13T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 29,
+      "prev_hash": "03c2a2ec872f686cb6b61e3ece7b36e349480591c0f127285c659e8b16e86cd6",
+      "content_hash": "23c26b1bb24f5ec7dd72746f2ab7709cffc28358dc457ebb9b47353b6404689c",
+      "values": {
+        "caller_id": "108",
+        "seq": "29",
+        "symbol": "ADC",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on ADC inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-02-13T23:59:59.000000Z",
+        "knowable_time": "2025-02-13T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 30,
+      "prev_hash": "23c26b1bb24f5ec7dd72746f2ab7709cffc28358dc457ebb9b47353b6404689c",
+      "content_hash": "b19a4c4465b94ca857735b495c772906de3c3fb8b712f565bc5a642463f00aa1",
+      "values": {
+        "caller_id": "108",
+        "seq": "30",
+        "symbol": "CMCO",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on CMCO inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-02-14T23:59:59.000000Z",
+        "knowable_time": "2025-02-14T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 31,
+      "prev_hash": "b19a4c4465b94ca857735b495c772906de3c3fb8b712f565bc5a642463f00aa1",
+      "content_hash": "f6e1cc0afdf4d617d0aca1d9632a4bc3d8cdf99db4f0935f36c0d19f723ec35b",
+      "values": {
+        "caller_id": "108",
+        "seq": "31",
+        "symbol": "FRSH",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on FRSH inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-02-14T23:59:59.000000Z",
+        "knowable_time": "2025-02-14T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 32,
+      "prev_hash": "f6e1cc0afdf4d617d0aca1d9632a4bc3d8cdf99db4f0935f36c0d19f723ec35b",
+      "content_hash": "bd5c51fea9fcb7ebc6d42c442832163b0f2ade958e307e8d5f846decab264394",
+      "values": {
+        "caller_id": "108",
+        "seq": "32",
+        "symbol": "FSCO",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on FSCO inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-02-14T23:59:59.000000Z",
+        "knowable_time": "2025-02-14T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 33,
+      "prev_hash": "bd5c51fea9fcb7ebc6d42c442832163b0f2ade958e307e8d5f846decab264394",
+      "content_hash": "f5f1581bab90a7d24233016b192770d0d4fbcd75f6ca19fb80a1cb082550de47",
+      "values": {
+        "caller_id": "108",
+        "seq": "33",
+        "symbol": "BALL",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on BALL inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-02-14T23:59:59.000000Z",
+        "knowable_time": "2025-02-14T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 34,
+      "prev_hash": "f5f1581bab90a7d24233016b192770d0d4fbcd75f6ca19fb80a1cb082550de47",
+      "content_hash": "383da86e26e687f6832091f700f6192155f1e17d738f6c05cccd94612fed4425",
+      "values": {
+        "caller_id": "108",
+        "seq": "34",
+        "symbol": "GPGI",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "medium",
+        "thesis": "8 separate filers acted on GPGI inside a short window — company insiders buying on the open market, and investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-02-17T23:59:59.000000Z",
+        "knowable_time": "2025-02-17T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 35,
+      "prev_hash": "383da86e26e687f6832091f700f6192155f1e17d738f6c05cccd94612fed4425",
+      "content_hash": "82637e714746013ad9b1017cfa10729a3c6bb864222d314a40f1557678e5a26f",
+      "values": {
+        "caller_id": "108",
+        "seq": "35",
+        "symbol": "ABUS",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on ABUS inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-02-21T23:59:59.000000Z",
+        "knowable_time": "2025-02-21T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 36,
+      "prev_hash": "82637e714746013ad9b1017cfa10729a3c6bb864222d314a40f1557678e5a26f",
+      "content_hash": "e19eaedc8d615f1910e3e653e20f405d8799011e575725ac376471fb425a945c",
+      "values": {
+        "caller_id": "108",
+        "seq": "36",
+        "symbol": "CMRC",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on CMRC inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-02-26T23:59:59.000000Z",
+        "knowable_time": "2025-02-26T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 37,
+      "prev_hash": "e19eaedc8d615f1910e3e653e20f405d8799011e575725ac376471fb425a945c",
+      "content_hash": "a5dad48890122c9a983bea39f7a7b6bee3bfbabb486e79e3fec2cb3a6f0cdd48",
+      "values": {
+        "caller_id": "108",
+        "seq": "37",
+        "symbol": "AUPH",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "medium",
+        "thesis": "3 separate filers acted on AUPH inside a short window — company insiders buying on the open market, and investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-03-04T23:59:59.000000Z",
+        "knowable_time": "2025-03-04T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 38,
+      "prev_hash": "a5dad48890122c9a983bea39f7a7b6bee3bfbabb486e79e3fec2cb3a6f0cdd48",
+      "content_hash": "fe4472026e3660f700a33c59fef55cb4a359ce01bb2a3d7560ee509dc76d7267",
+      "values": {
+        "caller_id": "108",
+        "seq": "38",
+        "symbol": "GSHD",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "4 separate filers acted on GSHD inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-03-05T23:59:59.000000Z",
+        "knowable_time": "2025-03-05T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 39,
+      "prev_hash": "fe4472026e3660f700a33c59fef55cb4a359ce01bb2a3d7560ee509dc76d7267",
+      "content_hash": "961881a1fbc042382b41cd1521dd6d07eb0852837ee70399fe973250f64168fe",
+      "values": {
+        "caller_id": "108",
+        "seq": "39",
+        "symbol": "EXE",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "medium",
+        "thesis": "6 separate filers acted on EXE inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-03-05T23:59:59.000000Z",
+        "knowable_time": "2025-03-05T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 40,
+      "prev_hash": "961881a1fbc042382b41cd1521dd6d07eb0852837ee70399fe973250f64168fe",
+      "content_hash": "f236a41ae8df3db7b923314764d7f826461391a8e8e58b34f97d0d5a006c208e",
+      "values": {
+        "caller_id": "108",
+        "seq": "40",
+        "symbol": "FMC",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on FMC inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-03-05T23:59:59.000000Z",
+        "knowable_time": "2025-03-05T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 41,
+      "prev_hash": "f236a41ae8df3db7b923314764d7f826461391a8e8e58b34f97d0d5a006c208e",
+      "content_hash": "e9cf238b98cb138a754491aefd0872cb44d2ff8f396fdad7b28949d417afcc73",
+      "values": {
+        "caller_id": "108",
+        "seq": "41",
+        "symbol": "FLYW",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on FLYW inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-03-06T23:59:59.000000Z",
+        "knowable_time": "2025-03-06T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 42,
+      "prev_hash": "e9cf238b98cb138a754491aefd0872cb44d2ff8f396fdad7b28949d417afcc73",
+      "content_hash": "a7d0973342219fb0d10f72f0d5ea02ee227619aa92e3d10bc3b10bb9b623a026",
+      "values": {
+        "caller_id": "108",
+        "seq": "42",
+        "symbol": "GDOT",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on GDOT inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-03-07T23:59:59.000000Z",
+        "knowable_time": "2025-03-07T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 43,
+      "prev_hash": "a7d0973342219fb0d10f72f0d5ea02ee227619aa92e3d10bc3b10bb9b623a026",
+      "content_hash": "0457652d93f98f173b0dc47406e2bf2f8a60967482eaa87d468de97a45be380c",
+      "values": {
+        "caller_id": "108",
+        "seq": "43",
+        "symbol": "BLND",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "medium",
+        "thesis": "8 separate filers acted on BLND inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-03-07T23:59:59.000000Z",
+        "knowable_time": "2025-03-07T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 44,
+      "prev_hash": "0457652d93f98f173b0dc47406e2bf2f8a60967482eaa87d468de97a45be380c",
+      "content_hash": "7b112aa9ae880810832bedee5975f0f172233eba924de6368e1ca98e5da5a101",
+      "values": {
+        "caller_id": "108",
+        "seq": "44",
+        "symbol": "ELAN",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on ELAN inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-03-07T23:59:59.000000Z",
+        "knowable_time": "2025-03-07T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 45,
+      "prev_hash": "7b112aa9ae880810832bedee5975f0f172233eba924de6368e1ca98e5da5a101",
+      "content_hash": "d67524a8ee2ac24ad8dc4eb96fbb9e17a43d18029a351c85bad4203125f94106",
+      "values": {
+        "caller_id": "108",
+        "seq": "45",
+        "symbol": "BBIO",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on BBIO inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-03-07T23:59:59.000000Z",
+        "knowable_time": "2025-03-07T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 46,
+      "prev_hash": "d67524a8ee2ac24ad8dc4eb96fbb9e17a43d18029a351c85bad4203125f94106",
+      "content_hash": "4a022828f678a61646762b877a7e95f89cd2f3cffddcf9416760aeac5b78177c",
+      "values": {
+        "caller_id": "108",
+        "seq": "46",
+        "symbol": "CTEV",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "4 separate filers acted on CTEV inside a short window — company insiders buying on the open market, and investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-03-10T23:59:59.000000Z",
+        "knowable_time": "2025-03-10T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 47,
+      "prev_hash": "4a022828f678a61646762b877a7e95f89cd2f3cffddcf9416760aeac5b78177c",
+      "content_hash": "72ef621fc0f6e7b04daa6775335d13444a03f3f38f5b844b84498fb3a3f49dd2",
+      "values": {
+        "caller_id": "108",
+        "seq": "47",
+        "symbol": "EU",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on EU inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-03-11T23:59:59.000000Z",
+        "knowable_time": "2025-03-11T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 48,
+      "prev_hash": "72ef621fc0f6e7b04daa6775335d13444a03f3f38f5b844b84498fb3a3f49dd2",
+      "content_hash": "fa84abe8ec19d89584fc0db3dbf324942e703e487e395a8a593e0db0255a075c",
+      "values": {
+        "caller_id": "108",
+        "seq": "48",
+        "symbol": "BBBY",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "4 separate filers acted on BBBY inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-03-13T23:59:59.000000Z",
+        "knowable_time": "2025-03-13T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 49,
+      "prev_hash": "fa84abe8ec19d89584fc0db3dbf324942e703e487e395a8a593e0db0255a075c",
+      "content_hash": "33b3d6a1a10b0d4ff8d11bf418d08b559579f622991fe17aa41977bbdb95d2b4",
+      "values": {
+        "caller_id": "108",
+        "seq": "49",
+        "symbol": "GDV",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on GDV inside a short window — company insiders buying on the open market, and investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-03-19T23:59:59.000000Z",
+        "knowable_time": "2025-03-19T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 50,
+      "prev_hash": "33b3d6a1a10b0d4ff8d11bf418d08b559579f622991fe17aa41977bbdb95d2b4",
+      "content_hash": "18640adb8ba5af2ae73fd4bb340e61e90978e721d4a49d25cdbe812d48c866f4",
+      "values": {
+        "caller_id": "108",
+        "seq": "50",
+        "symbol": "FRPT",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "7 separate filers acted on FRPT inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-04-03T23:59:59.000000Z",
+        "knowable_time": "2025-04-03T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 51,
+      "prev_hash": "18640adb8ba5af2ae73fd4bb340e61e90978e721d4a49d25cdbe812d48c866f4",
+      "content_hash": "57f5d83f6cccc6fd794e3d69a5cb9484731c38ebc58cfc1661cc34db70d05814",
+      "values": {
+        "caller_id": "108",
+        "seq": "51",
+        "symbol": "DOMO",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "4 separate filers acted on DOMO inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-04-07T23:59:59.000000Z",
+        "knowable_time": "2025-04-07T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 52,
+      "prev_hash": "57f5d83f6cccc6fd794e3d69a5cb9484731c38ebc58cfc1661cc34db70d05814",
+      "content_hash": "778c65ab56378863dd92dee4ec9424be099e374e61f09129434c19b47e35911d",
+      "values": {
+        "caller_id": "108",
+        "seq": "52",
+        "symbol": "CMPX",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "6 separate filers acted on CMPX inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-04-08T23:59:59.000000Z",
+        "knowable_time": "2025-04-08T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 53,
+      "prev_hash": "778c65ab56378863dd92dee4ec9424be099e374e61f09129434c19b47e35911d",
+      "content_hash": "205d199aa5fb7b52bc54f9c50821d1c7dae4a033f008d6041797cbda5dbd4c4e",
+      "values": {
+        "caller_id": "108",
+        "seq": "53",
+        "symbol": "ADC",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on ADC inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-04-10T23:59:59.000000Z",
+        "knowable_time": "2025-04-10T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 54,
+      "prev_hash": "205d199aa5fb7b52bc54f9c50821d1c7dae4a033f008d6041797cbda5dbd4c4e",
+      "content_hash": "bedce8557c4903bb2e0ce710002cdf6c82b766baf747d358e0fbbcd473743a8a",
+      "values": {
+        "caller_id": "108",
+        "seq": "54",
+        "symbol": "ADT",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on ADT inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-04-15T23:59:59.000000Z",
+        "knowable_time": "2025-04-15T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 55,
+      "prev_hash": "bedce8557c4903bb2e0ce710002cdf6c82b766baf747d358e0fbbcd473743a8a",
+      "content_hash": "1cc416afed8537b2ae0a0bd5793dba82ec99536b5bbcd71c18aa974c38f4064b",
+      "values": {
+        "caller_id": "108",
+        "seq": "55",
+        "symbol": "FIVN",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "4 separate filers acted on FIVN inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-04-15T23:59:59.000000Z",
+        "knowable_time": "2025-04-15T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 56,
+      "prev_hash": "1cc416afed8537b2ae0a0bd5793dba82ec99536b5bbcd71c18aa974c38f4064b",
+      "content_hash": "c213afb1314895239d313bed9b89626b905c56d51dd9f426e10e6b8b86ba6acf",
+      "values": {
+        "caller_id": "108",
+        "seq": "56",
+        "symbol": "GCO",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on GCO inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-04-17T23:59:59.000000Z",
+        "knowable_time": "2025-04-17T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 57,
+      "prev_hash": "c213afb1314895239d313bed9b89626b905c56d51dd9f426e10e6b8b86ba6acf",
+      "content_hash": "2b6223664a81abf1ae921a4fb37870f7c7cbc059a268c1e4ed2b90c759141514",
+      "values": {
+        "caller_id": "108",
+        "seq": "57",
+        "symbol": "CRL",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on CRL inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-04-17T23:59:59.000000Z",
+        "knowable_time": "2025-04-17T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 58,
+      "prev_hash": "2b6223664a81abf1ae921a4fb37870f7c7cbc059a268c1e4ed2b90c759141514",
+      "content_hash": "3d939cd87d2dd832da703572b11ef6e0f87fca6fd619bcc33f25a8c9c38f4993",
+      "values": {
+        "caller_id": "108",
+        "seq": "58",
+        "symbol": "CLF",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "4 separate filers acted on CLF inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-04-17T23:59:59.000000Z",
+        "knowable_time": "2025-04-17T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 59,
+      "prev_hash": "3d939cd87d2dd832da703572b11ef6e0f87fca6fd619bcc33f25a8c9c38f4993",
+      "content_hash": "06267706410652242245db22a8ed2965a0340689522f664793526059caf2b2ad",
+      "values": {
+        "caller_id": "108",
+        "seq": "59",
+        "symbol": "FIISO",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "4 separate filers acted on FIISO inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-04-22T23:59:59.000000Z",
+        "knowable_time": "2025-04-22T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 60,
+      "prev_hash": "06267706410652242245db22a8ed2965a0340689522f664793526059caf2b2ad",
+      "content_hash": "d1167edbfaa100e078dff0497a5f211b31403c7d994a4b8284737f527d796c5e",
+      "values": {
+        "caller_id": "108",
+        "seq": "60",
+        "symbol": "GABC",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "7 separate filers acted on GABC inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-04-24T23:59:59.000000Z",
+        "knowable_time": "2025-04-24T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 61,
+      "prev_hash": "d1167edbfaa100e078dff0497a5f211b31403c7d994a4b8284737f527d796c5e",
+      "content_hash": "6963d90e126ce2832a6b2ac80de0b7a22e8f8538cb553703ebe1f44de4ff59c0",
+      "values": {
+        "caller_id": "108",
+        "seq": "61",
+        "symbol": "CRC",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on CRC inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-04-28T23:59:59.000000Z",
+        "knowable_time": "2025-04-28T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 62,
+      "prev_hash": "6963d90e126ce2832a6b2ac80de0b7a22e8f8538cb553703ebe1f44de4ff59c0",
+      "content_hash": "df8fd02774da6caf240efa497d093969b3d554dafcdf421d0351c171e5e16c58",
+      "values": {
+        "caller_id": "108",
+        "seq": "62",
+        "symbol": "ASTS",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on ASTS inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-04-28T23:59:59.000000Z",
+        "knowable_time": "2025-04-28T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 63,
+      "prev_hash": "df8fd02774da6caf240efa497d093969b3d554dafcdf421d0351c171e5e16c58",
+      "content_hash": "b4acf1eff5b79a41e9d92316828db04dd65011611dcc7735b80d3ab3c56c8b6d",
+      "values": {
+        "caller_id": "108",
+        "seq": "63",
+        "symbol": "AVTR",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "medium",
+        "thesis": "6 separate filers acted on AVTR inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-04-29T23:59:59.000000Z",
+        "knowable_time": "2025-04-29T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 64,
+      "prev_hash": "b4acf1eff5b79a41e9d92316828db04dd65011611dcc7735b80d3ab3c56c8b6d",
+      "content_hash": "78ae464111f9277db68e1287896535024efd658ec4214419cb2c836f926abeb6",
+      "values": {
+        "caller_id": "108",
+        "seq": "64",
+        "symbol": "ABSI",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "4 separate filers acted on ABSI inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-04-30T23:59:59.000000Z",
+        "knowable_time": "2025-04-30T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 65,
+      "prev_hash": "78ae464111f9277db68e1287896535024efd658ec4214419cb2c836f926abeb6",
+      "content_hash": "77406cc5cdf09c03515ac26567a9609b0693ab404280211e79a53599a9a047c7",
+      "values": {
+        "caller_id": "108",
+        "seq": "65",
+        "symbol": "BANC",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on BANC inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-04-30T23:59:59.000000Z",
+        "knowable_time": "2025-04-30T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 66,
+      "prev_hash": "77406cc5cdf09c03515ac26567a9609b0693ab404280211e79a53599a9a047c7",
+      "content_hash": "31a7ce450b2c534d3dfeb363bca658f7bb0d27a255a07afa0118a100a6d2a7bd",
+      "values": {
+        "caller_id": "108",
+        "seq": "66",
+        "symbol": "CRVS",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on CRVS inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-05-02T23:59:59.000000Z",
+        "knowable_time": "2025-05-02T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 67,
+      "prev_hash": "31a7ce450b2c534d3dfeb363bca658f7bb0d27a255a07afa0118a100a6d2a7bd",
+      "content_hash": "82cac8504272c398ebd120215fe2d4b2e7d1516f18b4f171d1958cc6cdd8c62a",
+      "values": {
+        "caller_id": "108",
+        "seq": "67",
+        "symbol": "FSUN",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on FSUN inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-05-09T23:59:59.000000Z",
+        "knowable_time": "2025-05-09T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 68,
+      "prev_hash": "82cac8504272c398ebd120215fe2d4b2e7d1516f18b4f171d1958cc6cdd8c62a",
+      "content_hash": "bcfaa998c7468bdc2b190706f3e46dccb8b91f377bcc46d53b35450c7ef9d225",
+      "values": {
+        "caller_id": "108",
+        "seq": "68",
+        "symbol": "CLX",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on CLX inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-05-09T23:59:59.000000Z",
+        "knowable_time": "2025-05-09T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 69,
+      "prev_hash": "bcfaa998c7468bdc2b190706f3e46dccb8b91f377bcc46d53b35450c7ef9d225",
+      "content_hash": "0b87fd2582d57bd4bcb505fd81fc34669d3c782f1305afd4fa9be1e6bf8a3dc6",
+      "values": {
+        "caller_id": "108",
+        "seq": "69",
+        "symbol": "ENR",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "medium",
+        "thesis": "4 separate filers acted on ENR inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-05-13T23:59:59.000000Z",
+        "knowable_time": "2025-05-13T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 70,
+      "prev_hash": "0b87fd2582d57bd4bcb505fd81fc34669d3c782f1305afd4fa9be1e6bf8a3dc6",
+      "content_hash": "db1c3ab8c7fb9275a2ca202c71bb11585a606b2a308f9848e7d90527530ea921",
+      "values": {
+        "caller_id": "108",
+        "seq": "70",
+        "symbol": "FLUT",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on FLUT inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-05-13T23:59:59.000000Z",
+        "knowable_time": "2025-05-13T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 71,
+      "prev_hash": "db1c3ab8c7fb9275a2ca202c71bb11585a606b2a308f9848e7d90527530ea921",
+      "content_hash": "32e2fa5e2f1553fe2a5e955ebf561f73b5b77b3ab630aabc1d8e0901e76ed7fb",
+      "values": {
+        "caller_id": "108",
+        "seq": "71",
+        "symbol": "DMLP",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on DMLP inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-05-14T23:59:59.000000Z",
+        "knowable_time": "2025-05-14T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 72,
+      "prev_hash": "32e2fa5e2f1553fe2a5e955ebf561f73b5b77b3ab630aabc1d8e0901e76ed7fb",
+      "content_hash": "471cdc57562871bdc743acb1123ee1da4fd50f1d63097b5a538e69cedd238382",
+      "values": {
+        "caller_id": "108",
+        "seq": "72",
+        "symbol": "FPI",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on FPI inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-05-14T23:59:59.000000Z",
+        "knowable_time": "2025-05-14T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 73,
+      "prev_hash": "471cdc57562871bdc743acb1123ee1da4fd50f1d63097b5a538e69cedd238382",
+      "content_hash": "9554a76e48fbde4a3a38d17b104829c5104082d23fbf462cf92e5fc433699322",
+      "values": {
+        "caller_id": "108",
+        "seq": "73",
+        "symbol": "AUR",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on AUR inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-05-15T23:59:59.000000Z",
+        "knowable_time": "2025-05-15T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 74,
+      "prev_hash": "9554a76e48fbde4a3a38d17b104829c5104082d23fbf462cf92e5fc433699322",
+      "content_hash": "2d6baa45adb8f774e762376f37778d8c4873d476eda12014987c03dc672c2a8a",
+      "values": {
+        "caller_id": "108",
+        "seq": "74",
+        "symbol": "CRH",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on CRH inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-05-15T23:59:59.000000Z",
+        "knowable_time": "2025-05-15T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 75,
+      "prev_hash": "2d6baa45adb8f774e762376f37778d8c4873d476eda12014987c03dc672c2a8a",
+      "content_hash": "c26f4369a73b1c4d1f7ba82a73a45336dc60bf7aeba14a2285bdde9813009468",
+      "values": {
+        "caller_id": "108",
+        "seq": "75",
+        "symbol": "ADT",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on ADT inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-05-19T23:59:59.000000Z",
+        "knowable_time": "2025-05-19T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 76,
+      "prev_hash": "c26f4369a73b1c4d1f7ba82a73a45336dc60bf7aeba14a2285bdde9813009468",
+      "content_hash": "b6e790c8e9dc001649bd495a315f4a055845aa7f7b737c92cc6c82c511965e10",
+      "values": {
+        "caller_id": "108",
+        "seq": "76",
+        "symbol": "CMRC",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on CMRC inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-05-28T23:59:59.000000Z",
+        "knowable_time": "2025-05-28T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 77,
+      "prev_hash": "b6e790c8e9dc001649bd495a315f4a055845aa7f7b737c92cc6c82c511965e10",
+      "content_hash": "d4e0b9accc20dd8d6022962dc5a108f29247b72af59dd8a5ef1966b1e5656fdf",
+      "values": {
+        "caller_id": "108",
+        "seq": "77",
+        "symbol": "ADC",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on ADC inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-06-06T23:59:59.000000Z",
+        "knowable_time": "2025-06-06T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 78,
+      "prev_hash": "d4e0b9accc20dd8d6022962dc5a108f29247b72af59dd8a5ef1966b1e5656fdf",
+      "content_hash": "3ecb640f9e326db9e2097ee51007b66a690b0effac82fbea1b97f06c786da88e",
+      "values": {
+        "caller_id": "108",
+        "seq": "78",
+        "symbol": "BATRA",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "6 separate filers acted on BATRA inside a short window — company insiders buying on the open market, and investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-06-10T23:59:59.000000Z",
+        "knowable_time": "2025-06-10T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 79,
+      "prev_hash": "3ecb640f9e326db9e2097ee51007b66a690b0effac82fbea1b97f06c786da88e",
+      "content_hash": "1b8863e6237c1c09a809b2eac66bea10a50cd9ca90d62413a65d2d07d9033e3e",
+      "values": {
+        "caller_id": "108",
+        "seq": "79",
+        "symbol": "ASA",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "4 separate filers acted on ASA inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-06-11T23:59:59.000000Z",
+        "knowable_time": "2025-06-11T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 80,
+      "prev_hash": "1b8863e6237c1c09a809b2eac66bea10a50cd9ca90d62413a65d2d07d9033e3e",
+      "content_hash": "03ef467c6f298b4bc1e65ab2d77a3320b6d44dbafe05c2c9f9a9cae187f20f3a",
+      "values": {
+        "caller_id": "108",
+        "seq": "80",
+        "symbol": "ARVN",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "4 separate filers acted on ARVN inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-06-16T23:59:59.000000Z",
+        "knowable_time": "2025-06-16T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 81,
+      "prev_hash": "03ef467c6f298b4bc1e65ab2d77a3320b6d44dbafe05c2c9f9a9cae187f20f3a",
+      "content_hash": "59919306709bbcf6c5481e129f1e612c2bb74190893ad2acf1f531a95462ba1c",
+      "values": {
+        "caller_id": "108",
+        "seq": "81",
+        "symbol": "ABG",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on ABG inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-06-24T23:59:59.000000Z",
+        "knowable_time": "2025-06-24T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 82,
+      "prev_hash": "59919306709bbcf6c5481e129f1e612c2bb74190893ad2acf1f531a95462ba1c",
+      "content_hash": "86a752ef582b2f6f7b0e4a6f8d6c3ef291db308d644fb95ca709b2d649fd1a33",
+      "values": {
+        "caller_id": "108",
+        "seq": "82",
+        "symbol": "CAI",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on CAI inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-06-24T23:59:59.000000Z",
+        "knowable_time": "2025-06-24T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 83,
+      "prev_hash": "86a752ef582b2f6f7b0e4a6f8d6c3ef291db308d644fb95ca709b2d649fd1a33",
+      "content_hash": "ead9cdb1cc56c6b3e4654fd86382484f39a0b4681d6020bf81557f58f25004b1",
+      "values": {
+        "caller_id": "108",
+        "seq": "83",
+        "symbol": "ANNX",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "4 separate filers acted on ANNX inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-07-01T23:59:59.000000Z",
+        "knowable_time": "2025-07-01T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 84,
+      "prev_hash": "ead9cdb1cc56c6b3e4654fd86382484f39a0b4681d6020bf81557f58f25004b1",
+      "content_hash": "9a513561bde7106d1b08ed5d0629fdf37eb792815eedf6b2e33a2ec447524795",
+      "values": {
+        "caller_id": "108",
+        "seq": "84",
+        "symbol": "BBIO",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on BBIO inside a short window — company insiders buying on the open market, and investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-07-01T23:59:59.000000Z",
+        "knowable_time": "2025-07-01T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 85,
+      "prev_hash": "9a513561bde7106d1b08ed5d0629fdf37eb792815eedf6b2e33a2ec447524795",
+      "content_hash": "3f2fda79f8b45cee8283dabc2a80f97de1095cdae205d1c4365951e5c5e6d7bf",
+      "values": {
+        "caller_id": "108",
+        "seq": "85",
+        "symbol": "FIS",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on FIS inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-07-03T23:59:59.000000Z",
+        "knowable_time": "2025-07-03T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 86,
+      "prev_hash": "3f2fda79f8b45cee8283dabc2a80f97de1095cdae205d1c4365951e5c5e6d7bf",
+      "content_hash": "da5c0e97b7316943017f989fe7b209e29c615d796bff25d38853d93e5f396e6e",
+      "values": {
+        "caller_id": "108",
+        "seq": "86",
+        "symbol": "COGT",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "4 separate filers acted on COGT inside a short window — company insiders buying on the open market, and investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-07-14T23:59:59.000000Z",
+        "knowable_time": "2025-07-14T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 87,
+      "prev_hash": "da5c0e97b7316943017f989fe7b209e29c615d796bff25d38853d93e5f396e6e",
+      "content_hash": "00297d926302854c4105629d192a51460791bf09767cf3741c639696678ac306",
+      "values": {
+        "caller_id": "108",
+        "seq": "87",
+        "symbol": "DYN",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "8 separate filers acted on DYN inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-07-15T23:59:59.000000Z",
+        "knowable_time": "2025-07-15T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 88,
+      "prev_hash": "00297d926302854c4105629d192a51460791bf09767cf3741c639696678ac306",
+      "content_hash": "4be0af37108b7c79f9c477149fe59520794a2777647de234065662f32c7c7f70",
+      "values": {
+        "caller_id": "108",
+        "seq": "88",
+        "symbol": "CMPR",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on CMPR inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-07-16T23:59:59.000000Z",
+        "knowable_time": "2025-07-16T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 89,
+      "prev_hash": "4be0af37108b7c79f9c477149fe59520794a2777647de234065662f32c7c7f70",
+      "content_hash": "b729a5e175f873ac8027abdb1df229b89f3ede2b14f5edd4e182c724896df1db",
+      "values": {
+        "caller_id": "108",
+        "seq": "89",
+        "symbol": "CNDT",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "4 separate filers acted on CNDT inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-07-16T23:59:59.000000Z",
+        "knowable_time": "2025-07-16T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 90,
+      "prev_hash": "b729a5e175f873ac8027abdb1df229b89f3ede2b14f5edd4e182c724896df1db",
+      "content_hash": "8f1b8622bf5fd10ddc27959b637149bc597c528f65a8161f54cb250b7dbf74dc",
+      "values": {
+        "caller_id": "108",
+        "seq": "90",
+        "symbol": "ALKT",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on ALKT inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-07-17T23:59:59.000000Z",
+        "knowable_time": "2025-07-17T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 91,
+      "prev_hash": "8f1b8622bf5fd10ddc27959b637149bc597c528f65a8161f54cb250b7dbf74dc",
+      "content_hash": "d45af754e7c1dc538fb059ef97651ce42025168a6bd435d67f028a0279849e0e",
+      "values": {
+        "caller_id": "108",
+        "seq": "91",
+        "symbol": "AUB",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "4 separate filers acted on AUB inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-07-29T23:59:59.000000Z",
+        "knowable_time": "2025-07-29T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 92,
+      "prev_hash": "d45af754e7c1dc538fb059ef97651ce42025168a6bd435d67f028a0279849e0e",
+      "content_hash": "1a0faf2e4b2ed14abf3fb0b74b21de0d3f9b24079cadeb659a7d54f93132335e",
+      "values": {
+        "caller_id": "108",
+        "seq": "92",
+        "symbol": "BHRB",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "6 separate filers acted on BHRB inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-07-29T23:59:59.000000Z",
+        "knowable_time": "2025-07-29T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 93,
+      "prev_hash": "1a0faf2e4b2ed14abf3fb0b74b21de0d3f9b24079cadeb659a7d54f93132335e",
+      "content_hash": "5c69115f2fb6880faba1d10d7d7bb7b7d115a7a6edc8ad55f76e14b2929b73b2",
+      "values": {
+        "caller_id": "108",
+        "seq": "93",
+        "symbol": "GSHD",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "4 separate filers acted on GSHD inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-07-30T23:59:59.000000Z",
+        "knowable_time": "2025-07-30T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 94,
+      "prev_hash": "5c69115f2fb6880faba1d10d7d7bb7b7d115a7a6edc8ad55f76e14b2929b73b2",
+      "content_hash": "32878b9af3371040d76efab79962b5a5b89f42d4b716c05bbb85ae8e7fd93466",
+      "values": {
+        "caller_id": "108",
+        "seq": "94",
+        "symbol": "GBCI",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on GBCI inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-08-01T23:59:59.000000Z",
+        "knowable_time": "2025-08-01T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 95,
+      "prev_hash": "32878b9af3371040d76efab79962b5a5b89f42d4b716c05bbb85ae8e7fd93466",
+      "content_hash": "fc890c1b8a1ff29e27266ab51370204460f21ee532298813691b80be1fac18a4",
+      "values": {
+        "caller_id": "108",
+        "seq": "95",
+        "symbol": "FIVN",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on FIVN inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-08-07T23:59:59.000000Z",
+        "knowable_time": "2025-08-07T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 96,
+      "prev_hash": "fc890c1b8a1ff29e27266ab51370204460f21ee532298813691b80be1fac18a4",
+      "content_hash": "e32609e6438ca0d025af027edb9e29d20830d43ecff6f8e7a61012ccda367dd6",
+      "values": {
+        "caller_id": "108",
+        "seq": "96",
+        "symbol": "FOUR",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on FOUR inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-08-11T23:59:59.000000Z",
+        "knowable_time": "2025-08-11T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 97,
+      "prev_hash": "e32609e6438ca0d025af027edb9e29d20830d43ecff6f8e7a61012ccda367dd6",
+      "content_hash": "00bd70750d81dc524e8cd1a782e4634ebb17f1bc5a056113d0970ea363071079",
+      "values": {
+        "caller_id": "108",
+        "seq": "97",
+        "symbol": "ALKT",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on ALKT inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-08-13T23:59:59.000000Z",
+        "knowable_time": "2025-08-13T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 98,
+      "prev_hash": "00bd70750d81dc524e8cd1a782e4634ebb17f1bc5a056113d0970ea363071079",
+      "content_hash": "3bbd25acfe666645e4794d7402f3c4df318fc98ef0436d4d37cd696d2cdd838a",
+      "values": {
+        "caller_id": "108",
+        "seq": "98",
+        "symbol": "AVTR",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on AVTR inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-08-14T23:59:59.000000Z",
+        "knowable_time": "2025-08-14T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 99,
+      "prev_hash": "3bbd25acfe666645e4794d7402f3c4df318fc98ef0436d4d37cd696d2cdd838a",
+      "content_hash": "17c614124ce75c2668e72188e125ece34f0aeeb67f3ebe23900788eeee3ea49f",
+      "values": {
+        "caller_id": "108",
+        "seq": "99",
+        "symbol": "FLO",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "4 separate filers acted on FLO inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-08-14T23:59:59.000000Z",
+        "knowable_time": "2025-08-14T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 100,
+      "prev_hash": "17c614124ce75c2668e72188e125ece34f0aeeb67f3ebe23900788eeee3ea49f",
+      "content_hash": "a73ba4621d3d8db129a051983e20ad3baa5f27adce5567494c308d556474a391",
+      "values": {
+        "caller_id": "108",
+        "seq": "100",
+        "symbol": "GEF",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on GEF inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-08-14T23:59:59.000000Z",
+        "knowable_time": "2025-08-14T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 101,
+      "prev_hash": "a73ba4621d3d8db129a051983e20ad3baa5f27adce5567494c308d556474a391",
+      "content_hash": "89d87ddb1e9e38627c9f20d936f4c231b68f584711b1435ee26fa91e72c3155e",
+      "values": {
+        "caller_id": "108",
+        "seq": "101",
+        "symbol": "FIGS",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "5 separate filers acted on FIGS inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-08-14T23:59:59.000000Z",
+        "knowable_time": "2025-08-14T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 102,
+      "prev_hash": "89d87ddb1e9e38627c9f20d936f4c231b68f584711b1435ee26fa91e72c3155e",
+      "content_hash": "65bba05b1f65db19dd15af5b6d08fb31a67b82c370311e3385450b3d7f0a97d2",
+      "values": {
+        "caller_id": "108",
+        "seq": "102",
+        "symbol": "ADC",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on ADC inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-08-14T23:59:59.000000Z",
+        "knowable_time": "2025-08-14T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 103,
+      "prev_hash": "65bba05b1f65db19dd15af5b6d08fb31a67b82c370311e3385450b3d7f0a97d2",
+      "content_hash": "b712d2214e46b847c2941a3c5eb7dea20d2ee7539cc20a58523a4d0f4c517290",
+      "values": {
+        "caller_id": "108",
+        "seq": "103",
+        "symbol": "DOMO",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on DOMO inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-08-14T23:59:59.000000Z",
+        "knowable_time": "2025-08-14T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 104,
+      "prev_hash": "b712d2214e46b847c2941a3c5eb7dea20d2ee7539cc20a58523a4d0f4c517290",
+      "content_hash": "b9a92570fc0734ae247f1b395e8e661fbaa087dd7b917e2e7e0d99760c6a5d08",
+      "values": {
+        "caller_id": "108",
+        "seq": "104",
+        "symbol": "CRBD",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on CRBD inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-08-14T23:59:59.000000Z",
+        "knowable_time": "2025-08-14T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 105,
+      "prev_hash": "b9a92570fc0734ae247f1b395e8e661fbaa087dd7b917e2e7e0d99760c6a5d08",
+      "content_hash": "f8a6e7684aaef15564d4b3b4ae611034859a4135f30d14434483e203efb921cd",
+      "values": {
+        "caller_id": "108",
+        "seq": "105",
+        "symbol": "GPGI",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on GPGI inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-08-14T23:59:59.000000Z",
+        "knowable_time": "2025-08-14T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 106,
+      "prev_hash": "f8a6e7684aaef15564d4b3b4ae611034859a4135f30d14434483e203efb921cd",
+      "content_hash": "0511ea6ba4c25f9e18615d69e5febe0f33de755ee52aae5e4e626322c1c64955",
+      "values": {
+        "caller_id": "108",
+        "seq": "106",
+        "symbol": "ASA",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "medium",
+        "thesis": "4 separate filers acted on ASA inside a short window — company insiders buying on the open market, and investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-08-18T23:59:59.000000Z",
+        "knowable_time": "2025-08-18T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 107,
+      "prev_hash": "0511ea6ba4c25f9e18615d69e5febe0f33de755ee52aae5e4e626322c1c64955",
+      "content_hash": "634afd363980b947b1994ea69429a18d0715be626652ed4e5f148289aafba6ca",
+      "values": {
+        "caller_id": "108",
+        "seq": "107",
+        "symbol": "GOSS",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on GOSS inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-08-20T23:59:59.000000Z",
+        "knowable_time": "2025-08-20T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 108,
+      "prev_hash": "634afd363980b947b1994ea69429a18d0715be626652ed4e5f148289aafba6ca",
+      "content_hash": "03ba4fa44361b6b17f4927a1c5c440c48021654855e976d707bc5151b61f078b",
+      "values": {
+        "caller_id": "108",
+        "seq": "108",
+        "symbol": "BLND",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "medium",
+        "thesis": "9 separate filers acted on BLND inside a short window — company insiders buying on the open market, and investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-08-20T23:59:59.000000Z",
+        "knowable_time": "2025-08-20T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 109,
+      "prev_hash": "03ba4fa44361b6b17f4927a1c5c440c48021654855e976d707bc5151b61f078b",
+      "content_hash": "06542690059881502e66d83fe6ad16574bfd9c5df7858f7a6d2fe5bd1c415b68",
+      "values": {
+        "caller_id": "108",
+        "seq": "109",
+        "symbol": "BA",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on BA inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-08-21T23:59:59.000000Z",
+        "knowable_time": "2025-08-21T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 110,
+      "prev_hash": "06542690059881502e66d83fe6ad16574bfd9c5df7858f7a6d2fe5bd1c415b68",
+      "content_hash": "757038f96a3755ebcb67f2b60a51152460611657785f149a0d0b01e9c070609d",
+      "values": {
+        "caller_id": "108",
+        "seq": "110",
+        "symbol": "GTM",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on GTM inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-08-21T23:59:59.000000Z",
+        "knowable_time": "2025-08-21T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 111,
+      "prev_hash": "757038f96a3755ebcb67f2b60a51152460611657785f149a0d0b01e9c070609d",
+      "content_hash": "620030a405624696bcc69c95fda20b2f6ef2d715e2c59710becb0bd8c0ee1510",
+      "values": {
+        "caller_id": "108",
+        "seq": "111",
+        "symbol": "CMPX",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "medium",
+        "thesis": "8 separate filers acted on CMPX inside a short window — company insiders buying on the open market, and investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-08-21T23:59:59.000000Z",
+        "knowable_time": "2025-08-21T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 112,
+      "prev_hash": "620030a405624696bcc69c95fda20b2f6ef2d715e2c59710becb0bd8c0ee1510",
+      "content_hash": "f86d4298e2d6373f8b9e6fcd555752e89d24e9c865f9952b5015156b08013bfa",
+      "values": {
+        "caller_id": "108",
+        "seq": "112",
+        "symbol": "BFLY",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on BFLY inside a short window — company insiders buying on the open market, and investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-08-27T23:59:59.000000Z",
+        "knowable_time": "2025-08-27T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 113,
+      "prev_hash": "f86d4298e2d6373f8b9e6fcd555752e89d24e9c865f9952b5015156b08013bfa",
+      "content_hash": "a976aea595d63aa89ebd8bcf0275c42cf91b7cdffa7974769b8ffe2ea6572624",
+      "values": {
+        "caller_id": "108",
+        "seq": "113",
+        "symbol": "FRPT",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "medium",
+        "thesis": "7 separate filers acted on FRPT inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-09-11T23:59:59.000000Z",
+        "knowable_time": "2025-09-11T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 114,
+      "prev_hash": "a976aea595d63aa89ebd8bcf0275c42cf91b7cdffa7974769b8ffe2ea6572624",
+      "content_hash": "94209237a3def77ee5652539bcc0c6524e202f42ea1506ed500d45548f43ebbf",
+      "values": {
+        "caller_id": "108",
+        "seq": "114",
+        "symbol": "FOX",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "medium",
+        "thesis": "6 separate filers acted on FOX inside a short window — company insiders buying on the open market, and investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-09-12T23:59:59.000000Z",
+        "knowable_time": "2025-09-12T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 115,
+      "prev_hash": "94209237a3def77ee5652539bcc0c6524e202f42ea1506ed500d45548f43ebbf",
+      "content_hash": "a6833dae381241587a1d079a21629578bc5f9ccd84653f8ebef17f7cb1e26027",
+      "values": {
+        "caller_id": "108",
+        "seq": "115",
+        "symbol": "ASST",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "5 separate filers acted on ASST inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-09-16T23:59:59.000000Z",
+        "knowable_time": "2025-09-16T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 116,
+      "prev_hash": "a6833dae381241587a1d079a21629578bc5f9ccd84653f8ebef17f7cb1e26027",
+      "content_hash": "8f073d0d2a93cb6a9e7a76828523f6765cdebbd8a161beaf744a9980cf0961d2",
+      "values": {
+        "caller_id": "108",
+        "seq": "116",
+        "symbol": "ARVN",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on ARVN inside a short window — company insiders buying on the open market, and investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-09-24T23:59:59.000000Z",
+        "knowable_time": "2025-09-24T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 117,
+      "prev_hash": "8f073d0d2a93cb6a9e7a76828523f6765cdebbd8a161beaf744a9980cf0961d2",
+      "content_hash": "6b17bec83dc015d3100b6b8de5355ea03bc396f6e4072c17057e9b8ad7fab504",
+      "values": {
+        "caller_id": "108",
+        "seq": "117",
+        "symbol": "GPUS",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on GPUS inside a short window — company insiders buying on the open market, and investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-10-21T23:59:59.000000Z",
+        "knowable_time": "2025-10-21T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 118,
+      "prev_hash": "6b17bec83dc015d3100b6b8de5355ea03bc396f6e4072c17057e9b8ad7fab504",
+      "content_hash": "b5ee7dcf0a852df2f2be06934b2ec5859e581bcfe5efab2f9466fb64bd60061a",
+      "values": {
+        "caller_id": "108",
+        "seq": "118",
+        "symbol": "ARW",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on ARW inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-10-24T23:59:59.000000Z",
+        "knowable_time": "2025-10-24T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 119,
+      "prev_hash": "b5ee7dcf0a852df2f2be06934b2ec5859e581bcfe5efab2f9466fb64bd60061a",
+      "content_hash": "e90378f79d81142b4da934db7aff477e8acc8b3f120b8bccf05c2cca81aa99ce",
+      "values": {
+        "caller_id": "108",
+        "seq": "119",
+        "symbol": "FCPT",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on FCPT inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-10-31T23:59:59.000000Z",
+        "knowable_time": "2025-10-31T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 120,
+      "prev_hash": "e90378f79d81142b4da934db7aff477e8acc8b3f120b8bccf05c2cca81aa99ce",
+      "content_hash": "4fd59e8418785011650285b4df16cd8a011f0e2314e93ba970d753095e234f17",
+      "values": {
+        "caller_id": "108",
+        "seq": "120",
+        "symbol": "CRTO",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "5 separate filers acted on CRTO inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-11-04T23:59:59.000000Z",
+        "knowable_time": "2025-11-04T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 121,
+      "prev_hash": "4fd59e8418785011650285b4df16cd8a011f0e2314e93ba970d753095e234f17",
+      "content_hash": "dbad202bc90a55cd591f78738206c8c8ee40f751a64b6735d797948d0e5a02df",
+      "values": {
+        "caller_id": "108",
+        "seq": "121",
+        "symbol": "BBSI",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on BBSI inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-11-05T23:59:59.000000Z",
+        "knowable_time": "2025-11-05T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 122,
+      "prev_hash": "dbad202bc90a55cd591f78738206c8c8ee40f751a64b6735d797948d0e5a02df",
+      "content_hash": "110eacd2ac9e68721894b3433f6a5c25300c3ffd0b3cddedc54623eb8d8b5b79",
+      "values": {
+        "caller_id": "108",
+        "seq": "122",
+        "symbol": "FUBO",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on FUBO inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-11-06T23:59:59.000000Z",
+        "knowable_time": "2025-11-06T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 123,
+      "prev_hash": "110eacd2ac9e68721894b3433f6a5c25300c3ffd0b3cddedc54623eb8d8b5b79",
+      "content_hash": "049aa2f7964a8bfdf7ee1c7b97b17e93a7cd8f37e8df5a8db329ba9f9bf90def",
+      "values": {
+        "caller_id": "108",
+        "seq": "123",
+        "symbol": "CNXC",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on CNXC inside a short window — company insiders buying on the open market, and investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-11-07T23:59:59.000000Z",
+        "knowable_time": "2025-11-07T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 124,
+      "prev_hash": "049aa2f7964a8bfdf7ee1c7b97b17e93a7cd8f37e8df5a8db329ba9f9bf90def",
+      "content_hash": "4f457f086230a38f7b4994c630d868c32b10b335ba532d500608396c53a1a8e3",
+      "values": {
+        "caller_id": "108",
+        "seq": "124",
+        "symbol": "CAI",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "4 separate filers acted on CAI inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-11-10T23:59:59.000000Z",
+        "knowable_time": "2025-11-10T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 125,
+      "prev_hash": "4f457f086230a38f7b4994c630d868c32b10b335ba532d500608396c53a1a8e3",
+      "content_hash": "ea4f88abdad174817420755857b374242b676b09000c2cab8c134cbfb0aa731c",
+      "values": {
+        "caller_id": "108",
+        "seq": "125",
+        "symbol": "FPI",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on FPI inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-11-12T23:59:59.000000Z",
+        "knowable_time": "2025-11-12T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 126,
+      "prev_hash": "ea4f88abdad174817420755857b374242b676b09000c2cab8c134cbfb0aa731c",
+      "content_hash": "b0156751e929b06c046fc9e9b8259b824274c04ec3bdac94d896f1c288dac246",
+      "values": {
+        "caller_id": "108",
+        "seq": "126",
+        "symbol": "CAVA",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "5 separate filers acted on CAVA inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-11-12T23:59:59.000000Z",
+        "knowable_time": "2025-11-12T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 127,
+      "prev_hash": "b0156751e929b06c046fc9e9b8259b824274c04ec3bdac94d896f1c288dac246",
+      "content_hash": "9ad80970b842f36fc2ecb6cd86088a573dd8c2151948cf5ed2e27b4b549a5f66",
+      "values": {
+        "caller_id": "108",
+        "seq": "127",
+        "symbol": "FIS",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on FIS inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-11-13T23:59:59.000000Z",
+        "knowable_time": "2025-11-13T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 128,
+      "prev_hash": "9ad80970b842f36fc2ecb6cd86088a573dd8c2151948cf5ed2e27b4b549a5f66",
+      "content_hash": "9b6107d9cb601c431558c78ddba7fb1d1943485345ec87db130af9843264a9ec",
+      "values": {
+        "caller_id": "108",
+        "seq": "128",
+        "symbol": "INDV",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on INDV inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-11-13T23:59:59.000000Z",
+        "knowable_time": "2025-11-13T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 129,
+      "prev_hash": "9b6107d9cb601c431558c78ddba7fb1d1943485345ec87db130af9843264a9ec",
+      "content_hash": "41c25d757c35115842700b3ecbb746f57371556314315f24798b595d2c1f9865",
+      "values": {
+        "caller_id": "108",
+        "seq": "129",
+        "symbol": "ACVA",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on ACVA inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-11-13T23:59:59.000000Z",
+        "knowable_time": "2025-11-13T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 130,
+      "prev_hash": "41c25d757c35115842700b3ecbb746f57371556314315f24798b595d2c1f9865",
+      "content_hash": "2ae2fdf84d254708ba6ea7f7c0138579e2bf4de927dae1f733bbf5c0184d7973",
+      "values": {
+        "caller_id": "108",
+        "seq": "130",
+        "symbol": "EXE",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on EXE inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-11-13T23:59:59.000000Z",
+        "knowable_time": "2025-11-13T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 131,
+      "prev_hash": "2ae2fdf84d254708ba6ea7f7c0138579e2bf4de927dae1f733bbf5c0184d7973",
+      "content_hash": "18bc5ff837491c48dca932aa51fad73029d5d740392715321fa4874dd8126e2d",
+      "values": {
+        "caller_id": "108",
+        "seq": "131",
+        "symbol": "CTGO",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on CTGO inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-11-14T23:59:59.000000Z",
+        "knowable_time": "2025-11-14T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 132,
+      "prev_hash": "18bc5ff837491c48dca932aa51fad73029d5d740392715321fa4874dd8126e2d",
+      "content_hash": "2067dac86bbb328129e43cfaeccd9380c68ab105155d4f85288303d6835c9311",
+      "values": {
+        "caller_id": "108",
+        "seq": "132",
+        "symbol": "FND",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "4 separate filers acted on FND inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-11-14T23:59:59.000000Z",
+        "knowable_time": "2025-11-14T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 133,
+      "prev_hash": "2067dac86bbb328129e43cfaeccd9380c68ab105155d4f85288303d6835c9311",
+      "content_hash": "28ca6adde59ef2e3996d69314fdfda96326a2427b98697da1426f075a29d2dfc",
+      "values": {
+        "caller_id": "108",
+        "seq": "133",
+        "symbol": "CMPR",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on CMPR inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-11-14T23:59:59.000000Z",
+        "knowable_time": "2025-11-14T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 134,
+      "prev_hash": "28ca6adde59ef2e3996d69314fdfda96326a2427b98697da1426f075a29d2dfc",
+      "content_hash": "de3348ba38021d4476182ba5620a56482af7c420e0d9f46ce0b576ad27662b52",
+      "values": {
+        "caller_id": "108",
+        "seq": "134",
+        "symbol": "CELH",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on CELH inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-11-17T23:59:59.000000Z",
+        "knowable_time": "2025-11-17T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 135,
+      "prev_hash": "de3348ba38021d4476182ba5620a56482af7c420e0d9f46ce0b576ad27662b52",
+      "content_hash": "a26abe12ee9db0c38d42b36bd8e71bf43105850a14200609f69442c0e6bc72e8",
+      "values": {
+        "caller_id": "108",
+        "seq": "135",
+        "symbol": "COGT",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "medium",
+        "thesis": "6 separate filers acted on COGT inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-11-17T23:59:59.000000Z",
+        "knowable_time": "2025-11-17T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 136,
+      "prev_hash": "a26abe12ee9db0c38d42b36bd8e71bf43105850a14200609f69442c0e6bc72e8",
+      "content_hash": "2719ec018c4ceab754f3e71552fc3baaebc42764cc406e67e01d049084eadae9",
+      "values": {
+        "caller_id": "108",
+        "seq": "136",
+        "symbol": "CTEV",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on CTEV inside a short window — company insiders buying on the open market, and investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-11-18T23:59:59.000000Z",
+        "knowable_time": "2025-11-18T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 137,
+      "prev_hash": "2719ec018c4ceab754f3e71552fc3baaebc42764cc406e67e01d049084eadae9",
+      "content_hash": "03fdff1eed816236e5ea6167028c89ed7f4f24618c8857f4a14a26b0b3911809",
+      "values": {
+        "caller_id": "108",
+        "seq": "137",
+        "symbol": "BFLY",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on BFLY inside a short window — company insiders buying on the open market, and investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-11-24T23:59:59.000000Z",
+        "knowable_time": "2025-11-24T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 138,
+      "prev_hash": "03fdff1eed816236e5ea6167028c89ed7f4f24618c8857f4a14a26b0b3911809",
+      "content_hash": "9f108450896727944723c7a57eac3faf94cd3111a541d987342ac27c4fd3fa07",
+      "values": {
+        "caller_id": "108",
+        "seq": "138",
+        "symbol": "AUR",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on AUR inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-11-26T23:59:59.000000Z",
+        "knowable_time": "2025-11-26T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 139,
+      "prev_hash": "9f108450896727944723c7a57eac3faf94cd3111a541d987342ac27c4fd3fa07",
+      "content_hash": "1f08e1bd7b0dfe5c7969d75ffe5fe9d68c6ce98bd5feeead335d3267548b2c99",
+      "values": {
+        "caller_id": "108",
+        "seq": "139",
+        "symbol": "ENR",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "4 separate filers acted on ENR inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-12-02T23:59:59.000000Z",
+        "knowable_time": "2025-12-02T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 140,
+      "prev_hash": "1f08e1bd7b0dfe5c7969d75ffe5fe9d68c6ce98bd5feeead335d3267548b2c99",
+      "content_hash": "c8fb4e75f24cd2f5fa5a87a5c824b7feed497e420a1d8ccd96d185890ea45716",
+      "values": {
+        "caller_id": "108",
+        "seq": "140",
+        "symbol": "FSCO",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "4 separate filers acted on FSCO inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-12-03T23:59:59.000000Z",
+        "knowable_time": "2025-12-03T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 141,
+      "prev_hash": "c8fb4e75f24cd2f5fa5a87a5c824b7feed497e420a1d8ccd96d185890ea45716",
+      "content_hash": "48dadface048894c5979a03f5e3fbc1627e72c4c7c893286413f8188a0a6b764",
+      "values": {
+        "caller_id": "108",
+        "seq": "141",
+        "symbol": "GUTS",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "6 separate filers acted on GUTS inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-12-08T23:59:59.000000Z",
+        "knowable_time": "2025-12-08T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 142,
+      "prev_hash": "48dadface048894c5979a03f5e3fbc1627e72c4c7c893286413f8188a0a6b764",
+      "content_hash": "e1cc8d500ccf860239865bb6f7f6b095d06145e8151eda40d7752610923f68c2",
+      "values": {
+        "caller_id": "108",
+        "seq": "142",
+        "symbol": "ASTS",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on ASTS inside a short window — company insiders buying on the open market, and investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-12-10T23:59:59.000000Z",
+        "knowable_time": "2025-12-10T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 143,
+      "prev_hash": "e1cc8d500ccf860239865bb6f7f6b095d06145e8151eda40d7752610923f68c2",
+      "content_hash": "e4485469866f74ec4f63bec111f0db0e0e2356a4f357c8fbd350f91122c046ca",
+      "values": {
+        "caller_id": "108",
+        "seq": "143",
+        "symbol": "ELAN",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "medium",
+        "thesis": "5 separate filers acted on ELAN inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-12-15T23:59:59.000000Z",
+        "knowable_time": "2025-12-15T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 144,
+      "prev_hash": "e4485469866f74ec4f63bec111f0db0e0e2356a4f357c8fbd350f91122c046ca",
+      "content_hash": "a1ad64973fd3969d0f6e76aeaa72a2434b95efa3c344120d46224bcede060249",
+      "values": {
+        "caller_id": "108",
+        "seq": "144",
+        "symbol": "IMNM",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on IMNM inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-12-18T23:59:59.000000Z",
+        "knowable_time": "2025-12-18T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 145,
+      "prev_hash": "a1ad64973fd3969d0f6e76aeaa72a2434b95efa3c344120d46224bcede060249",
+      "content_hash": "2be7973d402795e73bd80198cfe2b9d565c18d3dff32c965776a8e6560e9d81e",
+      "values": {
+        "caller_id": "108",
+        "seq": "145",
+        "symbol": "BRCB",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "8 separate filers acted on BRCB inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-12-22T23:59:59.000000Z",
+        "knowable_time": "2025-12-22T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 146,
+      "prev_hash": "2be7973d402795e73bd80198cfe2b9d565c18d3dff32c965776a8e6560e9d81e",
+      "content_hash": "dfccbf42734200d3372170311b1356759402fec932f4b01010b426bd0835f2fb",
+      "values": {
+        "caller_id": "108",
+        "seq": "146",
+        "symbol": "CDNL",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "5 separate filers acted on CDNL inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-12-23T23:59:59.000000Z",
+        "knowable_time": "2025-12-23T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 147,
+      "prev_hash": "dfccbf42734200d3372170311b1356759402fec932f4b01010b426bd0835f2fb",
+      "content_hash": "d5ed6b038d640cc53fb37628e15f3775afed3e19994086d90985385740febf85",
+      "values": {
+        "caller_id": "108",
+        "seq": "147",
+        "symbol": "ANDG",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "medium",
+        "thesis": "6 separate filers acted on ANDG inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-12-29T23:59:59.000000Z",
+        "knowable_time": "2025-12-29T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 148,
+      "prev_hash": "d5ed6b038d640cc53fb37628e15f3775afed3e19994086d90985385740febf85",
+      "content_hash": "be2bf8201639bb19908a720df9740c625384883ed5c96ddce28b8b5eb67bef4b",
+      "values": {
+        "caller_id": "108",
+        "seq": "148",
+        "symbol": "GDV",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on GDV inside a short window — company insiders buying on the open market, and investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-12-29T23:59:59.000000Z",
+        "knowable_time": "2025-12-29T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 149,
+      "prev_hash": "be2bf8201639bb19908a720df9740c625384883ed5c96ddce28b8b5eb67bef4b",
+      "content_hash": "9e73a84b6a6e755d394460f83cfae9685eefb8f6cb71f5c4c521e3789a8e0bf8",
+      "values": {
+        "caller_id": "108",
+        "seq": "149",
+        "symbol": "BOC",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "medium",
+        "thesis": "4 separate filers acted on BOC inside a short window — company insiders buying on the open market. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-12-30T23:59:59.000000Z",
+        "knowable_time": "2025-12-30T23:59:59.000000Z"
+      }
+    },
+    {
+      "seq": 150,
+      "prev_hash": "9e73a84b6a6e755d394460f83cfae9685eefb8f6cb71f5c4c521e3789a8e0bf8",
+      "content_hash": "24df0daed4f23ccde198744a376cbae5f43f35fd611dc4288265e75679fee2d5",
+      "values": {
+        "caller_id": "108",
+        "seq": "150",
+        "symbol": "AESI",
+        "direction": "up",
+        "horizon_days": "30",
+        "confidence": "low",
+        "thesis": "3 separate filers acted on AESI inside a short window — investors filing activist stakes. The channel is informational asymmetry: insiders and large holders observe order books, hiring, renewals and pipeline before any of it reaches a public number, and a purchase is the costliest way to express that view. Clustering matters more than any single filing because one purchase can be a liquidity event or a scheduled plan, whereas several independent parties acting within days of each other is harder to explain that way. The effect is expected to show up over weeks to months as the information becomes public through ordinary reporting, not immediately.",
+        "benchmark_symbol": "SPY",
+        "published_at": "2025-12-30T23:59:59.000000Z",
+        "knowable_time": "2025-12-30T23:59:59.000000Z"
+      }
+    }
+  ]
+}

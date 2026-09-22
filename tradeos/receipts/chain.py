@@ -126,6 +126,42 @@ def seal(call: dict, prev_hash: str) -> tuple[str, str]:
     return payload, content_hash(payload, prev_hash)
 
 
+# How a client must frame the values before hashing, stated as data rather than only in two
+# codebases. It is on the wire at `/api/receipts/{handle}/chain` and in every export, so somebody
+# checking a record in a language nobody here has written does not have to read this source to get
+# the bytes right.
+FRAMING = ("each field as name:byte-length-of-value:value, joined with newline; "
+           "sha256 of (prev_hash + payload), hex")
+
+
+def export_payload(caller: dict, conn) -> dict:
+    """One caller's whole chain, in the shape a checker needs and nothing more.
+
+    IDENTICAL TO WHAT `/api/receipts/{handle}/chain` PUTS ON THE WIRE, deliberately, so the
+    exported file and the live endpoint cannot come to disagree — the browser verifier reads one
+    and `export/check.mjs` reads the other, and they are the same code.
+
+    Values are RENDERED to text here rather than sent as JSON types. Two of the ten sealed fields
+    are timestamps whose sealed spelling carries microseconds and a trailing Z, both of which a
+    JavaScript `Date` round trip drops; asking a checker to reinvent that spelling would mean an
+    intact record reporting as broken.
+    """
+    from . import calls as calls_mod
+    sealed = calls_mod.for_chain(caller["id"], conn)
+    return {
+        "handle": caller["handle"],
+        "display_name": caller["display_name"],
+        "is_house": caller["is_house"],
+        "fields": list(SEALED_FIELDS),
+        "genesis": GENESIS_HASH,
+        "framing": FRAMING,
+        "head": sealed[-1]["content_hash"] if sealed else GENESIS_HASH,
+        "links": [{"seq": c["seq"], "prev_hash": c["prev_hash"],
+                   "content_hash": c["content_hash"],
+                   "values": rendered_fields(c)} for c in sealed],
+    }
+
+
 def verify_chain(calls: list[dict]) -> dict:
     """Recompute every hash in sequence and report whether the record is intact.
 
