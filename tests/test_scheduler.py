@@ -19,9 +19,31 @@ def test_jobs_registry_is_sane():
     assert len(names) == len(set(names))                       # names unique (job_runs keys on them)
     assert all(interval > 0 for _, interval, _ in scheduler.JOBS)
     assert all(callable(fn) for _, _, fn in scheduler.JOBS)
-    # the jobs that make TradeOSS feel fresh every morning are all present
-    for required in ("news_rss", "news_sec", "analyze_news", "attention_wiki", "sentiment_hn"):
-        assert required in names
+    # Exactly the two jobs that keep a Receipts instance working with nobody touching it: get the
+    # prices, then score what the prices have made scoreable. Asserted as equality rather than
+    # membership, because a job left behind after its plane was deleted fails on the next tick and
+    # writes an error row every six hours forever.
+    assert names == ["ingest_prices", "resolve_calls"]
+
+
+def test_prices_are_fetched_before_calls_are_scored():
+    """The ORDER inside one tick, which `run_once` takes straight from this list. Scoring against a
+    feed that has not been topped up leaves a call open for an extra six hours for no reason, and
+    `resolve_due` refuses the whole batch on a lagging benchmark — so the wrong order does not
+    merely delay one call, it defers every call that tick."""
+    names = [n for n, _, _ in scheduler.JOBS]
+    assert names.index("ingest_prices") < names.index("resolve_calls")
+
+
+def test_every_job_named_by_the_source_registry_exists():
+    """`sources.CATALOG` names the scheduler jobs each source drives, and the integration page
+    joins health on them. A `jobs` entry pointing at a job that was deleted reports a source as
+    silent forever; the reverse — a job no source claims — is how an orphan keeps running."""
+    from tradeos import sources
+
+    names = {n for n, _, _ in scheduler.JOBS}
+    claimed = {j for s in sources.CATALOG for j in s["jobs"]}
+    assert claimed <= names, f"catalog names jobs that do not exist: {sorted(claimed - names)}"
 
 
 # ------------------------------------------------------------------ the zero-output alarm

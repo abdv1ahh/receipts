@@ -97,6 +97,80 @@ BATCH = 100
 MIN_INTERVAL = 0.35
 
 
+# ------------------------------------------------------------------ which symbols to fetch
+#
+# LIFTED FROM `backtest/run.py`, VERBATIM, when the research plane was deleted. These two decide
+# the order a quota-limited top-up works through the table, which is a property of price ingestion
+# and was only ever in the backtest module because that is where the first caller lived. The
+# comment below is the measurement that justifies the ordering and comes with it; a rule of this
+# shape without its evidence gets "simplified" back to ORDER BY symbol within a year.
+
+
+
+# ---------------------------------------------------------------------------------------------
+# WORK-LIST ORDERING. Every selector below returns symbols ORDERED BY STALENESS, oldest data first,
+# and none of them may order by symbol. This is a correctness property, not a performance one.
+#
+# All four used to end in `ORDER BY symbol` or `sorted(...)`. A free-tier pass cannot finish the
+# list — Tiingo allowed ~50 requests an hour against 500 symbols — so every run walked the alphabet
+# and died in the same place. Measured 2026-09-09: 0 of 500 symbols had a bar at the latest NYSE
+# session, 39 symbols reached 2026-09-02 in one contiguous alphabetical block ending at `PEB-PH`,
+# and the 79 stalest were the alphabetical tail from `PFX` to `YEXT`. Symbols late in the alphabet
+# were not unlucky, they were systematically never reached, and the table's own calendar reported
+# 99% fresh because it measured against the newest day it happened to hold.
+#
+# Ordering by staleness makes a truncated run leave the data EVENLY stale instead of biased: the
+# symbols a cut-short pass skips are by construction the freshest ones, and they sort to the front
+# of the next run.
+#
+# THE TIE-BREAK MATTERS AS MUCH AS THE SORT. Symbols with identical staleness — every symbol with
+# no data at all, or a whole block stuck on the same date — would fall back to whatever order the
+# planner returns, and `sorted()` would reintroduce exactly the bias this removes. `md5(symbol)`
+# is deterministic, so a run is reproducible, and uniformly distributed over the alphabet, so a
+# truncated pass through one staleness tier takes an unbiased sample of it.
+_STALENESS_ORDER = "ORDER BY last_day ASC NULLS FIRST, md5(symbol)"
+
+
+def _spy_first(symbols: list[str]) -> list[str]:
+    """SPY leads any work list it appears in.
+
+    It is the benchmark: a stale SPY makes every other symbol unscoreable no matter how current
+    that symbol is, so it must never sit behind 400 others in a queue that might be cut short.
+    This is the one deliberate exception to staleness ordering, and it is safe because it moves
+    exactly one symbol."""
+    if "SPY" not in symbols:
+        return symbols
+    return ["SPY"] + [s for s in symbols if s != "SPY"]
+
+
+def symbols_stale(conn: psycopg.Connection, since: date) -> list[str]:
+    """Symbols already in `prices_eod` whose series stops before `since` — the top-up pass.
+
+    The other three selectors ask "what is MISSING". None of them asks "what has gone STALE", so a
+    feed that stopped a month ago looked complete to every one of them: the table held 499 symbols
+    and 235,162 rows, and the newest close was 2026-07-24 while claims were being made on the 26th.
+    `excess_return` then returned `no_entry_price` for every one of them, which the Ledger reported
+    as "no price series for this subject" — a symbol with 1,293 rows described as having none.
+
+    SPY leads the list because it is the benchmark: a stale SPY makes every other symbol
+    unscoreable no matter how current it is, so it must never be at the back of a quota-limited
+    queue.
+
+    ORDERED OLDEST-DATA-FIRST. This selector produced the measured alphabetical bias: it ended in
+    `ORDER BY symbol`, so every quota-limited pass worked A->Z and stopped in the same place. See
+    the note above `_STALENESS_ORDER`."""
+    with conn.cursor() as cur:
+        cur.execute(
+            f"""SELECT symbol, max(day) AS last_day FROM prices_eod
+                 GROUP BY symbol HAVING max(day) < %s
+                 {_STALENESS_ORDER}""",  # noqa: S608 - constant, no user input
+            (since,),
+        )
+        stale = [r[0] for r in cur.fetchall()]
+    return _spy_first(stale)
+
+
+
 class AlpacaClient:
     """Batched daily bars. One HTTP client, throttled, host-allowlisted, header-authenticated."""
 

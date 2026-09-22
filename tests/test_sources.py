@@ -11,17 +11,8 @@ import pytest
 
 from tradeos import scheduler, sources
 
+
 # ------------------------------------------------------------------ the registry
-
-def test_catalog_states_are_derived_from_config(monkeypatch):
-    monkeypatch.delenv("REDDIT_CLIENT_ID", raising=False)
-    monkeypatch.delenv("REDDIT_CLIENT_SECRET", raising=False)
-    assert sources.by_key("reddit")["state"] == sources.NEEDS_KEY
-    monkeypatch.setenv("REDDIT_CLIENT_ID", "id")
-    monkeypatch.setenv("REDDIT_CLIENT_SECRET", "secret")
-    assert sources.by_key("reddit")["state"] == sources.CONNECTED
-
-
 def test_alpaca_state_is_derived_from_config(monkeypatch):
     """Alpaca is the price source, so a wrong state here stops outcomes being scored at all."""
     monkeypatch.delenv("ALPACA_API_KEY_ID", raising=False)
@@ -30,6 +21,31 @@ def test_alpaca_state_is_derived_from_config(monkeypatch):
     monkeypatch.setenv("ALPACA_API_KEY_ID", "id")
     monkeypatch.setenv("ALPACA_API_SECRET_KEY", "secret")
     assert sources.by_key("alpaca")["state"] == sources.CONNECTED
+
+
+def test_the_catalog_lists_every_source_and_nothing_more():
+    """Both directions, because both have bitten. A source absent from the catalog is invisible to
+    the operator no matter how badly it is failing — GDELT was exactly that for three phases. A
+    source LISTED but no longer talked to is the opposite failure and the one this deletion could
+    introduce: an integration page telling an operator to paste a Reddit key for a surface that no
+    longer exists.
+
+    Four entries, and each one is an external dependency the product still has: the price vendor,
+    outbound mail, Google sign-in, and error reporting.
+    """
+    assert {s["key"] for s in sources.catalog()} == {"alpaca", "smtp", "google_oauth", "sentry"}
+
+
+def test_alpaca_is_the_only_source_a_running_instance_actually_needs():
+    """The other three are optional by construction and the product says so rather than failing:
+    mail refuses to send unconfigured (docs/known_gaps.md §1), Google sign-in is config-gated
+    beside ordinary email signup, and Sentry initialises to nothing. Alpaca is not optional — with
+    no price series there is no universe to publish on and nothing can ever be scored."""
+    alpaca = sources.by_key("alpaca")
+    assert alpaca["jobs"] == ["ingest_prices"]
+    assert set(alpaca["env"]) == {"ALPACA_API_KEY_ID", "ALPACA_API_SECRET_KEY"}
+    for optional in ("smtp", "google_oauth", "sentry"):
+        assert sources.by_key(optional)["jobs"] == [], f"{optional} claims a scheduler job"
 
 
 def test_every_dynamic_source_has_a_config_check():
@@ -42,24 +58,6 @@ def test_every_dynamic_source_has_a_config_check():
     assert dynamic, "no dynamic sources found - has the registry's shape changed?"
     assert dynamic <= set(sources._DYNAMIC), (
         f"declared dynamic but no config check: {sorted(dynamic - set(sources._DYNAMIC))}")
-
-
-def test_sources_with_no_free_path_stay_unavailable_not_needs_key():
-    """X and StockTwits must never render as 'add a key' — there is no key to add."""
-    assert sources.by_key("x")["state"] == sources.UNAVAILABLE
-    assert sources.by_key("stocktwits")["state"] == sources.UNAVAILABLE
-    assert sources.by_key("sec_edgar")["state"] == sources.CONNECTED
-
-
-def test_gate_carries_what_the_ui_needs_to_explain_itself(monkeypatch):
-    monkeypatch.delenv("REDDIT_CLIENT_ID", raising=False)
-    g = sources.gate("reddit")
-    assert g["state"] == sources.NEEDS_KEY
-    assert g["signup_url"].startswith("https://www.reddit.com/")
-    assert "REDDIT_CLIENT_ID" in g["env"] and "REDDIT_CLIENT_SECRET" in g["env"]
-    assert g["powers"]                                   # never an empty explanation
-
-
 def test_unknown_source_degrades_instead_of_raising():
     g = sources.gate("nope")
     assert g["state"] == sources.UNAVAILABLE and g["label"] == "nope"
@@ -161,36 +159,6 @@ def test_require_admin_contract_is_user_on_success_none_on_failure():
 
 
 # ------------------------------------------------------------------ B-22: watchlist ownership
-
-def test_no_watchlist_route_accepts_an_owner_as_a_parameter():
-    """B-22: /api/watchlist took the owner as a QUERY PARAMETER defaulting to 'demo', with no
-    session check — every account shared one list and any caller could address another's by
-    changing one parameter. The owner must come from the session and nowhere else."""
-    import inspect
-    import re
-
-    from tradeos import app as app_module
-
-    src = inspect.getsource(app_module)
-    for match in re.finditer(r"^def (watchlist_\w+)\((.*?)\)\s*->", src, re.M | re.S):
-        name, params = match.group(1), match.group(2)
-        assert "user:" not in params, f"{name} takes the owner as a parameter"
-        assert "user_key" not in params, f"{name} takes a raw key as a parameter"
-        assert "tos_session" in params, f"{name} does not read the session"
-
-
-def test_watchlist_queries_are_scoped_by_user_id():
-    """A query filtering on the old free-text key would silently reintroduce the shared pile."""
-    import inspect
-
-    from tradeos import app as app_module
-
-    src = inspect.getsource(app_module)
-    for line in src.splitlines():
-        if "FROM watchlists" in line or "INTO watchlists" in line:
-            assert "user_key" not in line, f"watchlist query still uses user_key: {line.strip()}"
-
-
 def test_httpx_request_logging_cannot_print_an_api_key():
     """httpx logs every request at INFO with the full URL, query string included. Tiingo
     authenticates with `?token=`, so that one logger turns a captured CLI session or a CI log into
@@ -207,209 +175,10 @@ def _tiingo_probe_source() -> str:
     import pathlib
     src = pathlib.Path(__file__).resolve().parents[1].joinpath("tradeos", "cli.py").read_text()
     return src.split('if key == "tiingo":')[1].split('if key == "coingecko":')[0]
-
-
-def test_tiingo_probe_uses_an_endpoint_that_actually_authenticates():
-    """`check-source tiingo` exists to answer one question — is the key that was just pasted in
-    good? `/api/test` cannot answer it: measured 2026-08-24, it returns 200 for a garbage token
-    and for a revoked one alike. The probe therefore reported OK for the single case it was
-    built to catch, and a key rotation could be signed off against a key that does not work."""
-    probe = _tiingo_probe_source()
-    # Match the URL as CALLED, not the bare path — the comment above the probe names
-    # `/api/test` in order to explain why it is wrong, and must not trip its own guard.
-    assert "https://api.tiingo.com/api/test" not in probe, (
-        "tiingo probe is back on /api/test, which returns 200 for ANY token — it cannot "
-        "distinguish a working key from a revoked one")
-    assert "/tiingo/daily/" in probe, (
-        "tiingo probe must call an endpoint that 403s on a bad token")
-
-
-def test_tiingo_probe_treats_a_rate_limit_as_a_working_token(monkeypatch):
-    """A 429 came back THROUGH authentication, so the token is good. The free tier limits at
-    ~57 symbols/hour, so this is the normal state for most of the day; reporting it as FAILED
-    would send an operator to re-check a key that is fine. A 403 still has to fail."""
-    import httpx
-
-    from tradeos import cli
-
-    def _client(status: int):
-        class _Resp:
-            status_code = status
-
-            def raise_for_status(self):
-                if status >= 400:
-                    raise httpx.HTTPStatusError("boom", request=None, response=self)
-
-            def json(self):
-                return {"ticker": "SPY"}
-
-        class _Client:
-            def __init__(self, *a, **k): pass
-            def __enter__(self): return self
-            def __exit__(self, *a): return False
-            def get(self, *a, **k): return _Resp()
-
-        return _Client
-
-    monkeypatch.setenv("TIINGO_API_KEY", "irrelevant-to-this-test")
-
-    monkeypatch.setattr(httpx, "Client", _client(429))
-    ok, detail = cli._probe("tiingo")
-    assert ok is True, "a rate-limited response proves the token authenticated"
-    assert "rate limited" in detail
-
-    monkeypatch.setattr(httpx, "Client", _client(403))
-    ok, detail = cli._probe("tiingo")
-    assert ok is False, "a rejected token must report FAILED"
-
-
 def _openfigi_probe_source() -> str:
     import pathlib
     src = pathlib.Path(__file__).resolve().parents[1].joinpath("tradeos", "cli.py").read_text()
     return src.split('if key == "openfigi":')[1].split('if key == "coingecko":')[0]
-
-
-def test_openfigi_probe_cannot_pass_without_the_key_doing_work():
-    """OpenFIGI's mapping endpoint answers KEYLESS requests too, so a 200 on an ordinary body
-    proves nothing about the key — the same trap `/api/test` set for Tiingo. Measured
-    2026-08-24: the keyless cap is 10 jobs per request and a key raises it to 100, so a body of
-    ELEVEN separates the three states cleanly (valid 200 / invalid 401 / absent 413). A probe
-    that drops back under 10 jobs would report OK for a key that is never applied."""
-    probe = _openfigi_probe_source()
-    assert "X-OPENFIGI-APIKEY" in probe, "the probe must actually send the key"
-    # Count the CUSIPs the probe posts; it must stay over the keyless ceiling.
-    listed = probe.split("cusips = [")[1].split("]")[0]
-    jobs = len([c for c in listed.split(",") if c.strip()])
-    assert jobs > 10, (
-        f"probe posts {jobs} jobs — at or under the keyless cap of 10 it would also succeed "
-        "with no key at all, so it would no longer test authentication"
-    )
-    assert "413" in probe, "a 413 means the key was not applied and must report FAILED, not OK"
-
-
-def test_openfigi_probe_reports_failure_when_the_key_was_not_applied(monkeypatch):
-    """413 is the signature of a request that was rated as keyless — the key never reached the
-    process. That is precisely the misconfiguration this command exists to surface, so it must
-    not raise_for_status into a generic 'request failed'."""
-    import httpx
-
-    from tradeos import cli
-
-    class _Resp:
-        status_code = 413
-
-        def raise_for_status(self):
-            raise AssertionError("413 must be handled before raise_for_status")
-
-        def json(self):
-            return []
-
-    class _Client:
-        def __init__(self, *a, **k): pass
-        def __enter__(self): return self
-        def __exit__(self, *a): return False
-        def post(self, *a, **k): return _Resp()
-
-    monkeypatch.setenv("OPENFIGI_API_KEY", "irrelevant-to-this-test")
-    monkeypatch.setattr(httpx, "Client", _Client)
-    ok, detail = cli._probe("openfigi")
-    assert ok is False, "a keyless-rated request must report FAILED"
-    assert "not applied" in detail
-
-
-def test_openfigi_client_never_puts_the_key_in_a_url():
-    """B-30: httpx puts the full request URL in its exception text, so a credential carried in a
-    query string lands in any stored error — that is how 1,172 ingest_rejects rows came to hold
-    the live Tiingo key. OpenFIGI authenticates with a HEADER and must keep doing so."""
-    import pathlib
-    src = pathlib.Path(__file__).resolve().parents[1].joinpath(
-        "tradeos", "resolution", "openfigi.py").read_text()
-    assert 'headers["X-OPENFIGI-APIKEY"] = api_key' in src, (
-        "the key must travel as a header, never in the URL"
-    )
-    assert "params=" not in src, "a params= dict would put the key in the query string"
-    assert "str(exc)" not in src, (
-        "raw httpx exception text carries the request URL; store the exception TYPE instead"
-    )
-
-
-# ------------------------------------------------------------------ the registry's own coverage
-#
-# The rule in CLAUDE.md is that an external dependency is not done until it has a CATALOG entry,
-# because the integration page is the only place an operator looks to find out why a panel is
-# empty. Six services were missing from it, and the consequence was not cosmetic: the model
-# provider chain's fallback answered HTTP 410 for five weeks and the page whose entire job is to
-# report that outage structurally could not see it. These tests are the guard against the same
-# gap reopening.
-
-def test_every_external_service_the_code_talks_to_is_in_the_catalog():
-    keys = {s["key"] for s in sources.catalog()}
-    for key in ("binance", "finra", "llm_gemini", "llm_openai", "stripe", "sentry"):
-        assert key in keys, f"{key} is talked to in code but invisible on the integration page"
-
-
-def test_the_model_chain_is_reported_link_by_link(monkeypatch):
-    """Both links, separately. One entry for 'the LLM' would have gone on reading 'connected' on
-    Gemini's key while the fallback was dead, which is precisely the outage that went unseen."""
-    monkeypatch.setenv("GEMINI_API_KEY", "g")
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    assert sources.by_key("llm_gemini")["state"] == sources.CONNECTED
-    assert sources.by_key("llm_openai")["state"] == sources.NEEDS_KEY
-
-    monkeypatch.setenv("OPENAI_API_KEY", "k")
-    monkeypatch.setenv("OPENAI_BASE_URL", "https://api.groq.com/openai/v1")
-    assert sources.by_key("llm_openai")["state"] == sources.CONNECTED
-
-
-def test_an_openai_compatible_key_without_a_base_url_is_not_configured(monkeypatch):
-    """The slot is a protocol, not a vendor, so the endpoint is as load-bearing as the key. A key
-    with no base URL would be sent to whatever the last operator pointed it at."""
-    monkeypatch.setenv("OPENAI_API_KEY", "k")
-    monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
-    assert sources.by_key("llm_openai")["state"] == sources.NEEDS_KEY
-
-
-def test_the_llm_probe_asks_each_provider_alone(monkeypatch):
-    """A probe that used the configured chain would fall through to the fallback and report OK for
-    a dead Gemini key. Each link has to be asked by name."""
-    from tradeos import cli
-    seen = []
-
-    def fake_complete(prompt, max_tokens=400, json_mode=False, provider=None, role="deep"):
-        seen.append(provider)
-        return "alive", ""
-
-    monkeypatch.setattr("tradeos.llm.complete", fake_complete)
-    monkeypatch.setattr("tradeos.llm.model_id", lambda p=None, role="deep": "m")
-    assert cli._probe("llm_gemini")[0] is True
-    assert cli._probe("llm_openai")[0] is True
-    assert seen == ["gemini", "openai"]
-
-
-def test_a_model_failure_names_the_status_code_and_nothing_else():
-    """HTTP 410 is 'this endpoint is retired' and 401 is 'your key is wrong'; an operator reading
-    'HTTPStatusError' cannot tell them apart. The URL stays out of it — Gemini authenticates with
-    ?key= and str(exc) would carry the credential."""
-    import httpx
-
-    from tradeos import llm
-    llm.reset_cooldowns()
-
-    def boom(p, prompt, image, max_tokens, json_mode, role):
-        req = httpx.Request("POST", "https://models.github.ai/inference?key=SECRET")
-        raise httpx.HTTPStatusError("410", request=req, response=httpx.Response(410, request=req))
-
-    import unittest.mock as mock
-    with mock.patch.object(llm, "_call", boom), mock.patch.dict(
-            "os.environ", {"GEMINI_API_KEY": "g", "EXPLAIN_PROVIDER": "gemini"}):
-        out, why = llm.complete("hi")
-    assert out is None
-    assert "HTTP 410" in why
-    assert "SECRET" not in why and "models.github.ai" not in why
-
-
-# ------------------------------------------------------------------ the demo account's credentials
-
 def test_seed_demo_generates_its_password_rather_than_shipping_one():
     """The default used to be a constant that also appeared in CLAUDE.md, GO-LIVE.md and two
     runbooks — so every reader of the repository knew the login for a tier=pro account with no

@@ -45,17 +45,6 @@ def test_trending_applies_mention_floor_and_orders_by_attention():
     assert syms[0] == "AAA"                            # higher velocity ranks first
     top = board[0]
     assert top["velocity"] == 6.0 and top["is_new"] is False and top["flags"] == ["single_source"]
-
-
-def test_sources_status_is_honest():
-    st = S.sources_status()
-    assert st["hn"]["state"] == "connected"            # keyless, wired by default
-    assert st["x"]["state"] == "unavailable"           # no free tier -> never faked
-    assert st["reddit"]["state"] in ("connected", "needs_key")
-
-
-# ------------------------------------------------------------------ regression: the inflated board (B-02)
-
 def test_velocity_is_not_inflated_by_a_source_with_no_baseline():
     """The board used to divide total mentions (all sources) by total baseline (only sources that
     HAVE one), which turned a flat 1.0x name into a multi-x 'spike' and pushed noise to the top."""

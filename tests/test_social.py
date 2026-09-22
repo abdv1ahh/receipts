@@ -1,7 +1,6 @@
 """Offline tests for Social & Attention Intelligence pure logic: Wikipedia pageview velocity, Reddit
 ticker extraction + transparent lexicon sentiment, the attention 'why' (deterministic, guard-clean,
 honest about a missing catalyst), and the honest multi-source status. No network, no database."""
-from tradeos import sentiment
 from tradeos.explain.guards import allowed_numbers, directive_guard, numbers_guard
 from tradeos.ingestion import attention_wiki as W
 from tradeos.ingestion import social_reddit as R
@@ -59,10 +58,3 @@ def test_attention_confidence_rules():
 
 
 # ------------------------------------------------------------------ honest source status
-
-def test_sources_status_multi_source_honest():
-    st = sentiment.sources_status()
-    assert st["wikipedia"]["state"] == "connected" and st["wikipedia"]["sentiment"] is False
-    assert st["stocktwits"]["state"] == "unavailable"            # datacenter-blocked -> never faked
-    assert st["reddit"]["state"] in ("connected", "needs_key")
-    assert st["hn"]["state"] == "connected"
