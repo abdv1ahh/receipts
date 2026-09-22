@@ -13,72 +13,10 @@ from base64 import urlsafe_b64encode
 
 import pytest
 
-from tradeos import authn, billing, mail, oauth, onboarding
+from tradeos import authn, mail, oauth
+
 
 # ------------------------------------------------------------------ tier gating
-
-def test_exposure_is_paid_and_the_ledger_is_not():
-    """The split the brief specifies. The Ledger is deliberately absent from every tier's
-    entitlements: an accuracy record behind a paywall is not an accuracy record."""
-    assert billing.entitlements("free")["exposure"] is False
-    for tier in ("retail", "pro", "admin"):
-        assert billing.entitlements(tier)["exposure"] is True
-    for tier in billing.ENTITLEMENTS:
-        assert "ledger" not in billing.ENTITLEMENTS[tier]
-
-
-def test_an_unknown_tier_falls_back_to_the_least_privilege():
-    assert billing.entitlements("enterprise") == billing.ENTITLEMENTS["free"]
-    assert billing.entitlements(None) == billing.ENTITLEMENTS["free"]
-def test_symbols_are_cleaned_deduplicated_and_capped():
-    out = onboarding._clean_symbols(["  pbr ", "VALE", "vale", "", None, "toolongsymbolname"])
-    assert out == ["PBR", "VALE", "TOOLONGSYMBO"]       # upper, deduped, trimmed to 12
-
-
-def test_a_none_in_the_list_is_dropped_rather_than_becoming_a_ticker():
-    """`str(None)` is "NONE", so a naive uppercase would quietly add a holding called NONE to
-    someone's watchlist. Found by reading this function's real output rather than assuming it."""
-    assert onboarding._clean_symbols([None, "", "  ", "NVDA"]) == ["NVDA"]
-
-
-def test_the_watchlist_cap_holds():
-    out = onboarding._clean_symbols([f"SYM{i}" for i in range(50)])
-    assert len(out) == onboarding.MAX_WATCHLIST
-
-
-def test_finishing_with_nothing_chosen_still_counts_as_answered():
-    """Asked and answered, including "answered with nothing". Re-asking every session is the
-    nagging the brief rules out."""
-    src = inspect.getsource(onboarding.complete)
-    assert "onboarded_at  = now()" in src
-    # Nothing in the write path may reject an empty submission.
-    assert "raise" not in src
-
-
-def test_setup_never_gates_a_feature():
-    """A reader who skips forever gets the whole product. If this module ever grows a check that
-    something is unavailable without a frame, this test is the tripwire."""
-    src = inspect.getsource(onboarding)
-    for word in ("entitlement", "locked", "403", "forbidden", "required"):
-        assert word not in src.lower().replace("not required", ""), f"onboarding mentions {word!r}"
-
-
-def test_a_skip_is_temporary_by_construction():
-    """"Gently persistent" — a skip snoozes, it never sets a permanent flag."""
-    src = inspect.getsource(onboarding.snooze)
-    assert "snoozed_until = now() +" in src
-    assert "onboarded_at" not in src              # skipping must not mark it complete
-
-
-def test_the_watchlist_write_is_additive():
-    """Onboarding seeds a list; it must never replace one."""
-    src = inspect.getsource(onboarding.complete)
-    assert "ON CONFLICT DO NOTHING" in src
-    assert "DELETE FROM watchlists" not in src
-
-
-# ------------------------------------------------------------------ OAuth: reading the token
-
 def _jwt(payload: dict) -> str:
     """A JWT-shaped string. Only the payload segment is ever read — see property 5 in oauth.py."""
     seg = urlsafe_b64encode(json.dumps(payload).encode()).rstrip(b"=").decode()

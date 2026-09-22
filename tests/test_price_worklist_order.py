@@ -1,7 +1,7 @@
 """The price work list must be ordered by STALENESS, never by symbol.
 
 This is a correctness test, not a performance one, and it exists because the alphabetical version
-shipped and did measurable damage. Every selector in `backtest/run.py` used to end in
+shipped and did measurable damage. Every selector in the price work list used to end in
 `ORDER BY symbol` or `sorted(...)`. A free-tier pass cannot finish the list, so every run walked
 A->Z and died in the same place: measured 2026-09-09, 0 of 500 symbols had a bar at the latest NYSE
 session, the 39 that reached the newest day were one contiguous alphabetical block ending at
@@ -22,7 +22,7 @@ import pytest
 
 try:
     from tradeos import db
-    from tradeos.backtest import run as btrun
+    from tradeos.ingestion import prices_alpaca as btrun
     _IMPORTS_OK = True
 except Exception:                                                   # pragma: no cover
     _IMPORTS_OK = False
@@ -136,15 +136,15 @@ def test_spy_leads_the_worklist_even_though_it_is_not_the_stalest(staggered_symb
 def test_no_selector_sorts_by_symbol():
     """A source-level guard, because the SQL is what regresses.
 
-    The three `symbols_for_clusters*` selectors need a populated `signal_clusters` join to test
-    behaviourally, which makes them awkward to fixture. Their ordering is a one-line property of
-    the SQL, so it is asserted against the source: none of them may end in `ORDER BY symbol`, and
-    none may wrap its result in `sorted(...)`.
+    ONE SELECTOR NOW, WHERE THERE WERE FOUR. The three `symbols_for_clusters*` selectors started
+    from `signal_clusters` and went with it; `symbols_stale` is the whole of the top-up pass and
+    it moved into the Alpaca adapter with this guard attached to it. The property is a one-line
+    property of the SQL, so it is asserted against the source: it may not end in `ORDER BY symbol`,
+    and it may not wrap its result in `sorted(...)`.
     """
     import inspect
     src = inspect.getsource(btrun)
-    for fn in ("symbols_for_clusters", "symbols_for_clusters_missing",
-               "symbols_for_clusters_missing_history", "symbols_stale"):
+    for fn in ("symbols_stale",):
         body = src.split(f"def {fn}(")[1].split("\ndef ")[0]
         assert "ORDER BY symbol\"" not in body and "ORDER BY symbol'" not in body, \
             f"{fn} orders alphabetically"

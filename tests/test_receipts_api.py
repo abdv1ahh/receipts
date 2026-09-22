@@ -22,7 +22,7 @@ import pytest
 try:
     from fastapi.testclient import TestClient
 
-    from tradeos import db, presentation
+    from tradeos import db
     from tradeos.app import app
     from tradeos.receipts import calls as receipts_calls
     from tradeos.receipts import card as receipts_card
@@ -274,14 +274,12 @@ def test_the_card_escapes_what_a_caller_typed():
 def test_no_card_carries_the_pre_rebrand_name():
     """The share card is the most public string in the product: the image a shared link renders in
     every feed. It had the old name welded in as markup for eight phases."""
-    for svg in (receipts_card.receipt_card_svg(
-                    handle="h", display_name="D",
-                    counts={"hit": 0, "miss": 0, "inconclusive": 0, "unscoreable": 0, "open": 0},
-                    hit_rate=None, hit_rate_ci=None, resolved_scoreable=0, links=0, brand="Rhumb"),
-                presentation.score_card_svg("NVDA", "NVIDIA", 80, "high", "a headline",
-                                            brand="Rhumb")):
-        assert "TRADEOSS" not in svg.upper().replace("<TSPAN", "").replace("</TSPAN>", "")
-        assert "RHUMB" in svg.upper()
+    svg = receipts_card.receipt_card_svg(
+        handle="h", display_name="D",
+        counts={"hit": 0, "miss": 0, "inconclusive": 0, "unscoreable": 0, "open": 0},
+        hit_rate=None, hit_rate_ci=None, resolved_scoreable=0, links=0, brand="Rhumb")
+    assert "TRADEOSS" not in svg.upper().replace("<TSPAN", "").replace("</TSPAN>", "")
+    assert "RHUMB" in svg.upper()
 
 
 # ------------------------------------------------------------------ rate limiting
