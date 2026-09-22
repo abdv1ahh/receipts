@@ -115,11 +115,16 @@ def test_the_live_universe_holds_the_benchmark_and_excludes_what_we_cannot_price
     with db.connect() as conn:
         universe.reset_cache()
         syms = universe.scoreable_symbols(conn)
-    assert len(syms) > 1000, "the price table should hold thousands of symbols"
+    assert len(syms) > 10000, "the universe is now every tradable non-OTC US equity and ETF"
     assert universe.holds(syms, "SPY"), "the benchmark must be in its own universe"
-    # Measured 2026-09-15: zero price rows for AAPL, and the publish form's placeholder said AAPL.
-    assert not universe.holds(syms, "AAPL"), (
-        "AAPL has no price series here; if that changes, the point still stands -- update the test")
+
+    # THIS ASSERTION USED TO READ `not universe.holds(syms, "AAPL")`, and it was correct: the
+    # universe came from `signal_clusters`, so it was 2,018 insider-signal names and AAPL was not
+    # among them — while the publish form's own placeholder said AAPL. The test pinned the defect
+    # rather than the requirement. The universe is now built from Alpaca's asset list, so the names
+    # a person actually reaches for are the ones that must be here.
+    for liquid in ("AAPL", "MSFT", "NVDA", "TSLA", "GOOGL", "AMZN", "META", "SPY", "QQQ"):
+        assert universe.holds(syms, liquid), f"{liquid} must be publishable"
 
 
 def test_the_universe_is_cached_so_typing_does_not_query_per_keystroke():

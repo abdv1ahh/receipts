@@ -19,8 +19,8 @@ from tradeos import cli
 def _dispatch(monkeypatch, argv: list[str]) -> str:
     """Run the real parser over argv; return which command function it reached."""
     called: list[str] = []
-    for name in ("cmd_ingest_prices", "cmd_ingest_prices_alpaca"):
-        monkeypatch.setattr(cli, name, (lambda n: lambda _args: called.append(n))(name))
+    monkeypatch.setattr(cli, "cmd_ingest_prices_alpaca",
+                        lambda _args: called.append("cmd_ingest_prices_alpaca"))
     monkeypatch.setattr("sys.argv", ["tradeos", *argv])
     cli.main()
     return called[0]
@@ -37,10 +37,30 @@ def test_alpaca_alias_still_resolves(monkeypatch):
     assert _dispatch(monkeypatch, ["ingest-prices-alpaca", "--symbols", "SPY"]) == "cmd_ingest_prices_alpaca"
 
 
-def test_tiingo_is_still_reachable_as_the_fallback(monkeypatch):
-    """Tiingo is the only second opinion this database has on a price, and `compare-prices`
-    measures Alpaca against the rows it wrote. Demoted, never removed."""
-    assert _dispatch(monkeypatch, ["ingest-prices-tiingo", "--symbols", "SPY"]) == "cmd_ingest_prices"
+def test_tiingo_is_gone_from_the_product(monkeypatch):
+    """Removed, not demoted, and the reason is licensing rather than performance.
+
+    Tiingo's terms permit persistent storage only on eligible paid plans, with deletion obligations
+    when the subscription ends. This application stores every entry and exit price permanently and
+    displays the arithmetic on a public page, which is exactly what those terms do not grant on a
+    free key — so shipping Tiingo as a fallback in a public repository would hand every self-hoster
+    a breach they never opted into. The adapter, its commands and `compare-prices` live on in the
+    `research_platform` tag, where the measurement that justified the migration was taken.
+    """
+    for gone in ("ingest-prices-tiingo", "compare-prices"):
+        monkeypatch.setattr("sys.argv", ["tradeos", gone, "--symbols", "SPY"])
+        with pytest.raises(SystemExit) as exc:
+            cli.main()
+        assert exc.value.code != 0, f"{gone} still parses"
+
+
+def test_alpaca_is_the_only_price_source_left():
+    """Asserted against the package, not the parser: a second adapter that nothing routes to is
+    still a second adapter a self-hoster can find and wire up."""
+    import pathlib as _p
+    root = _p.Path(__file__).resolve().parents[1] / "tradeos" / "ingestion"
+    adapters = sorted(f.name for f in root.glob("prices*.py"))
+    assert adapters == ["prices_alpaca.py"], adapters
 
 
 @pytest.mark.parametrize("flag", ["--only-stale", "--symbols-from-clusters",

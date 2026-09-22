@@ -158,18 +158,26 @@ def test_13f_parser_rejects_filing_without_information_table():
         form13f.parse_13f(text)
 
 
-def test_price_row_rejects_high_below_low():
+def test_price_bar_rejects_high_below_low():
     """Guards the OHLC sanity check. This path had no test, which is how a variable rename
-    silently broke it (the reference to the old name only failed at runtime)."""
+    silently broke it (the reference to the old name only failed at runtime).
+
+    Rewritten for Alpaca's bar shape when the Tiingo adapter was removed: `t` is an RFC 3339
+    timestamp and the prices are `o/h/l/c/v`, where Tiingo sent `date` and `adjOpen`/`adjClose`.
+    The three rejections are deliberately the same ones, which is the property worth pinning —
+    an adapter swap must not quietly change what counts as a usable row.
+    """
     from datetime import date
 
-    from tradeos.ingestion.prices import _valid_row
+    from tradeos.ingestion.prices_alpaca import _valid_bar
+
     today = date(2026, 7, 25)
-    good = {"date": "2026-07-24", "adjOpen": 10, "adjHigh": 12, "adjLow": 9, "adjClose": 11, "adjVolume": 100}
-    assert _valid_row(good, today) == (date(2026, 7, 24), 10, 12, 9, 11, 100)
-    assert _valid_row({**good, "adjHigh": 8, "adjLow": 9}, today) is None      # high < low -> reject
-    assert _valid_row({**good, "adjClose": 0}, today) is None                  # non-positive close
-    assert _valid_row({**good, "date": "2026-07-26"}, today) is None           # future bar
+    good = {"t": "2026-07-24T04:00:00Z", "o": 10, "h": 12, "l": 9, "c": 11, "v": 100}
+    assert _valid_bar(good, today) == (date(2026, 7, 24), 10, 12, 9, 11, 100)
+    assert _valid_bar({**good, "h": 8, "l": 9}, today) is None          # high < low -> reject
+    assert _valid_bar({**good, "c": 0}, today) is None                  # non-positive close
+    assert _valid_bar({**good, "t": "2026-07-26T04:00:00Z"}, today) is None   # future bar
+    assert _valid_bar({**good, "t": None}, today) is None               # unparseable date
 
 
 def test_every_migration_registers_itself():

@@ -874,3 +874,70 @@ def test_a_note_never_contradicts_itself_at_the_floor(caller):
         assert verdict == "inconclusive"
         assert "2.00%" not in note, f"{excess} rendered as 2.00% beside a 2% floor: {note}"
         assert "noise floor" in note
+
+
+def test_a_thin_name_with_no_trade_on_the_entry_session_rolls_forward_and_scores(caller, monkeypatch):
+    """The free Alpaca tier serves the IEX feed, and IEX does not print every symbol every day.
+
+    So a thinly traded name has HOLES in its series — days the market was open and this symbol
+    simply did not trade there. That is not the same shape as a feed that has stopped, and it must
+    not be treated like one: the series continues past the horizon, so an honest verdict exists.
+
+    `entry_day_after` and `exit_day_for` read the SYMBOL'S OWN sessions (`_first_gt` / `_first_ge`),
+    not the market calendar, so a hole rolls forward to the next session the symbol actually has.
+    This pins that, because the obvious alternative implementation — index into the benchmark's
+    calendar and look the symbol up — would return no price on exactly these names and seal or
+    hang every one of them.
+    """
+    caller_id, _handle, conn = caller
+    published_at = datetime.now(UTC) - timedelta(days=200)
+    published = calls.publish(caller_id, VALID, conn, now=published_at)
+
+    real = scoring._series
+    spy = real(conn, "SPY")
+    as_of = published_at.date()
+    after = [d for d in spy.days if d > as_of]
+    assert len(after) > 40, "the benchmark fixture must span the horizon"
+
+    # Punch out the first session after publication AND the session the 30-day horizon lands on,
+    # which are the two days the arithmetic reaches for by name.
+    horizon_day = as_of + timedelta(days=VALID["horizon_days"])
+    holes = {after[0], next(d for d in spy.days if d >= horizon_day)}
+    kept = [d for d in spy.days if d not in holes]
+    thin = Series(kept, {d: spy.close[d] for d in kept})
+    monkeypatch.setattr(scoring, "_series",
+                        lambda c, sym: thin if sym == VALID["symbol"] else real(c, sym))
+
+    out = scoring.resolve_call(published["id"], conn)
+    assert out.get("status") != "open", f"a name with holes must still resolve: {out}"
+    assert out["verdict"] in ("hit", "miss", "inconclusive"), out
+    assert out["verdict"] != "unscoreable", "a hole is not an absent series"
+    # And it entered on a day the symbol actually traded, not on the hole.
+    assert date.fromisoformat(str(out["entry_session"])) not in holes
+
+
+def test_a_thin_name_whose_series_ends_before_the_horizon_waits_and_never_seals(caller, monkeypatch):
+    """The other half of the same feed reality, asserted separately so a failure names which one.
+
+    A hole rolls forward; an END has nothing to roll to. That case must stay OPEN forever rather
+    than seal, because we cannot tell a delisting from a feed that has given up, and a sealed
+    verdict can never be corrected.
+    """
+    caller_id, _handle, conn = caller
+    published_at = datetime.now(UTC) - timedelta(days=200)
+    published = calls.publish(caller_id, VALID, conn, now=published_at)
+
+    real = scoring._series
+    spy = real(conn, "SPY")
+    as_of = published_at.date()
+    stops = as_of + timedelta(days=5)              # after entry, well before the 30-day horizon
+    kept = [d for d in spy.days if d <= stops]
+    assert kept and kept[-1] > as_of
+    ends = Series(kept, {d: spy.close[d] for d in kept})
+    monkeypatch.setattr(scoring, "_series",
+                        lambda c, sym: ends if sym == VALID["symbol"] else real(c, sym))
+
+    out = scoring.resolve_call(published["id"], conn)
+    assert out.get("status") == "open", out
+    assert out.get("open_reason_code") in (
+        "waiting_for_subject_price", "subject_series_ended"), out

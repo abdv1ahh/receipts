@@ -15,7 +15,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 import os
 import secrets
@@ -29,7 +28,6 @@ from .config import sec_user_agent
 from .ingestion import form13f, schedule13
 from .ingestion.edgar_client import EdgarClient
 from .ingestion.finra import FinraClient, ingest_short_interest
-from .ingestion.prices import TiingoClient, ingest_prices
 from .ingestion.prices_alpaca import AlpacaClient, ingest_prices_alpaca
 from .ingestion.runner import ingest_day as ingest_form4_day
 from .library import sync_library
@@ -159,44 +157,6 @@ def cmd_compute_signals(args) -> None:
             print(f"compute-signals: {counters}")
 
 
-def cmd_ingest_prices(args) -> None:
-    """The Tiingo FALLBACK path, reached as `ingest-prices-tiingo`.
-
-    Kept working and kept reachable, not deleted: it is the only second opinion on a price this
-    database has, and `compare-prices` measures Alpaca against the rows it wrote. One symbol per
-    request at ~50 requests/hour means it cannot complete a pass over the cluster universe — that
-    is why it is no longer what `ingest-prices` runs.
-    """
-    start = date.fromisoformat(args.start)
-    client = TiingoClient(os.environ.get("TIINGO_API_KEY", ""))
-    try:
-        with db.connect() as conn:
-            if args.only_stale:
-                # Default the cutoff to the freshest close anything has, so "stale" means "behind
-                # the rest of the table" without the operator having to look the date up.
-                if args.stale_before:
-                    cutoff = date.fromisoformat(args.stale_before)
-                else:
-                    with conn.cursor() as cur:
-                        cur.execute("SELECT max(day) FROM prices_eod")
-                        cutoff = cur.fetchone()[0]
-                symbols = backtest.symbols_stale(conn, cutoff) if cutoff else []
-            elif args.only_missing_history:
-                symbols = backtest.symbols_for_clusters_missing_history(conn, date.fromisoformat(args.history_before))
-            elif args.only_missing:
-                symbols = backtest.symbols_for_clusters_missing(conn)  # quota-efficient free-tier top-up
-            elif args.symbols_from_clusters:
-                symbols = backtest.symbols_for_clusters(conn)
-            else:
-                symbols = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
-            if args.limit:
-                symbols = symbols[: args.limit]  # bound a pass so free-tier 429s don't stall it
-            counters = ingest_prices(conn, client, symbols, start)
-        print(f"ingest-prices: {counters}")
-    finally:
-        client.close()
-
-
 def _price_worklist(conn, args) -> list[str]:
     """The symbols a price pass should fetch, in the order it should fetch them.
 
@@ -223,6 +183,31 @@ def _price_worklist(conn, args) -> list[str]:
     return [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
 
 
+def _universe_worklist(conn, client, only_new: bool) -> list[str]:
+    """Every tradable, non-OTC US equity and ETF Alpaca lists, oldest-data-first.
+
+    THE POINT OF THIS FUNCTION IS WHAT IT DOES NOT READ. Every other selector above starts from
+    `signal_clusters`, so the set of symbols anyone could publish a call on was decided by an
+    insider signal — 2,018 small-cap-skewed names. Measured 2026-09-22 against the list a person
+    actually reaches for, 18 of 21 were absent, including AAPL, NVDA, TSLA, GOOGL, AMZN, META and
+    QQQ. On a fresh clone the research tables do not exist at all, so a new instance had an empty
+    universe and nothing a caller could call. This asks the price vendor what exists instead.
+
+    Ordered by staleness, oldest first, for the reason `symbols_stale` is: a quota-limited pass
+    that ends early must leave the table evenly behind rather than alphabetically behind. SPY leads
+    regardless — it is the benchmark, and a stale SPY makes every other symbol unscoreable.
+    """
+    listed = client.assets()
+    with conn.cursor() as cur:
+        cur.execute("SELECT symbol, max(day) FROM prices_eod GROUP BY symbol")
+        held = dict(cur.fetchall())
+    if only_new:
+        return sorted(set(listed) - set(held))
+    # `date.min` sorts the never-fetched to the front, which is what a first run wants.
+    ordered = sorted(listed, key=lambda sym: (held.get(sym) or date.min, sym))
+    return backtest._spy_first(ordered)
+
+
 def cmd_ingest_prices_alpaca(args) -> None:
     """The default price path. Batched, so 500 symbols is five requests rather than 500."""
     start = date.fromisoformat(args.start)
@@ -230,71 +215,14 @@ def cmd_ingest_prices_alpaca(args) -> None:
     client = AlpacaClient(key_id, secret)
     try:
         with db.connect() as conn:
-            symbols = _price_worklist(conn, args)
+            if getattr(args, "universe", False):
+                symbols = _universe_worklist(conn, client, only_new=args.only_new)
+            else:
+                symbols = _price_worklist(conn, args)
             if args.limit:
                 symbols = symbols[: args.limit]
             counters = ingest_prices_alpaca(conn, client, symbols, start)
         print(f"ingest-prices-alpaca: {counters}")
-    finally:
-        client.close()
-
-
-def cmd_compare_prices(args) -> None:
-    """Measure Alpaca against the Tiingo series already in this database, before trusting it.
-
-    This exists because swapping a price source without measuring it would replace a known
-    limitation with an unknown one. The free Alpaca tier serves the IEX feed rather than the
-    consolidated tape (see `prices_alpaca` module docstring), so some divergence is EXPECTED; the
-    question is whether it is small enough to be irrelevant beside the 2% noise floor the scorer
-    already applies.
-
-    Reads Tiingo rows straight from `prices_eod` — no Tiingo API call and no quota spent — and
-    compares them day by day against a live Alpaca fetch over the same window.
-    """
-    symbols = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
-    start, end = date.fromisoformat(args.start), date.fromisoformat(args.end)
-    key_id, secret = config.alpaca_credentials()
-    client = AlpacaClient(key_id, secret)
-    try:
-        with db.connect() as conn:
-            alpaca = client.daily_batch(symbols, start, end)
-            rows, worst, diffs = [], None, []
-            for sym in symbols:
-                with conn.cursor() as cur:
-                    cur.execute(
-                        """SELECT day, close FROM prices_eod
-                            WHERE symbol = %s AND day BETWEEN %s AND %s AND source LIKE 'tiingo%%'
-                            ORDER BY day""",
-                        (sym, start, end))
-                    tiingo = {d: float(c) for d, c in cur.fetchall()}
-                alp = {}
-                for bar in alpaca.get(sym, []):
-                    raw = bar.get("t")
-                    if isinstance(raw, str) and bar.get("c"):
-                        alp[datetime.fromisoformat(raw.replace("Z", "+00:00")).date()] = float(bar["c"])
-                shared = sorted(set(tiingo) & set(alp))
-                exact = sum(1 for d in shared if tiingo[d] == alp[d])
-                per = [abs(alp[d] - tiingo[d]) / tiingo[d] * 100 for d in shared if tiingo[d]]
-                diffs.extend(per)
-                for d in shared:
-                    if tiingo[d]:
-                        pct = abs(alp[d] - tiingo[d]) / tiingo[d] * 100
-                        if worst is None or pct > worst[2]:
-                            worst = (sym, d, pct, tiingo[d], alp[d])
-                rows.append({"symbol": sym, "days": len(shared), "exact": exact,
-                             "mad_pct": (sum(per) / len(per)) if per else None,
-                             "tiingo_only": len(set(tiingo) - set(alp)),
-                             "alpaca_only": len(set(alp) - set(tiingo))})
-        overall = (sum(diffs) / len(diffs)) if diffs else None
-        print(json.dumps({"symbols": rows,
-                          "overall_mean_abs_pct_diff": overall,
-                          "total_days_compared": len(diffs),
-                          "worst": {"symbol": worst[0], "day": worst[1].isoformat(),
-                                    "pct": worst[2], "tiingo": worst[3], "alpaca": worst[4]}
-                                   if worst else None,
-                          "verdict": ("PASS" if overall is not None and overall <= 0.5 else
-                                      "FAIL - exceeds the 0.5% gate" if overall is not None else
-                                      "NO OVERLAP - nothing compared")}, indent=2, default=str))
     finally:
         client.close()
 
@@ -1060,27 +988,6 @@ def main() -> None:
 
     # Tiingo is the FALLBACK price path now. It keeps every flag it had; only the name moved,
     # so a muscle-memory `ingest-prices` reaches the source that can actually finish a pass.
-    ip = sub.add_parser("ingest-prices-tiingo",
-                        help="daily bars from Tiingo; FALLBACK — one symbol per request, "
-                             "~50 requests/hour, cannot finish a full pass")
-    ip.add_argument("--symbols-from-clusters", action="store_true", dest="symbols_from_clusters")
-    ip.add_argument("--only-missing", action="store_true", dest="only_missing",
-                    help="only fetch cluster symbols with no prices yet (spend free-tier quota wisely)")
-    ip.add_argument("--only-missing-history", action="store_true", dest="only_missing_history",
-                    help="only fetch cluster symbols lacking price history before --history-before "
-                         "(patient deep-history backfill; pair with --start 2024-04-01)")
-    ip.add_argument("--history-before", default="2026-01-02",
-                    help="cutoff date for --only-missing-history: symbols with no price row before this")
-    ip.add_argument("--only-stale", action="store_true", dest="only_stale",
-                    help="only fetch symbols ALREADY stored whose series stops before --stale-before "
-                         "(the top-up pass; SPY first, because a stale benchmark unscoreables "
-                         "everything)")
-    ip.add_argument("--stale-before", default="",
-                    help="cutoff for --only-stale; defaults to the freshest day any symbol has")
-    ip.add_argument("--limit", type=int, default=0, help="cap symbols fetched this pass (0 = no cap)")
-    ip.add_argument("--symbols", default="", help="comma-separated symbols if not --symbols-from-clusters")
-    ip.add_argument("--start", default="2026-01-01")
-    ip.set_defaults(fn=cmd_ingest_prices)
 
     # THE default price path. `ingest-prices-alpaca` stays as an alias rather than being retired:
     # the Makefile, GO-LIVE.md and three docs name one or the other, and a command that silently
@@ -1104,14 +1011,13 @@ def main() -> None:
     ipa.add_argument("--limit", type=int, default=0, help="cap symbols fetched this pass (0 = no cap)")
     ipa.add_argument("--symbols", default="", help="comma-separated symbols if not --symbols-from-clusters")
     ipa.add_argument("--start", default="2026-01-01")
+    ipa.add_argument("--universe", action="store_true",
+                     help="every tradable non-OTC US equity and ETF Alpaca lists "
+                          "(no research table involved)")
+    ipa.add_argument("--only-new", action="store_true",
+                     help="with --universe, fetch only symbols not already in prices_eod")
     ipa.set_defaults(fn=cmd_ingest_prices_alpaca)
 
-    cp = sub.add_parser("compare-prices",
-                        help="measure Alpaca against the Tiingo rows already stored, before switching")
-    cp.add_argument("--symbols", required=True, help="comma-separated")
-    cp.add_argument("--start", default="2026-06-01")
-    cp.add_argument("--end", default="2026-09-01")
-    cp.set_defaults(fn=cmd_compare_prices)
 
     si = sub.add_parser("ingest-short-interest")
     si.add_argument("--start", default="2026-05-01")

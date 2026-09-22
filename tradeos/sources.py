@@ -150,16 +150,6 @@ CATALOG: list[dict] = [
         "feeds": [], "jobs": ["ingest_prices"],
     },
     {
-        "key": "tiingo", "label": "Tiingo (price fallback)", "kind": "market",
-        "powers": "end-of-day prices — FALLBACK only; Alpaca above is the price source",
-        "state": None, "env": ["TIINGO_API_KEY"], "signup_url": "https://www.tiingo.com/account/api/token",
-        "note": ("Kept as a fallback, not deleted, until Alpaca is proven against real data. "
-                 "Free tier is ~50 requests/hour and ONE symbol per request, which is why a "
-                 "500-symbol top-up could never finish and price staleness became "
-                 "alphabetically biased."),
-        "feeds": [], "jobs": [],
-    },
-    {
         "key": "reddit", "label": "Reddit", "kind": "social",
         "powers": "discussion volume AND sentiment — the only connected source that measures mood, "
                   "not just attention",
@@ -307,7 +297,6 @@ def _google_oauth_configured() -> bool:
 
 _DYNAMIC = {
     "alpaca": config.alpaca_configured,
-    "tiingo": lambda: bool(config.tiingo_configured()),
     "reddit": config.reddit_configured,
     "youtube": config.youtube_configured,
     "openfigi": lambda: bool(config.openfigi_configured()),

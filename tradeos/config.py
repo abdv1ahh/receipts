@@ -85,11 +85,6 @@ def youtube_configured() -> bool:
     return bool(os.environ.get("YOUTUBE_API_KEY"))
 
 
-def tiingo_configured() -> bool:
-    """End-of-day prices — how claim outcomes get scored. Free tier."""
-    return bool(os.environ.get("TIINGO_API_KEY"))
-
-
 def alpaca_configured() -> bool:
     """End-of-day prices via Alpaca — the replacement for Tiingo as the price source.
 

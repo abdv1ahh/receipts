@@ -20,7 +20,7 @@ engine that explains market consequences. The product brief is
 **RECEIPTS is now the product** (`tradeos/receipts/`, migration 034, added 2026-09-02). A public,
 permanent, chained record of market calls: a caller publishes a dated directional call BEFORE the
 outcome is known, it is sealed into a per-caller SHA256 hash chain, and a database trigger refuses
-every delete and every update to a sealed column. It resolves automatically against Tiingo prices,
+every delete and every update to a sealed column. It resolves automatically against Alpaca prices,
 benchmarked to SPY, with a 2% noise floor and a 25 call sample gate. Anyone can hit **Verify chain**
 and watch every hash recompute. Surfaces: `/board` (the landing route) `/record` `/publish`
 `/call` `/methodology`.
@@ -114,7 +114,7 @@ command also refuses to run when `COOKIE_SECURE=true` unless given `--i-know`.
 ### Tests
 
 ```bash
-make test     # 991 tests, ~5.3s. Offline except the DB-backed authz and Receipts integrity tests
+make test     # 990 tests, ~8.5s. Offline except the DB-backed authz and Receipts integrity tests
 make test-js  # the cross-language guard on the sealed wire format. Runs on the HOST, needs node
 make lint     # ruff; zero errors is the standard
 make dev      # reload-in-place stack; then `make web` for a UI change
@@ -162,8 +162,8 @@ All 44, checked against `--help` rather than remembered:
 are logged past) · **resolution** `sync-tickers`, `resolve-entities`, `resolve-cusips` ·
 **signals** `signals-register`, `compute-signals`, `run-backtest`, `calibration` ·
 **prices** `ingest-prices` (Alpaca, THE price path — batched, 500 symbols is 5 requests;
-`ingest-prices-alpaca` is kept as an alias), `ingest-prices-tiingo` (the fallback, one symbol per
-request, cannot finish a full pass), `compare-prices` ·
+`ingest-prices-alpaca` is kept as an alias). **`--universe` builds the ticker list from Alpaca's
+own asset endpoint and reads no research table** ·
 **other ingestion** `ingest-short-interest`, `ingest-sentiment`, `ingest-news`,
 `analyze-news`, `ingest-calendar`, `ingest-bluesky` · **spine and claims** `spine`, `reprocess`, `interpret`,
 `measure-claims`, `ledger`, `import-signals` · **seeds** `seed-admin`, `seed-demo`,
@@ -585,6 +585,22 @@ fastest:
    shares, bankruptcy `Q` tickers. IEX does not quote them. `--only-stale` re-selects them every
    run and can never fix them.
 
+0h5. **THE TICKER UNIVERSE IS ALPACA'S ASSET LIST, AND IT USED TO BE AN INSIDER SIGNAL.** Symbols
+   only ever entered `prices_eod` through `signal_clusters`, so the set of names anyone could
+   publish a call on was 2,018 small-cap-skewed tickers chosen by the convergence signal — and on a
+   FRESH CLONE the research tables do not exist at all, so a new instance had an empty universe and
+   nothing a caller could call. Measured 2026-09-22 against the names a person actually reaches
+   for: **18 of 21 absent**, including AAPL, NVDA, TSLA, GOOGL, AMZN, META and QQQ, while the
+   publish form's own placeholder said AAPL. A test asserted `not universe.holds(syms, "AAPL")` —
+   it pinned the defect as though it were the requirement.
+   `cli ingest-prices --universe` now reads **Alpaca's asset endpoint**, which is on the TRADING
+   api and specifically the **paper** host (`paper-api.alpaca.markets`; `api.alpaca.markets` answers
+   401 for a market-data key). Filter: active + tradable + not OTC, which is 13,170 of 14,357 — and
+   deliberately nothing about ticker morphology, because the empirical filter is better: a symbol
+   only enters the universe if Alpaca actually returns bars, and the universe IS `prices_eod`.
+   Measured: 12,270 of 13,170 had data, 2,801,311 rows over one year. A daily pass is ~48 batches
+   and ~156s at ~47 requests/minute against a 200/minute limit.
+
 0h. **Prices come from ALPACA now; the Tiingo ceiling is why.** Free Tiingo is ~57 unique
    symbols/HOUR, ~500/month, and ONE symbol per request, so a 500-symbol top-up could never
    finish: it died mid-alphabet every time and price staleness became alphabetically biased while
@@ -644,8 +660,7 @@ fastest:
 | Wikipedia pageviews | none | Attention | connected (noisy — see bugs) |
 | Hacker News | none | Attention | connected |
 | CoinGecko | none | Crypto | connected |
-| Alpaca Market Data | `ALPACA_API_KEY_ID` + `_SECRET_KEY` | EOD prices — **the price source**; batched, free IEX feed | connected |
-| Tiingo | `TIINGO_API_KEY` | EOD prices — FALLBACK only | connected |
+| Alpaca Market Data | `ALPACA_API_KEY_ID` + `_SECRET_KEY` | EOD prices — **the ONLY price source**, and the ticker universe; batched, free IEX feed | connected |
 | OpenFIGI | `OPENFIGI_API_KEY` | 13F CUSIP → ticker; unmapped holdings are invisible | connected |
 | Reddit | `REDDIT_CLIENT_ID` + `_SECRET` | Social sentiment | **not connected** |
 | YouTube | `YOUTUBE_API_KEY` | Social sentiment | not connected |

@@ -55,6 +55,36 @@ SOURCE = "alpaca:iex:adjusted"
 ALPACA_HOST = "data.alpaca.markets"
 ALPACA_BARS_URL = f"https://{ALPACA_HOST}/v2/stocks/bars"
 
+# THE ASSET LIST LIVES ON THE TRADING API, NOT THE DATA API, and specifically on the PAPER host.
+# Measured 2026-09-22 with this project's own keys: `paper-api` answers 200 with 14,357 active US
+# equity assets, and `api.alpaca.markets` answers 401 `request is not authorized` for the same
+# credentials. A market-data key is not a live-trading key, and the paper host serves the identical
+# asset universe — so this is the endpoint a self-hoster's free key can actually reach.
+ALPACA_TRADING_HOST = "paper-api.alpaca.markets"
+ALPACA_ASSETS_URL = f"https://{ALPACA_TRADING_HOST}/v2/assets"
+
+# THE UNIVERSE FILTER, and it is deliberately short.
+#
+# Before this, symbols only ever entered `prices_eod` through `signal_clusters` — so the universe
+# was 2,018 names derived from an insider signal and skewed to small caps, and on a FRESH CLONE
+# the insider tables do not exist at all, leaving a new instance with nothing anyone could call.
+# Measured 2026-09-22 against the list a caller actually reaches for: 18 of 21 absent, including
+# AAPL, NVDA, TSLA, GOOGL, AMZN, META and QQQ.
+#
+# Two rules, both about whether a price can be obtained at all rather than about quality:
+#
+#   tradable    878 of the 14,357 active assets are not tradable. Alpaca will not quote them.
+#   not OTC     a further 309. The free tier serves the IEX feed, and IEX does not quote OTC
+#               lines — the same class of name CLAUDE.md 0h4 measured as permanently frozen:
+#               warrants, units, preferreds, foreign OTC lines, bankruptcy Q tickers.
+#
+# 13,170 symbols survive. There is deliberately NO filter on ticker morphology (a trailing W, a
+# .PR suffix, a length ceiling): guessing a security's type from its ticker is how `GEF-B` became
+# a 400 that killed a batch of 100. The empirical filter is better anyway — a symbol only enters
+# the universe if Alpaca actually returns bars for it, because the universe IS `prices_eod`.
+# Nothing has to be predicted; the names with no data simply never land.
+_EXCLUDED_EXCHANGES = frozenset({"OTC"})
+
 # Symbols per request. Alpaca imposes no documented ceiling on the `symbols` list, but the request
 # is a GET and the whole list goes in the query string, so the real limit is URL length. 100
 # five-character symbols is well under any proxy's 8 KB line limit and turns 500 symbols into five
@@ -139,6 +169,33 @@ class AlpacaClient:
             if not token:
                 return out
             params["page_token"] = token
+
+    def assets(self) -> list[str]:
+        """Every symbol a call may be published on, from Alpaca's own asset list.
+
+        Returns sorted symbols, not records: the only thing this product needs to know about a
+        security is whether it can be priced, and that question is settled by whether bars come
+        back. See `_EXCLUDED_EXCHANGES` above for the filter and why it is only two rules.
+
+        One request, no pagination — the endpoint returns the whole list in a single response
+        (measured: 14,357 records, ~4 MB). The host allowlist is checked here the same way
+        `daily_batch` checks the bars host, because `follow_redirects` is False and an
+        `APCA-API-SECRET-KEY` header would otherwise be sent wherever a redirect pointed.
+        """
+        if urlparse(ALPACA_ASSETS_URL).hostname != ALPACA_TRADING_HOST:
+            raise ValueError("Alpaca trading host allowlist violation")
+        self._throttle()
+        resp = self._client.get(ALPACA_ASSETS_URL,
+                                params={"status": "active", "asset_class": "us_equity"})
+        resp.raise_for_status()
+        out = {
+            a["symbol"] for a in resp.json()
+            if a.get("tradable") and a.get("status") == "active"
+            and a.get("exchange") not in _EXCLUDED_EXCHANGES
+            and a.get("symbol")
+        }
+        log.info("alpaca assets: %d tradable, non-OTC US equities and ETFs", len(out))
+        return sorted(out)
 
     def close(self) -> None:
         self._client.close()
