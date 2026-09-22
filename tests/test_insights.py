@@ -99,41 +99,6 @@ def test_deterministic_report_is_guard_clean_and_honest():
 
 
 # ------------------------------------------------------------------ world context (Phase 6)
-
-def test_the_context_route_is_owner_only_not_merely_public_trade_only():
-    """The per-trade analysis route serves a PUBLISHED trade to any viewer. The context route must
-    not: the snapshot is ranked by the owner's personal relevance, so it leaks their country,
-    currency and watchlist. Publishing a trade is not consent to publish the frame you read the
-    world through — so this route checks ownership in the query, never `is_public`."""
-    import inspect
-    import re
-
-    from tradeos import app as app_module
-
-    src = inspect.getsource(app_module)
-    body = re.search(r"def trade_context\(.*?\n(?=@app\.)", src, re.S)
-    assert body, "trade_context route not found"
-    body = body.group(0)
-    assert "tos_session" in body, "trade_context does not read the session"
-    assert "AND user_id=%s" in body, "trade_context does not scope the lookup to the owner"
-    assert "is_public" not in body, "trade_context must not widen access to published trades"
-
-
-def test_a_capture_failure_can_never_lose_the_trade_the_user_just_wrote():
-    """World context is a nice-to-have wrapped around something that is not: the journal entry. If
-    the spine is empty or broken the capture is skipped and the interface says so — it must never
-    take the write down with it."""
-    import inspect
-
-    from tradeos import app as app_module
-
-    src = inspect.getsource(app_module.trade_create)
-    capture_at = src.index("journal_context.capture")
-    assert "try:" in src[:capture_at], "capture is not inside a try"
-    assert "conn.commit()" in src[:capture_at], "capture runs before the trade is committed"
-    assert "except Exception" in src[capture_at:], "a capture failure is not contained"
-
-
 def test_a_backfill_invalidates_the_cached_report():
     """Attaching context to old trades does not touch `trades.updated_at`, so a hash over the
     trades alone would serve a report with its behavioural patterns permanently missing."""

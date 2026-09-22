@@ -428,20 +428,6 @@ def test_the_window_buttons_are_a_grid_not_a_wrapping_flex():
     assert "grid-template-columns: repeat(3, minmax(0, 1fr))" in css
     block = css[css.index("PUBLISHING FROM A PHONE"):]
     assert "flex-wrap: nowrap" in block
-
-
-@_frontend
-def test_the_radar_onboarding_card_is_off_the_receipts_surfaces():
-    """Measured at 375px: the card filled the entire first viewport of /publish and /record -- a
-    country selector and a currency field, above the fold, on the two screens whose job is
-    publish-a-call and check-my-record."""
-    src = _read("App.jsx")
-    assert "ONBOARDING_SUPPRESSED" in src
-    for view in ("publish", "record", "board", "auth"):
-        assert f'"{view}"' in src[src.index("ONBOARDING_SUPPRESSED"):
-                                  src.index("ONBOARDING_SUPPRESSED") + 260]
-
-
 @_frontend
 def test_an_open_call_shows_why_it_is_open_and_when_we_last_looked():
     """Part A stored the reason (migration 036) so this could exist. A call past its horizon with

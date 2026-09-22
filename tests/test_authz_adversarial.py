@@ -1,15 +1,29 @@
-"""Adversarial authorization: two real accounts, one actually trying to read the other's data.
+"""Adversarial authorization: two real accounts, one actually trying to reach the other's things.
 
 **These are the only tests in the suite that touch a database.** Everything else is pure and
-offline, and that is worth protecting — but the brief asks for authorization "tested adversarially
-with automated tests", and a static check that a route mentions `user_id` is not adversarial. It
-asserts the shape of the code, not the behaviour of the system. The two disagree exactly when it
+offline, and that is worth protecting — but a static check that a route mentions `user_id` asserts
+the shape of the code, not the behaviour of the system, and the two disagree exactly when it
 matters: when a guard exists, looks right, and is bypassable.
 
 So this file signs in as Mallory and asks for Alice's things. No network is involved — the database
 is the local container the rest of `make test` already depends on — and the whole file skips
-cleanly when no database is reachable, so it cannot turn a green suite red on a machine that
-deliberately has none.
+cleanly when no database is reachable.
+
+WHAT CHANGED WHEN THE RESEARCH PLANE WENT. The old file attacked trades, portfolios, watchlists,
+the journal report, follows and notifications, because that was where the private data was. None of
+those routes exists now. What is left is a product whose public surface is public ON PURPOSE, which
+makes the boundary a different shape and, in one respect, a sharper one:
+
+  what must stay PUBLIC    the board, a record, a chain, a card, /r/{handle}. A stranger has to be
+                           able to check a caller without an account. Requiring one would be the
+                           first thing taken on trust, which is the thing this product argues
+                           against. A regression here is a guard added by mistake.
+  what must stay PRIVATE   an account's own identity, another caller's publishing rights, and the
+                           admin verification queue.
+  what must stay IMPOSSIBLE  publishing into a chain that is not yours. This is the one that
+                           cannot be undone: a call is sealed on write and a verdict is permanent,
+                           so a caller_id a stranger can choose is not a data leak, it is a forged
+                           entry in somebody else's permanent public record.
 
 Every account and row it creates is removed in the fixture teardown.
 """
@@ -23,6 +37,7 @@ try:
     from fastapi.testclient import TestClient
 
     from tradeos import authn, db
+    from tradeos.receipts import calls as receipts_calls
     _IMPORTS_OK = True
 except Exception:                                             # pragma: no cover
     _IMPORTS_OK = False
@@ -55,9 +70,6 @@ class _Actor:
     def post(self, path, json=None):
         return self.client.post(path, json=json or {})
 
-    def patch(self, path, json=None):
-        return self.client.patch(path, json=json or {})
-
     def delete(self, path):
         return self.client.delete(path)
 
@@ -79,32 +91,39 @@ def _make_actor(app, conn) -> _Actor:
 
 @pytest.fixture(scope="module")
 def actors():
-    """Alice owns things. Mallory tries to read them. Both are torn down."""
+    """Alice holds a handle and has published. Mallory tries to publish into it. Both torn down."""
     from tradeos.app import app
 
     with db.connect() as conn:
         alice, mallory = _make_actor(app, conn), _make_actor(app, conn)
-        # Alice's private objects, created through the API so they are exactly what a real user has.
-        r = alice.post("/api/trades", {"symbol": "SECRET", "direction": "long", "status": "open",
-                                       "entry_price": 100, "stop_price": 90, "target_price": 130,
-                                       "reason_entry": "alice private note", "is_public": False})
-        alice_trade = r.json().get("id")
-        r = alice.post("/api/portfolios", {"name": "Alice private", "kind": "manual"})
-        alice_portfolio = r.json().get("id")
-        alice.post("/api/watchlist/ALICEONLY")
-
-        yield {"alice": alice, "mallory": mallory,
-               "trade": alice_trade, "portfolio": alice_portfolio}
-
+        handle = f"authz-{secrets.token_hex(6)}"
         with conn.cursor() as cur:
+            cur.execute("""INSERT INTO callers (handle, display_name, kind, user_id,
+                                                jurisdiction_attested)
+                           VALUES (%s, 'Alice', 'human', %s, true) RETURNING id""",
+                        (handle, alice.uid))
+            caller_id = cur.fetchone()[0]
+        conn.commit()
+        call = receipts_calls.publish(caller_id, {
+            "symbol": "ABT", "direction": "up", "horizon_days": 7, "confidence": "low",
+            "thesis": "a thesis long enough to be worth holding somebody to, forty plus characters",
+        }, conn)
+
+        yield {"alice": alice, "mallory": mallory, "caller_id": caller_id,
+               "handle": handle, "call_id": call["id"]}
+
+        conn.rollback()
+        with conn.cursor() as cur:
+            cur.execute("ALTER TABLE calls DISABLE TRIGGER calls_append_only_trg")
+            cur.execute("DELETE FROM calls WHERE caller_id = %s", (caller_id,))
+            cur.execute("ALTER TABLE calls ENABLE TRIGGER calls_append_only_trg")
+            cur.execute("DELETE FROM callers WHERE id = %s", (caller_id,))
             for uid in (alice.uid, mallory.uid):
                 # Neither `sessions.user_id` nor `invites.used_by` cascades, so both references go
-                # first. The invite one was missing: registering redeems an invite, so a torn-down
-                # user left an invites row pointing at it and the DELETE aborted the whole
-                # transaction — leaving the accounts behind. Three of them were found still sitting
-                # in the demo database days later.
+                # first. The invite one was missing once: a torn-down user left an invites row
+                # pointing at it and the DELETE aborted the whole transaction, leaving the accounts
+                # behind. Three of them were found still sitting in the demo database days later.
                 cur.execute("UPDATE invites SET used_by = NULL WHERE used_by = %s", (uid,))
-                cur.execute("DELETE FROM trades WHERE user_id = %s", (uid,))
                 cur.execute("DELETE FROM sessions WHERE user_id = %s", (uid,))
                 cur.execute("DELETE FROM users WHERE id = %s", (uid,))
         conn.commit()
@@ -124,131 +143,61 @@ def _denied(resp) -> bool:
     return body.get("found") is False or body.get("authenticated") is False or "error" in body
 
 
-# ------------------------------------------------------------------ the attempts
+# ------------------------------------------------------------------ the attempt that cannot be undone
 
-def test_setup_actually_created_alices_objects(actors):
+def test_setup_actually_created_alices_record(actors):
     """If this fails the rest of the file is vacuously green, which is the failure mode of every
     negative test suite ever written."""
-    assert actors["trade"], "Alice's trade was not created"
-    assert actors["portfolio"], "Alice's portfolio was not created"
-    own = actors["alice"].get(f"/api/trades/{actors['trade']}").json()
-    assert own["found"] is True and own["owner"] is True
+    assert actors["call_id"], "Alice's call was not published"
+    r = actors["alice"].get("/api/callers/me")
+    assert r.status_code == 200 and r.json()["caller"]["handle"] == actors["handle"]
 
 
-def test_mallory_cannot_read_alices_private_trade(actors):
-    r = actors["mallory"].get(f"/api/trades/{actors['trade']}")
-    assert _denied(r), r.text
-    assert "alice private note" not in r.text
+def test_mallory_cannot_publish_into_alices_chain(actors):
+    """THE one that cannot be taken back. A call is sealed on write and its verdict is permanent,
+    so a caller_id a stranger can choose is not a data leak — it is a forged entry in somebody
+    else's permanent public record, and no correction exists.
 
-
-def test_mallory_cannot_read_the_world_context_of_alices_trade(actors):
-    """Stricter than the trade itself: the snapshot is ranked by the owner's personal relevance, so
-    it discloses their country, currency and watchlist."""
-    r = actors["mallory"].get(f"/api/trades/{actors['trade']}/context")
-    assert _denied(r), r.text
-
-
-def test_mallory_cannot_read_the_ai_analysis_of_alices_private_trade(actors):
-    r = actors["mallory"].get(f"/api/trades/{actors['trade']}/analysis")
+    The route derives the caller from the SESSION and takes no caller_id from the body. This sends
+    one anyway, which `calls.validate` refuses outright as an unknown field rather than ignoring:
+    a field silently dropped is a caller believing they said something they did not say.
+    """
+    r = actors["mallory"].post("/api/calls", {
+        "caller_id": actors["caller_id"], "symbol": "ABT", "direction": "down",
+        "horizon_days": 7, "confidence": "high",
+        "thesis": "a forged call published into a record that belongs to somebody else entirely"})
     assert _denied(r), r.text
 
+    with db.connect() as conn, conn.cursor() as cur:
+        cur.execute("SELECT count(*) FROM calls WHERE caller_id = %s", (actors["caller_id"],))
+        assert cur.fetchone()[0] == 1, "Mallory published into Alice's chain"
 
-def test_mallory_cannot_read_the_chart_image_of_alices_trade(actors):
-    r = actors["mallory"].get(f"/api/trades/{actors['trade']}/image")
-    assert r.status_code != 200 or not r.content, r.status_code
 
-
-def test_mallory_cannot_edit_alices_trade(actors):
-    r = actors["mallory"].patch(f"/api/trades/{actors['trade']}", {"symbol": "PWNED", "direction": "long"})
+def test_mallory_cannot_claim_a_handle_that_is_taken(actors):
+    r = actors["mallory"].post("/api/callers", {
+        "handle": actors["handle"], "display_name": "Not Alice", "kind": "human",
+        "jurisdiction_attested": True})
     assert _denied(r), r.text
-    still = actors["alice"].get(f"/api/trades/{actors['trade']}").json()
-    assert still["trade"]["symbol"] == "SECRET", "Mallory modified Alice's trade"
+    with db.connect() as conn, conn.cursor() as cur:
+        cur.execute("SELECT user_id FROM callers WHERE handle = %s", (actors["handle"],))
+        assert cur.fetchone()[0] == actors["alice"].uid, "the handle changed hands"
 
 
-def test_mallory_cannot_delete_alices_trade(actors):
-    r = actors["mallory"].delete(f"/api/trades/{actors['trade']}")
-    assert _denied(r), r.text
-    assert actors["alice"].get(f"/api/trades/{actors['trade']}").json()["found"] is True
+def test_my_caller_is_the_callers_own(actors):
+    """`/api/callers/me` resolves through the session. Mallory holds no handle and must be told
+    that, not handed Alice's."""
+    r = actors["mallory"].get("/api/callers/me")
+    assert actors["handle"] not in r.text
+    assert r.status_code != 200 or not r.json().get("caller")
 
 
-def test_mallorys_similar_trades_never_reach_alices_journal(actors):
-    """The cohort finder searches a journal. It must search the CALLER's, never the owner's."""
-    r = actors["mallory"].get(f"/api/trades/{actors['trade']}/similar")
-    assert _denied(r) or "SECRET" not in r.text, r.text
-
-
-def test_mallory_cannot_read_alices_portfolio(actors):
-    r = actors["mallory"].get(f"/api/portfolios/{actors['portfolio']}")
-    assert _denied(r), r.text
-    assert "Alice private" not in r.text
-
-
-def test_mallory_cannot_delete_alices_portfolio(actors):
-    """Asserted on the EFFECT, not the response. This route answers `{"removed": false}` with a
-    200 — correct, and identical to what a nonexistent id returns, which is the right amount to
-    tell a stranger. The first version of this test read that as a success and failed; the object
-    surviving is the property that actually matters."""
-    actors["mallory"].delete(f"/api/portfolios/{actors['portfolio']}")
-    survived = actors["alice"].get(f"/api/portfolios/{actors['portfolio']}")
-    assert survived.status_code == 200 and "Alice private" in survived.text, \
-        "Mallory deleted Alice's portfolio"
-
-
-def test_watchlists_are_not_shared(actors):
-    """B-22 was exactly this: one shared list addressable by a query parameter."""
-    r = actors["mallory"].get("/api/watchlist")
-    assert "ALICEONLY" not in r.text, "Mallory sees Alice's watchlist"
-
-
-def test_the_journal_report_is_computed_over_the_callers_own_journal(actors):
-    r = actors["mallory"].get("/api/journal/report")
-    assert "SECRET" not in r.text
-    assert r.json().get("report", {}).get("n_total", 0) == 0, "Mallory's report counted Alice's trades"
-
-
-def test_performance_is_the_callers_own(actors):
-    r = actors["mallory"].get("/api/performance")
-    assert r.json().get("total", 0) == 0, "Mallory's performance counted Alice's trades"
-
-
-def test_an_anonymous_caller_gets_none_of_it(actors):
-    """No cookie at all — the case that matters most, and the one a logged-in developer never
-    exercises by hand."""
-    from tradeos.app import app
-
-    anon = TestClient(app)
-    for path in (f"/api/trades/{actors['trade']}",
-                 f"/api/trades/{actors['trade']}/context",
-                 f"/api/trades/{actors['trade']}/analysis",
-                 f"/api/portfolios/{actors['portfolio']}",
-                 "/api/watchlist", "/api/journal/report", "/api/performance",
-                 "/api/follows", "/api/notifications", "/api/alert-prefs"):
-        r = anon.get(path)
-        assert _denied(r), f"anonymous read succeeded on {path}: {r.text[:200]}"
-
-
-def test_a_non_admin_cannot_reach_the_admin_surface(actors):
+def test_a_non_admin_cannot_reach_the_verification_queue(actors):
     """`_require_admin` returns the USER on success and None on failure — getting that backwards
     serves admin data to everyone, silently. It has happened once in this project."""
-    for path in ("/api/admin/users", "/api/admin/watchlist-accounts", "/api/admin/audit",
-                 "/api/admin/reports", "/api/admin/flags"):
-        r = actors["mallory"].get(path)
-        assert _denied(r), f"non-admin reached {path}: {r.text[:200]}"
-
-
-def test_the_public_surface_leaks_nothing_user_scoped(actors):
-    """These answer anyone. Nothing a signed-in user owns may appear in them."""
-    from tradeos.app import app
-
-    anon = TestClient(app)
-    for path in ("/api/public/live", "/api/public/walkthrough", "/api/public/frame?country=AE",
-                 "/api/ledger"):
-        r = anon.get(path)
-        assert r.status_code in (200, 429), f"{path} -> {r.status_code}"
-        if r.status_code == 200:
-            assert "SECRET" not in r.text and "ALICEONLY" not in r.text
-            assert "alice private note" not in r.text
-            assert "@test.invalid" not in r.text
+    r = actors["mallory"].get("/api/admin/callers/pending")
+    assert _denied(r), r.text
+    r = actors["mallory"].post("/api/admin/callers/1/verify", {"decision": "verified"})
+    assert _denied(r), r.text
 
 
 def test_a_forged_session_cookie_is_rejected(actors):
@@ -257,5 +206,41 @@ def test_a_forged_session_cookie_is_rejected(actors):
 
     forged = TestClient(app)
     forged.cookies.set("tos_session", secrets.token_urlsafe(32))
-    assert _denied(forged.get("/api/journal/report"))
     assert forged.get("/api/auth/me").json().get("user") is None
+    assert _denied(forged.get("/api/callers/me"))
+    assert _denied(forged.post("/api/calls", json={
+        "symbol": "ABT", "direction": "up", "horizon_days": 7, "confidence": "low",
+        "thesis": "a call published on a session token that was never issued by this server"}))
+
+
+# ------------------------------------------------------------------ and what must stay open
+
+def test_the_record_answers_a_stranger_with_no_account(actors):
+    """A guard added here would be a regression, not a fix. The product's argument is that a reader
+    can check a caller without taking anything on trust, and an account with us would be the first
+    thing taken on trust. Every one of these must answer a client holding no cookie at all."""
+    from tradeos.app import app
+
+    anon = TestClient(app)
+    for path in ("/api/board",
+                 f"/api/receipts/{actors['handle']}",
+                 f"/api/receipts/{actors['handle']}/chain",
+                 f"/api/receipts/{actors['handle']}/verify",
+                 f"/api/calls/{actors['call_id']}",
+                 "/api/receipts/methodology",
+                 f"/r/{actors['handle']}",
+                 f"/api/card/receipt/{actors['handle']}.svg"):
+        r = anon.get(path)
+        assert r.status_code in (200, 429), f"{path} refused a stranger: {r.status_code}"
+
+
+def test_no_public_surface_discloses_an_account_address(actors):
+    """A handle is public and an email address is not. They are joined one table apart."""
+    from tradeos.app import app
+
+    anon = TestClient(app)
+    for path in ("/api/board", f"/api/receipts/{actors['handle']}",
+                 f"/api/calls/{actors['call_id']}", f"/r/{actors['handle']}"):
+        r = anon.get(path)
+        if r.status_code == 200:
+            assert "@test.invalid" not in r.text, f"{path} leaked an account address"

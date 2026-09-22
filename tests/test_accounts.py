@@ -30,20 +30,6 @@ def test_exposure_is_paid_and_the_ledger_is_not():
 def test_an_unknown_tier_falls_back_to_the_least_privilege():
     assert billing.entitlements("enterprise") == billing.ENTITLEMENTS["free"]
     assert billing.entitlements(None) == billing.ENTITLEMENTS["free"]
-
-
-def test_the_exposure_gate_is_enforced_in_the_route_not_the_client():
-    from tradeos import app as app_module
-
-    src = inspect.getsource(app_module.exposure_view)
-    assert 'entitlements(user["tier"])["exposure"]' in src
-    # And it explains itself rather than returning a bare 403 — a locked feature that says nothing
-    # is indistinguishable from a broken one.
-    assert '"locked": True' in src and '"what"' in src
-
-
-# ------------------------------------------------------------------ first-run setup
-
 def test_symbols_are_cleaned_deduplicated_and_capped():
     out = onboarding._clean_symbols(["  pbr ", "VALE", "vale", "", None, "toolongsymbolname"])
     assert out == ["PBR", "VALE", "TOOLONGSYMBO"]       # upper, deduped, trimmed to 12
