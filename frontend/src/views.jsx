@@ -46,9 +46,13 @@ export function AuthPanel({ onAuthed, onBack, initialInvite }) {
       <button className="back" onClick={onBack}>← back</button>
       <h2>{mode === "login" ? "Log in" : "Create account"}</h2>
       <div className="meta">
+        {/* The tiers and the delayed signal feed both went with the research plane. This line
+            still advertised them, which the ten-minute test caught on the first screen a stranger
+            reaches: an account buys exactly one thing here and saying so is more use than a
+            price list for a product that does not exist. */}
         {mode === "register" && reg
-          ? `${reg.note} Free tier sees signals on a 48-hour delay; paid tiers see them live.`
-          : "Free tier sees signals on a 48-hour delay; paid tiers see them live."}
+          ? `${reg.note} An account lets you claim a handle and publish. Reading every record is free and needs no account.`
+          : "Reading every record is free and needs no account. An account is for publishing."}
       </div>
       {initialInvite && mode === "register" && <div className="warn" style={{ borderColor: "#2f4a2f", color: "var(--green)", background: "#0f2417" }}>You were referred — register to start a 14-day Pro trial free.</div>}
       <div className="auth-form">

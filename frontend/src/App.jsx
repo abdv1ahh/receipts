@@ -72,7 +72,15 @@ export default function App() {
     setCallId(route.query.get("id") || null);
   }, [route.path, route.query.toString()]);
 
-  useEffect(() => { document.title = `${NAV_LABELS[view] || BRAND} · ${BRAND}`; }, [view]);
+  // Surfaces that are addressable but not on the rail have no NAV_LABELS entry, so this used to
+  // fall back to the brand and render "Receipts · Receipts" in the tab. Caught on /auth, which is
+  // the first screen a stranger who wants to publish ever sees.
+  const TITLES = { auth: "Sign in", claim: "Claim a handle", call: "One call",
+                   verify: "Confirm your email", reset: "Reset your password" };
+  useEffect(() => {
+    const name = NAV_LABELS[view] || TITLES[view];
+    document.title = name ? `${name} · ${BRAND}` : BRAND;
+  }, [view]);
 
   // One place that changes the surface, so the URL and the rendered view can never disagree.
   const setView = (v, query) => { setViewState(v); route.go(v, query); };
