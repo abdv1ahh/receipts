@@ -229,18 +229,18 @@ def test_a_publish_freezes_the_world_context(caller):
 
 # ================================================================== scoring
 
-def test_entry_is_the_session_after_publication_never_the_one_in_progress(caller):
+def test_entry_is_the_session_after_publication_never_the_one_in_progress(caller, synthetic_market):
     """The single easiest way to flatter a record is to enter at the close of the day the call was
     made, when most of that move has already happened."""
     caller_id, _handle, conn = caller
-    published_at = datetime.now(UTC) - timedelta(days=200)
+    published_at = synthetic_market.published_at
     published = calls.publish(caller_id, VALID, conn, now=published_at)
     scoring.resolve_call(published["id"], conn)
     row = calls.get(published["id"], conn)
     assert row["entry_session"] > published_at.date().isoformat()
 
 
-def test_the_stored_arithmetic_reconciles(caller):
+def test_the_stored_arithmetic_reconciles(caller, synthetic_market):
     """The components have to actually produce the stored excess return.
 
     READ FROM THE DATABASE, not from `calls.get`. The six component columns are no longer in any
@@ -250,7 +250,7 @@ def test_the_stored_arithmetic_reconciles(caller):
     challenge to, and this test is the operator making that check.
     """
     caller_id, _handle, conn = caller
-    published = calls.publish(caller_id, VALID, conn, now=datetime.now(UTC) - timedelta(days=200))
+    published = calls.publish(caller_id, VALID, conn, now=synthetic_market.published_at)
     scoring.resolve_call(published["id"], conn)
 
     with conn.cursor() as cur:
@@ -266,12 +266,12 @@ def test_the_stored_arithmetic_reconciles(caller):
     assert excess == pytest.approx(sub - bench, abs=1e-5)
 
 
-def test_the_components_that_arithmetic_used_never_reach_the_payload(caller):
+def test_the_components_that_arithmetic_used_never_reach_the_payload(caller, synthetic_market):
     """The same call, from the reader's side. The numbers above are real, stored and sealed; none
     of them may be served. `tests/test_price_redistribution.py` sweeps the whole app for this —
     here it is pinned at the one function every Receipts surface reads its calls through."""
     caller_id, _handle, conn = caller
-    published = calls.publish(caller_id, VALID, conn, now=datetime.now(UTC) - timedelta(days=200))
+    published = calls.publish(caller_id, VALID, conn, now=synthetic_market.published_at)
     scoring.resolve_call(published["id"], conn)
     r = calls.get(published["id"], conn)
 
@@ -301,11 +301,11 @@ def test_every_verdict_carries_a_reason_a_reader_can_check():
         assert reason and len(reason) > 20
 
 
-def test_resolving_writes_only_resolution_columns(caller):
+def test_resolving_writes_only_resolution_columns(caller, synthetic_market):
     """If the scorer ever touched a sealed column the database would refuse it, which is why both
     the trigger and this test exist rather than only one of them."""
     caller_id, _handle, conn = caller
-    published = calls.publish(caller_id, VALID, conn, now=datetime.now(UTC) - timedelta(days=200))
+    published = calls.publish(caller_id, VALID, conn, now=synthetic_market.published_at)
     before = calls.get(published["id"], conn)
     scoring.resolve_call(published["id"], conn)
     after = calls.get(published["id"], conn)
@@ -314,9 +314,9 @@ def test_resolving_writes_only_resolution_columns(caller):
     assert after["verdict"] is not None
 
 
-def test_an_already_resolved_call_is_skipped_rather_than_rescored(caller):
+def test_an_already_resolved_call_is_skipped_rather_than_rescored(caller, synthetic_market):
     caller_id, _handle, conn = caller
-    published = calls.publish(caller_id, VALID, conn, now=datetime.now(UTC) - timedelta(days=200))
+    published = calls.publish(caller_id, VALID, conn, now=synthetic_market.published_at)
     scoring.resolve_call(published["id"], conn)
     again = scoring.resolve_call(published["id"], conn)
     assert again["skipped"] == "already resolved"
@@ -505,13 +505,17 @@ def test_a_user_can_hold_only_one_caller(caller):
     guard and inserted under different handles, so UNIQUE (handle) did not catch it, and the user
     ended up with two records that `_caller_for_user` returned interchangeably."""
     caller_id, _handle, conn = caller
+    # ITS OWN USER, not whichever row `SELECT id FROM users LIMIT 1` happened to return. That was a
+    # skip on any database with no accounts in it — so on every fresh clone this invariant, which
+    # exists because two concurrent posts really did give one user two records, was never checked
+    # at all. Borrowing a stranger's account row to test a UNIQUE constraint was also the wrong
+    # shape: the test writes to `callers.user_id` and a failure mid-way left that pointing at a
+    # real person's account.
     with conn.cursor() as cur:
-        cur.execute("SELECT id FROM users LIMIT 1")
-        row = cur.fetchone()
-    if not row:
-        pytest.skip("no users in this database")
-    user_id = row[0]
-    with conn.cursor() as cur:
+        cur.execute("""INSERT INTO users (email, password_hash)
+                       VALUES (%s, 'not-a-hash-this-row-never-authenticates') RETURNING id""",
+                    (f"one-caller-{secrets.token_hex(6)}@example.invalid",))
+        user_id = cur.fetchone()[0]
         cur.execute("UPDATE callers SET user_id = %s WHERE id = %s", (user_id, caller_id))
     conn.commit()
     try:
@@ -525,12 +529,13 @@ def test_a_user_can_hold_only_one_caller(caller):
     finally:
         with conn.cursor() as cur:
             cur.execute("UPDATE callers SET user_id = NULL WHERE id = %s", (caller_id,))
+            cur.execute("DELETE FROM users WHERE id = %s", (user_id,))
         conn.commit()
 
 
 # ================================================================== a missing exit price stays open
 
-def test_a_symbol_whose_feed_is_behind_is_never_sealed_unscoreable(caller, monkeypatch):
+def test_a_symbol_whose_feed_is_behind_is_never_sealed_unscoreable(caller, synthetic_market):
     """The most dangerous mistake available in this module, and one an earlier version of it made.
 
     A symbol lagging the benchmark is the ROUTINE state of this price table: the free tier paces at
@@ -539,20 +544,16 @@ def test_a_symbol_whose_feed_is_behind_is_never_sealed_unscoreable(caller, monke
     uncorrectable verdict on ordinary calls an hour before their prices arrived.
     """
     caller_id, _handle, conn = caller
-    published_at = datetime.now(UTC) - timedelta(days=200)
+    published_at = synthetic_market.published_at
     published = calls.publish(caller_id, VALID, conn, now=published_at)
 
     # A symbol series that stops AFTER entry but BEFORE the horizon closes, against a full
     # benchmark. That is exactly the shape a lagging feed has at the moment the scorer looks: an
     # entry price exists, an exit price does not yet, and the benchmark has both.
-    real = scoring._series
-    spy = real(conn, "SPY")
     stops = published_at.date() + timedelta(days=10)          # entry + 1, horizon is 30
-    cut = [d for d in spy.days if d <= stops]
-    short = Series(cut, {d: spy.close[d] for d in cut})
+    cut = [d for d in synthetic_market.spy.days if d <= stops]
     assert cut and cut[-1] > published_at.date(), "the fixture must still supply an entry price"
-    monkeypatch.setattr(scoring, "_series",
-                        lambda c, sym: short if sym == VALID["symbol"] else real(c, sym))
+    synthetic_market.use_subject(synthetic_market.series_of(cut))
 
     out = scoring.resolve_call(published["id"], conn)
     assert out.get("status") == "open", out
@@ -934,7 +935,7 @@ def test_a_note_never_contradicts_itself_at_the_floor(caller):
         assert "noise floor" in note
 
 
-def test_a_thin_name_with_no_trade_on_the_entry_session_rolls_forward_and_scores(caller, monkeypatch):
+def test_a_thin_name_with_no_trade_on_the_entry_session_rolls_forward_and_scores(caller, synthetic_market):
     """The free Alpaca tier serves the IEX feed, and IEX does not print every symbol every day.
 
     So a thinly traded name has HOLES in its series — days the market was open and this symbol
@@ -948,11 +949,10 @@ def test_a_thin_name_with_no_trade_on_the_entry_session_rolls_forward_and_scores
     hang every one of them.
     """
     caller_id, _handle, conn = caller
-    published_at = datetime.now(UTC) - timedelta(days=200)
+    published_at = synthetic_market.published_at
     published = calls.publish(caller_id, VALID, conn, now=published_at)
 
-    real = scoring._series
-    spy = real(conn, "SPY")
+    spy = synthetic_market.spy
     as_of = published_at.date()
     after = [d for d in spy.days if d > as_of]
     assert len(after) > 40, "the benchmark fixture must span the horizon"
@@ -962,9 +962,7 @@ def test_a_thin_name_with_no_trade_on_the_entry_session_rolls_forward_and_scores
     horizon_day = as_of + timedelta(days=VALID["horizon_days"])
     holes = {after[0], next(d for d in spy.days if d >= horizon_day)}
     kept = [d for d in spy.days if d not in holes]
-    thin = Series(kept, {d: spy.close[d] for d in kept})
-    monkeypatch.setattr(scoring, "_series",
-                        lambda c, sym: thin if sym == VALID["symbol"] else real(c, sym))
+    synthetic_market.use_subject(synthetic_market.series_of(kept))
 
     out = scoring.resolve_call(published["id"], conn)
     assert out.get("status") != "open", f"a name with holes must still resolve: {out}"
@@ -974,7 +972,7 @@ def test_a_thin_name_with_no_trade_on_the_entry_session_rolls_forward_and_scores
     assert date.fromisoformat(str(out["entry_session"])) not in holes
 
 
-def test_a_thin_name_whose_series_ends_before_the_horizon_waits_and_never_seals(caller, monkeypatch):
+def test_a_thin_name_whose_series_ends_before_the_horizon_waits_and_never_seals(caller, synthetic_market):
     """The other half of the same feed reality, asserted separately so a failure names which one.
 
     A hole rolls forward; an END has nothing to roll to. That case must stay OPEN forever rather
@@ -982,18 +980,14 @@ def test_a_thin_name_whose_series_ends_before_the_horizon_waits_and_never_seals(
     verdict can never be corrected.
     """
     caller_id, _handle, conn = caller
-    published_at = datetime.now(UTC) - timedelta(days=200)
+    published_at = synthetic_market.published_at
     published = calls.publish(caller_id, VALID, conn, now=published_at)
 
-    real = scoring._series
-    spy = real(conn, "SPY")
     as_of = published_at.date()
     stops = as_of + timedelta(days=5)              # after entry, well before the 30-day horizon
-    kept = [d for d in spy.days if d <= stops]
+    kept = [d for d in synthetic_market.spy.days if d <= stops]
     assert kept and kept[-1] > as_of
-    ends = Series(kept, {d: spy.close[d] for d in kept})
-    monkeypatch.setattr(scoring, "_series",
-                        lambda c, sym: ends if sym == VALID["symbol"] else real(c, sym))
+    synthetic_market.use_subject(synthetic_market.series_of(kept))
 
     out = scoring.resolve_call(published["id"], conn)
     assert out.get("status") == "open", out
