@@ -67,7 +67,11 @@ def scratch():
                     cur.execute("DELETE FROM callers WHERE id = %s", (cid,))
                 cur.execute("DELETE FROM sessions WHERE user_id = %s", (uid,))
                 cur.execute("DELETE FROM subscriptions WHERE user_id = %s", (uid,))
-                cur.execute("DELETE FROM user_profiles WHERE user_id = %s", (uid,))
+                # NO user_profiles. It was the consumer plane's table, created by migration 025
+                # and deleted with that plane, so it is absent from `migrations/baseline/` — which
+                # is what a fresh install gets. This line therefore passed on the operator's
+                # database, whose 37 ordered migrations had created it years earlier, and errored
+                # every test in this file on any clone. Nothing under `tradeos/` reads the table.
                 cur.execute("UPDATE invites SET used_by=NULL, used_at=NULL WHERE used_by = %s",
                             (uid,))
                 cur.execute("UPDATE users SET referred_by=NULL WHERE referred_by = %s", (uid,))
