@@ -95,6 +95,12 @@ tradeos/migrations/035_receipts_seal_the_measurement.sql seals the ARITHMETIC an
 
 ### Tests — 4 files, 108 tests
 
+> **Count corrected 2026-09-24.** The 108 was the Receipts subset on this machine's database
+> before the extraction. The whole suite is now **390 passed, 2 skipped**, and it is that in
+> all three setups — a fresh clone on `migrations/baseline/`, a database carrying the 37
+> ordered migrations, and this instance. Every figure below is from 2026-09-13 and describes
+> the repository as it was then; they are left as measured rather than restated.
+
 ```
 tests/test_receipts.py        integrity against a live database
 tests/test_receipts_api.py    the routes
@@ -241,13 +247,14 @@ whole chain to `llm` and `explain/`. Worth doing *before* the deletion rather th
    asset.
 5. **Before deleting `presentation.py`:** `receipt_card_svg` has to go somewhere or the share card
    route dies.
-6. **After any deletion:** `make test` (108 Receipts tests must pass), then
-   `cli verify-chain convergence-v3` and `convergence-v4` — 323 and 150 links must come back intact.
+6. **After any deletion:** `make test` (390 passed, 2 skipped — see the note above; the 108 was
+   the Receipts subset in September 2026), then `cli verify-chain convergence-v3` and
+   `convergence-v4` — 323 and 150 links must come back intact.
 
 ## 5. The one-command health check
 
 ```bash
-make test                                                            # 108 receipts tests
+make test                                                            # 390 passed, 2 skipped
 docker compose exec -T api python -m tradeos.cli verify-chain convergence-v3   # 323 links
 docker compose exec -T api python -m tradeos.cli verify-chain convergence-v4   # 150 links
 curl -s localhost:8000/api/board | head -c 200                        # the landing route

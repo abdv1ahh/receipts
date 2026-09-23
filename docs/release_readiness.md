@@ -18,7 +18,7 @@ disagreed, reality is recorded and the plan is quoted.
 | Repository private | ✓ `abdv1ahh/tradeos`, `PRIVATE` |
 | `research_platform` → `845d689` | ✓ annotated tag `05065ec`, peels to `845d689` |
 | Tag pushed | ✓ present on `origin` |
-| Full suite | ✓ 990 passed, 2 skipped |
+| Full suite | ✓ 990 passed, 2 skipped (pre-extraction, on this instance) |
 | `make test-js` / `make lint` | ✓ both clean |
 | Three chains | ✓ v3 323 / `c9f480e0a79a28c7`, v4 150 / `24df0daed4f23ccd`, a-real-stranger 1 / `79de970e41a46b35` |
 | **Working tree clean** | **✗ — 4 modified, 1 untracked** |
@@ -289,7 +289,7 @@ owner's stack is untouched — three containers up, `tradeos_pgdata` and `tradeo
 | Repository | **private**, unchanged |
 | `research_platform` | `845d689`, on `origin`, untouched |
 | Working tree | clean |
-| `make test` | **390 passed, 2 skipped** |
+| `make test` | **390 passed, 2 skipped** — on a fresh clone, on the 37-migration shape, and on this instance |
 | `make lint` | **clean** |
 | `make test-js` | **passes**, including `export/check.mjs` |
 | Price guard | **4 passed** |
@@ -322,6 +322,77 @@ One decision is still the owner's and is called out in §K.6: whether to publish
 `research_platform` tag. `docs/research/insider_buying.md` tells a reader to check it out and
 reproduce the result, so if the tag stays private that document has to say so plainly rather than
 give commands nobody can run.
+
+---
+
+## Addendum, 2026-09-24 — the suite now passes on a clone, and did not
+
+Written after the release checks found it. Everything here was measured today.
+
+**What was wrong.** `make test` was quoted as **390 passed, 2 skipped**, and that number was true
+only on a database carrying the 37 ordered migrations. A fresh clone takes `migrations/baseline/`
+instead — 19 tables, by design — and scored **363 passed, 27 failed, 6 errors**. The figure had
+been measured in one setup and written down as though it described the other, which is the whole
+reason every number in this document now names the database it came from.
+
+**Three causes, all fixed, none of them the code under test.**
+
+1. **A teardown fixture deleted from `user_profiles`.** That table was the consumer plane's, created
+   by migration 025 and removed with that plane, so `migrations/baseline/` never creates it. Six
+   tests in `test_registration.py` errored in setup on any clone. Nothing under `tradeos/`
+   references the table — it was a stale line in a fixture, not a runtime bug.
+
+2. **`seed-house-records` could not run anywhere but this machine.** It read `claims` and
+   `claim_outcomes`, the retired signal plane's tables, which a fresh install does not create at
+   all — so the command raised `UndefinedTable`, and before that, on the 37-migration shape where
+   the tables exist and are empty, it printed `0 calls sealed … chain head 0000000000000000` and
+   exited 0. A report of success for having done nothing, in the codebase whose scheduler has an
+   alarm for exactly that.
+
+   It now falls back to the committed export, and **reproduces the published heads exactly**:
+   `convergence-v3` 323 links `c9f480e0a79a28c7`, `convergence-v4` 150 links `24df0daed4f23ccd`,
+   with 115H/167M/41I and 63H/67M/20I restored. `caller_id` is the first sealed field, so the
+   restore pins the caller ids the chain was sealed under (107 and 108) and moves the sequence past
+   them; a restore that does not reproduce the published head is refused outright and writes
+   nothing. Sealing is done from the exported TEXT, not from re-rendered database types, so the
+   payload bytes cannot drift. When there is genuinely nothing to import it says so and **exits 1**.
+
+   Two things had to change around it: the export now carries an `outcomes` array beside the chain
+   (the ten sealed fields alone cannot restate a verdict, so a restored board read 0 of 0), and the
+   Dockerfile now copies `export/` into the image, which it never did. The outcomes carry only
+   columns already in `calls._LIST_COLUMNS`; the six vendor price columns are not selectable there
+   and so cannot reach an export. `export_payload` is unchanged and still byte-identical to what
+   `/api/receipts/{handle}/chain` puts on the wire.
+
+3. **Eight scoring tests derived their fixtures from `prices_eod`.** They sliced whatever the live
+   table happened to hold, which made them depend on an Alpaca key, on how much history had been
+   ingested, and on today's date. They now read `tests/fixtures/prices_synthetic.json` — generated
+   by a closed form recorded inside the file, dated absolutely and in the past — through the
+   `synthetic_market` fixture in `tests/conftest.py`. Not vendor data, so gotcha 1 does not reach
+   it. A ninth test skipped whenever the database held no accounts, which meant the "one caller per
+   user" invariant went unchecked on every clone; it creates and removes its own user now.
+
+**Two other things the same pass fixed.** `docker-compose.yml` published the app on `0.0.0.0:8000`
+— every device on the network — while the database was correctly on `127.0.0.1`; both are on
+loopback now. And the README, the one file a stranger reads, said nothing about `COOKIE_SECURE`,
+which was documented in four other places.
+
+**Measured after, on three databases:**
+
+| database | `make test` | `make lint` | `make test-js` |
+|---|---|---|---|
+| fresh clone: `setup.sh` + `make quickstart` (baseline, 19 tables) | **390 passed, 2 skipped** | clean | passes |
+| operator shape: 37 ordered migrations (64 tables) | **390 passed, 2 skipped** | clean | passes |
+| this machine's live instance (474 calls) | **390 passed, 2 skipped** | clean | passes |
+
+Zero failures and zero errors in all three. The two skips are environment-conditional and each
+names a guard that does run. The live instance was unchanged by the run: 474 calls, 3 callers, 64
+tables, and all three chains verifying at their recorded heads.
+
+`make quickstart` now runs `seed-house-records`, which used to be printed as an optional extra
+because it only worked here. The board's own argument is that the first two records on it are ours
+and that they lose; an install whose board is empty of them makes a weaker claim than this product
+actually makes.
 
 ---
 
