@@ -1,5 +1,5 @@
 {
-  "exported_at": "2026-09-22T21:18:19.647502+00:00",
+  "exported_at": "2026-09-23T20:29:58.617522+00:00",
   "framing": "each field as name:byte-length-of-value:value, joined with newline; sha256 of (prev_hash + payload), hex",
   "sealed_fields": [
     "caller_id",
@@ -15,13 +15,13 @@
   ],
   "files": {
     "convergence-v3.json": {
-      "sha256": "eda5ee2a7e06ce34f14b399ba13ba0a8cf6a0cfa3b54a37dedfbfd9025d1f01a",
+      "sha256": "7348fae3cddf7c0022b81f91f0ad38145fb5f7d9efb98534004e1e9886d39902",
       "links": 323,
       "head": "c9f480e0a79a28c73f149eec3c083a0d436169812471c7b5c4d94f613b6ef5f1",
       "sealed_after_the_outcome_was_known": true
     },
     "convergence-v4.json": {
-      "sha256": "ee74a740674f7ae7e0f600a6ccd5f9fe3edf87da65ab29f2d044ab114695eb7b",
+      "sha256": "db95964d4de354cc732b6657c28b379ba96a82605dfcfa0945e73e3dd58f0c6c",
       "links": 150,
       "head": "24df0daed4f23ccde198744a376cbae5f43f35fd611dc4288265e75679fee2d5",
       "sealed_after_the_outcome_was_known": true

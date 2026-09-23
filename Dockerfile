@@ -48,6 +48,12 @@ COPY requirements.txt .
 # enough to stop being read.
 RUN pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir -r requirements.txt
 COPY tradeos ./tradeos
+# The house records' committed export, 940K. It ships in the image because `cli
+# seed-house-records` restores from it: `claims` is the retired signal plane's table, it is in the
+# schema and it is empty everywhere but the operator's own database, so on every other install the
+# export IS the record. Without this line the command finds nothing and a fresh board has no house
+# record at all — which is how it behaved, silently, reporting success.
+COPY export ./export
 COPY --from=web /src/frontend/dist ./tradeos/static
 # run as a non-root user (production additionally pins the base image by digest)
 RUN useradd --create-home --uid 10001 appuser && chown -R appuser:appuser /app

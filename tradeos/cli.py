@@ -314,14 +314,30 @@ def cmd_seed_house_records(_args) -> None:
     from .receipts.seed import seed_house_records
     with db.connect() as conn:
         out = seed_house_records(conn)
+    failed = False
     for handle, result in out.items():
         if result.get("skipped"):
             print(f"seed-house-records {handle}: skipped, {result['existing_calls']} calls already "
                   f"sealed (an append only record is never imported twice)")
+        elif not result.get("sealed"):
+            # SAY SO, AND FAIL. This used to print `0 calls sealed ... chain head 0000...` and exit
+            # 0, which is a report of success for having done nothing — on a fresh clone, every
+            # time, because the table it reads ships empty. An operator who cannot tell "imported
+            # 473" from "imported nothing" by the exit code has no gate to put in a script.
+            failed = True
+            print(f"seed-house-records {handle}: NOTHING WAS SEALED. {result['reason']}")
         else:
-            print(f"seed-house-records {handle}: {result['imported']} calls sealed "
+            src = result.get("source")
+            where = {"claims": "from the signal engine's ledger",
+                     "export": "from this record's committed export"}.get(src, "")
+            still_open = f", {result['open']} open" if result.get("open") else ""
+            print(f"seed-house-records {handle}: {result['sealed']} calls sealed {where} "
                   f"({result['hit']}H/{result['miss']}M/{result['inconclusive']}I/"
-                  f"{result['unscoreable']}U), chain head {result['chain_head'][:16]}")
+                  f"{result['unscoreable']}U{still_open}), chain head "
+                  f"{result['chain_head'][:16]}  [SEALED BACKTEST — imported already scored, "
+                  f"after the outcomes were known]")
+    if failed:
+        raise SystemExit(1)
 
 
 def cmd_resolve_calls(args) -> None:
@@ -421,6 +437,7 @@ def cmd_export_records(args) -> None:
     calls are unedited, and the manifest proves the FILES are the ones that were exported — which
     is the different question somebody downloading a zip actually has.
     """
+    from .receipts import calls as calls_mod
     from .receipts import chain, record
     out = pathlib.Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -432,6 +449,13 @@ def cmd_export_records(args) -> None:
             if not caller:
                 raise SystemExit(f"no caller @{handle}")
             payload = chain.export_payload(caller, conn)
+            # The chain proves nothing was edited; the outcomes are what the record SAYS. Added
+            # alongside rather than inside `export_payload`, which is byte-identical to what
+            # `/api/receipts/{handle}/chain` puts on the wire and must stay that way — the browser
+            # verifier and `check.mjs` read the same shape, and a third variant of a frozen format
+            # is the liability this project keeps refusing. A checker ignores the extra key; a
+            # restore needs it, because without it a re-seeded board reads 0 of 0.
+            payload["outcomes"] = calls_mod.outcomes(caller["id"], conn)
             path = out / f"{handle}.json"
             path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n")
             written.append((handle, len(payload["links"]), payload["head"]))

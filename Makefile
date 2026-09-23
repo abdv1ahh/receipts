@@ -30,13 +30,18 @@ quickstart:
 	docker compose up -d --build
 	$(X) migrate
 	$(X) ingest-prices --universe --start $$(python3 -c "import datetime;print(datetime.date.today()-datetime.timedelta(days=30))")
+# Not optional, and it used to be. The board's own argument is that the first two records on it are
+# OURS and that they lose; an install whose board is empty of them is making a weaker claim than
+# this product actually makes. It was optional because it only worked on the operator's machine —
+# it read the deleted signal plane's tables and, everywhere else, sealed nothing while reporting
+# success. It now restores from the committed export and reproduces the published head, so there
+# is no longer a reason to leave it out.
+	$(X) seed-house-records
 	@echo ""
 	@echo "Ready at http://localhost:8000 — register, claim a handle, publish a call."
 	@echo "Every US-listed symbol Alpaca quotes is publishable; run the line below whenever you"
 	@echo "want deeper history (about 3.5 hours for a full year, and nothing needs it to work):"
 	@echo "  docker compose exec -T api python -m tradeos.cli ingest-prices --universe --start 2024-01-01"
-	@echo "Optional, to put our own 473-call record on your board:"
-	@echo "  docker compose exec api python -m tradeos.cli seed-house-records"
 
 # tests/ is deliberately NOT copied into the image (test files have no business in a production
 # artifact), so the suite runs against a mount. `make test` used to fail with "file or directory

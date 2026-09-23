@@ -448,6 +448,37 @@ def for_chain(caller_id: int, conn: psycopg.Connection) -> list[dict]:
                 for r in cur.fetchall()]
 
 
+# What the RECORD SHOWS about a resolved call, for an export that has to rebuild a board rather
+# than only re-verify a chain. Every name here is already in `_LIST_COLUMNS`, which is the list
+# that decides what may leave this module at all — so the six vendor price columns cannot reach an
+# export by being added here, because they are not selectable in the first place.
+#
+# This exists because the chain alone is not the record. `export_payload` carries the ten sealed
+# fields, which is exactly right for proving nothing was edited and useless for answering "what
+# was the hit rate": the outcome is measured after the commitment and is deliberately not sealed.
+# An export that cannot restate the verdicts is an export that cannot reconstitute the record it
+# claims to preserve, and `seed-house-records` on a fresh clone proved it — 473 calls, every one
+# unresolved, a board reading 0 of 0.
+_OUTCOME_COLUMNS = ("seq", "entry_session", "exit_session", "excess_return", "verdict",
+                    "verdict_note", "resolved_at", "open_reason_code", "open_reason")
+
+
+def outcomes(caller_id: int, conn: psycopg.Connection) -> list[dict]:
+    """One caller's resolutions, keyed by seq, in the shape an export restores from."""
+    with conn.cursor() as cur:
+        cur.execute(sql.SQL("SELECT {cols} FROM calls WHERE caller_id = %s ORDER BY seq").format(
+            cols=sql.SQL(", ").join(map(sql.Identifier, _OUTCOME_COLUMNS))), (caller_id,))
+        rows = cur.fetchall()
+    out = []
+    for r in rows:
+        d = dict(zip(_OUTCOME_COLUMNS, r, strict=True))
+        for k in ("entry_session", "exit_session", "resolved_at"):
+            d[k] = d[k].isoformat() if d[k] is not None else None
+        d["excess_return"] = float(d["excess_return"]) if d["excess_return"] is not None else None
+        out.append(d)
+    return out
+
+
 def get(call_id: int, conn: psycopg.Connection) -> dict | None:
     with conn.cursor() as cur:
         cur.execute(sql.SQL("SELECT {cols} FROM calls WHERE id = %s").format(cols=_LIST_COLUMNS),
